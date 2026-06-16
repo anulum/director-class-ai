@@ -85,9 +85,7 @@ class TestActionFusionFailClosed:
         assert v.allow is True
 
     def test_critical_severity_escalates_to_human(self) -> None:
-        v = fuse(
-            [sig(Plane.ACTION, 0.95, sev=Severity.CRITICAL, locus=Locus.ACTION)]
-        )
+        v = fuse([sig(Plane.ACTION, 0.95, sev=Severity.CRITICAL, locus=Locus.ACTION)])
         assert v.allow is False
         assert v.requires_human is True
         assert "human" in v.rationale.lower()

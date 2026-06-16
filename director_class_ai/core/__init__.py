@@ -8,6 +8,7 @@
 
 """Plane-agnostic detector signal, fusion, and (forthcoming) ensemble runner."""
 
+from .ensemble import ParallelEnsembleScorer
 from .fusion import FusionPolicy, Verdict, fuse
 from .signal import (
     Detector,
@@ -27,6 +28,7 @@ __all__ = [
     "FusionMode",
     "FusionPolicy",
     "Locus",
+    "ParallelEnsembleScorer",
     "Plane",
     "Severity",
     "Span",

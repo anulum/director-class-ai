@@ -112,9 +112,7 @@ def fuse(
         risk = max(s.weighted_score for s in action_signals)
         plane_risk[Plane.ACTION] = risk
         objectors = [
-            s
-            for s in action_signals
-            if s.weighted_score >= policy.action_block_threshold
+            s for s in action_signals if s.weighted_score >= policy.action_block_threshold
         ]
         if objectors:
             allow = False
