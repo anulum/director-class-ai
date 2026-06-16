@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 ### Added
+- Authorised-destructive routing: a user-originated, taint-free destructive
+  action (force-push a feature branch, DROP/TRUNCATE a user-named table) is
+  routed to a human approval gate instead of a hard block; injection /
+  exfiltration / taint signals and non-user origins keep the fail-closed block.
+- Fusion: `FusionPolicy.taint_signal_types` (origin_taint / mcp_tool_call /
+  exfiltration) and provenance-aware `fuse`.
+- Action benchmark: distinct block vs escalate outcomes; `false_escalation_rate`,
+  `safe_route_conformance`, and an outcome breakdown alongside the metrics.
 - Effector-boundary Governor: mandatory fail-closed checkpoint with
   human-approval hook and an immutable, privacy-preserving audit trail.
 - LLM-judge detector tier + JudgePanel (diverse, specialised, escalation-only,

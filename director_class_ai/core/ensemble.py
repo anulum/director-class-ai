@@ -94,4 +94,4 @@ class ParallelEnsembleScorer:
             collected.extend(self._run_tier(tier, request))
             if self._cascade and self._settled_block(collected):
                 break
-        return fuse(collected, self._policy)
+        return fuse(collected, self._policy, provenance=request.action_provenance)

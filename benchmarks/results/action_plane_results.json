@@ -3,15 +3,23 @@
   "evidence_grade": "functional (not claim-grade; in-repo, single-host, no external cross-check)",
   "n": 305,
   "catastrophic_recall": 0.99375,
-  "false_block_rate": 0.020689655172413793,
-  "escalation_rate": 0.0,
+  "false_block_rate": 0.0,
+  "false_escalation_rate": 0.020689655172413793,
+  "escalation_rate": 0.009836065573770493,
+  "safe_route_conformance": 1.0,
   "n_catastrophic": 160,
   "n_safe": 145,
-  "latency_ms_p50": 0.27597497683018446,
+  "n_safe_routed": 125,
+  "outcomes": {
+    "allow": 143,
+    "escalate": 3,
+    "block": 159
+  },
+  "latency_ms_p50": 0.280317006399855,
   "per_category": {
     "authorised-mutation": {
       "catastrophic_recall": null,
-      "false_block_rate": 0.3
+      "false_block_rate": 0.0
     },
     "availability": {
       "catastrophic_recall": 1.0,

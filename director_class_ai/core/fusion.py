@@ -67,6 +67,17 @@ class FusionPolicy:
     # human. A split judge panel lands here, which is exactly when a person should
     # look. Set to 0 to disable borderline escalation.
     uncertainty_margin: float = 0.15
+    # Action signal types whose danger is injection / exfiltration / structural
+    # taint rather than an inherently-destructive but potentially user-authorised
+    # operation. An action carrying one of these is never downgraded from a hard
+    # block to a human-approval escalation on the strength of "the user asked": a
+    # tainted argument, an untrusted origin, or a data-exfiltration shape is the
+    # threat the action plane exists to stop, not an authorised op.
+    taint_signal_types: frozenset[str] = field(
+        default_factory=lambda: frozenset(
+            {"origin_taint", "mcp_tool_call", "exfiltration"}
+        )
+    )
     plane_mode: dict[Plane, FusionMode] = field(
         default_factory=lambda: {
             Plane.CONTENT: FusionMode.FAIL_OPEN,
@@ -79,11 +90,39 @@ class FusionPolicy:
         """Fuse content/integrity signals — calibrated noisy-OR by default."""
         return _noisy_or([s.weighted_score for s in signals])
 
+    def user_authorised_destructive(
+        self, objectors: Sequence[DetectorSignal], provenance: str
+    ) -> bool:
+        """True when a destructive action is the user's own request, taint-free.
+
+        The action plane blocks destructive commands by default. But when the
+        request is *explicitly user-originated* (``provenance == "user"``) and none
+        of the objecting signals is an injection / exfiltration / structural-taint
+        class — i.e. the objection is purely that the operation is inherently
+        destructive (drop a table the user named, force-push the user's own branch)
+        — the proportionate control is a human approval gate, not an unrecoverable
+        hard block. A tainted argument, an untrusted origin, or an exfiltration
+        shape is never "authorised" this way and keeps the hard block regardless of
+        provenance.
+        """
+        if provenance.strip().lower() != "user":
+            return False
+        return not any(s.signal_type in self.taint_signal_types for s in objectors)
+
 
 def fuse(
-    signals: Sequence[DetectorSignal], policy: FusionPolicy | None = None
+    signals: Sequence[DetectorSignal],
+    policy: FusionPolicy | None = None,
+    *,
+    provenance: str = "",
 ) -> Verdict:
-    """Resolve parallel detector signals into one verdict across planes."""
+    """Resolve parallel detector signals into one verdict across planes.
+
+    ``provenance`` is the request's ``action_provenance`` (``"user"`` when a human
+    explicitly originated the action). It gates authorised-destructive routing: a
+    user-originated, taint-free destructive action is escalated to a human rather
+    than hard-blocked. Defaulting to ``""`` keeps every existing caller fail-closed.
+    """
     policy = policy or FusionPolicy()
     by_plane: dict[Plane, list[DetectorSignal]] = {}
     for sig in signals:
@@ -127,14 +166,25 @@ def fuse(
             s for s in action_signals if s.weighted_score >= policy.action_block_threshold
         ]
         if objectors:
-            allow = False
             firing.extend(objectors)
-            reasons.append(
-                f"action blocked: {len(objectors)} objector(s), risk {risk:.2f}"
-            )
-            if any(s.severity >= Severity.CRITICAL for s in objectors):
+            if policy.user_authorised_destructive(objectors, provenance):
+                # User-originated, taint-free destructive op: route to a human
+                # approval gate instead of a dead hard block. ``allow`` is left
+                # untouched, so a content/integrity objection that already blocked
+                # still wins — only the action-plane verdict softens to escalation.
                 requires_human = True
-                reasons.append("CRITICAL severity → human approval required")
+                reasons.append(
+                    f"action escalated: user-authorised destructive op, "
+                    f"{len(objectors)} objector(s), risk {risk:.2f} → human approval"
+                )
+            else:
+                allow = False
+                reasons.append(
+                    f"action blocked: {len(objectors)} objector(s), risk {risk:.2f}"
+                )
+                if any(s.severity >= Severity.CRITICAL for s in objectors):
+                    requires_human = True
+                    reasons.append("CRITICAL severity → human approval required")
         elif borderline(risk, policy.action_block_threshold):
             requires_human = True
             reasons.append(f"action risk {risk:.2f} borderline → human approval")

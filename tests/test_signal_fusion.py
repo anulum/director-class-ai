@@ -20,13 +20,22 @@ from director_class_ai.core import (
 )
 
 
-def sig(plane, score, *, sev=Severity.MEDIUM, calib=1.0, locus=Locus.RESPONSE, name="d"):
+def sig(
+    plane,
+    score,
+    *,
+    sev=Severity.MEDIUM,
+    calib=1.0,
+    locus=Locus.RESPONSE,
+    name="d",
+    stype="t",
+):
     return DetectorSignal(
         detector=name,
         plane=plane,
         score=score,
         locus=locus,
-        signal_type="t",
+        signal_type=stype,
         severity=sev,
         calibration=calib,
     )
@@ -94,6 +103,81 @@ class TestActionFusionFailClosed:
         policy = FusionPolicy(action_block_threshold=0.8)
         v = fuse([sig(Plane.ACTION, 0.5, locus=Locus.ACTION)], policy)
         assert v.allow is True  # 0.5 < 0.8 custom block threshold
+
+
+class TestAuthorisedDestructiveRouting:
+    """A user-originated, taint-free destructive op escalates instead of hard-blocking.
+
+    The whole point is recoverability: a hard block on an op the user explicitly
+    asked for is a dead end, so it is routed to a human approval gate — but only
+    when the origin is the user and no injection / exfiltration / taint signal
+    fired. Every other path keeps the fail-closed hard block.
+    """
+
+    def _destructive(self, *, sev=Severity.HIGH, stype="history_rewrite"):
+        return sig(Plane.ACTION, 0.9, sev=sev, locus=Locus.ACTION, stype=stype)
+
+    def test_user_authorised_destructive_escalates_not_blocks(self) -> None:
+        v = fuse([self._destructive()], provenance="user")
+        assert v.allow is True
+        assert v.requires_human is True
+        assert "user-authorised" in v.rationale and "escalat" in v.rationale
+
+    def test_critical_user_authorised_also_escalates(self) -> None:
+        v = fuse([self._destructive(sev=Severity.CRITICAL, stype="sql_drop")],
+                 provenance="user")
+        assert v.allow is True
+        assert v.requires_human is True
+
+    def test_unknown_provenance_still_hard_blocks(self) -> None:
+        # The default empty provenance must stay fail-closed (no silent softening).
+        v = fuse([self._destructive()])
+        assert v.allow is False
+        assert v.requires_human is False
+
+    def test_untrusted_provenance_still_hard_blocks(self) -> None:
+        v = fuse([self._destructive()], provenance="retrieved")
+        assert v.allow is False
+
+    def test_user_origin_with_taint_signal_still_blocks(self) -> None:
+        # provenance says "user" but a taint-class objector fired (e.g. a tainted
+        # MCP argument): the danger is injection, not an authorised op → hard block.
+        objectors = [
+            self._destructive(sev=Severity.CRITICAL, stype="sql_drop"),
+            sig(Plane.ACTION, 0.85, sev=Severity.HIGH, locus=Locus.ACTION,
+                stype="mcp_tool_call"),
+        ]
+        v = fuse(objectors, provenance="user")
+        assert v.allow is False
+
+    def test_exfiltration_signal_never_authorised(self) -> None:
+        v = fuse(
+            [sig(Plane.ACTION, 0.9, sev=Severity.HIGH, locus=Locus.ACTION,
+                 stype="exfiltration")],
+            provenance="user",
+        )
+        assert v.allow is False
+
+    def test_content_block_is_not_resurrected_by_action_escalation(self) -> None:
+        # A content objection that already blocked must win — softening the action
+        # verdict to escalation does not allow the request through.
+        v = fuse(
+            [sig(Plane.CONTENT, 0.9), self._destructive()],
+            provenance="user",
+        )
+        assert v.allow is False
+        assert v.requires_human is True
+
+    def test_provenance_match_is_case_insensitive(self) -> None:
+        v = fuse([self._destructive()], provenance="  USER ")
+        assert v.allow is True and v.requires_human is True
+
+    def test_taint_set_is_policy_tunable(self) -> None:
+        # Treat history_rewrite as taint-class via policy → it can no longer be
+        # authorised, so it hard-blocks even from the user.
+        policy = FusionPolicy(taint_signal_types=frozenset({"history_rewrite"}))
+        v = fuse([self._destructive()], policy, provenance="user")
+        assert v.allow is False
 
 
 class TestVerdictShape:

@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from director_class_ai.action import DestructiveCommandDetector
+from director_class_ai.action import DestructiveCommandDetector, OriginTaintDetector
 from director_class_ai.core import (
     DetectorSignal,
     EvaluationRequest,
@@ -102,3 +102,48 @@ def test_digest_is_stable_for_same_request() -> None:
     a = gov.review(EvaluationRequest(action="rm -rf /tmp/x")).record.request_digest
     b = gov.review(EvaluationRequest(action="rm -rf /tmp/x")).record.request_digest
     assert a == b
+
+
+def _action_governor(**kw) -> Governor:
+    ensemble = ParallelEnsembleScorer(
+        [DestructiveCommandDetector(), OriginTaintDetector()]
+    )
+    return Governor(ensemble=ensemble, **kw)
+
+
+_USER_DROP = EvaluationRequest(
+    action="DROP TABLE staging_import;",
+    query="drop the staging_import table",
+    action_provenance="user",
+)
+
+
+def test_user_authorised_destructive_escalates_not_hard_blocks() -> None:
+    d = _action_governor().review(_USER_DROP)
+    # No approver: fail-closed, so still not permitted — but escalated, not a dead
+    # hard block. The audit record carries the human-review flag.
+    assert d.escalated is True
+    assert d.permitted is False
+    assert d.record.requires_human is True
+    assert "sql_drop" in d.record.firing
+
+
+def test_user_authorised_destructive_proceeds_once_approved() -> None:
+    d = _action_governor(approval=lambda _v, _r: True).review(_USER_DROP)
+    assert d.escalated is True and d.permitted is True
+
+
+def test_injected_destructive_hard_blocks_never_escalates() -> None:
+    # Same DROP, but sourced from retrieved content (injection): origin taint fires,
+    # so it is a hard block — an approver is never even consulted.
+    consulted = []
+    d = _action_governor(approval=lambda _v, _r: consulted.append(1) or True).review(
+        EvaluationRequest(
+            action="DROP TABLE audit_log;",
+            query="report the row counts",
+            action_provenance="retrieved",
+        )
+    )
+    assert d.permitted is False
+    assert d.escalated is False
+    assert not consulted, "a hard block must not consult the approver"
