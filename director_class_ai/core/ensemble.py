@@ -34,6 +34,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 
+from .calibration import CalibrationRegistry
 from .fusion import FusionPolicy, Verdict, fuse
 from .signal import Detector, DetectorSignal, EvaluationRequest, Plane, Severity
 
@@ -48,6 +49,7 @@ class ParallelEnsembleScorer:
         detectors: Sequence[Detector],
         *,
         policy: FusionPolicy | None = None,
+        calibration: CalibrationRegistry | None = None,
         max_workers: int | None = None,
         cascade: bool = True,
     ) -> None:
@@ -55,6 +57,7 @@ class ParallelEnsembleScorer:
             raise ValueError("at least one detector is required")
         self._detectors = list(detectors)
         self._policy = policy or FusionPolicy()
+        self._calibration = calibration
         self._max_workers = max_workers
         self._cascade = cascade
         self._tiers = sorted({d.tier for d in self._detectors})
@@ -63,10 +66,14 @@ class ParallelEnsembleScorer:
         members = [d for d in self._detectors if d.tier == tier]
         if len(members) == 1:
             sig = members[0].evaluate(request)
-            return [sig] if sig is not None else []
-        with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
-            results = pool.map(lambda d: d.evaluate(request), members)
-        return [s for s in results if s is not None]
+            signals = [sig] if sig is not None else []
+        else:
+            with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
+                results = pool.map(lambda d: d.evaluate(request), members)
+            signals = [s for s in results if s is not None]
+        if self._calibration is not None:
+            signals = [self._calibration.apply(s) for s in signals]
+        return signals
 
     def _settled_block(self, signals: Sequence[DetectorSignal]) -> bool:
         """True when a confident high-severity action objection already blocks.

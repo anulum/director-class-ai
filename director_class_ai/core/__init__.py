@@ -8,6 +8,7 @@
 
 """Plane-agnostic detector signal, fusion, and (forthcoming) ensemble runner."""
 
+from .calibration import CalibrationRegistry, PlattCalibrator, fit_platt
 from .ensemble import ParallelEnsembleScorer
 from .fusion import FusionPolicy, Verdict, fuse
 from .signal import (
@@ -23,6 +24,9 @@ from .signal import (
 
 __all__ = [
     "Detector",
+    "fit_platt",
+    "PlattCalibrator",
+    "CalibrationRegistry",
     "DetectorSignal",
     "EvaluationRequest",
     "FusionMode",
