@@ -11,6 +11,7 @@
 from .calibration import CalibrationRegistry, PlattCalibrator, fit_platt
 from .ensemble import ParallelEnsembleScorer
 from .fusion import FusionPolicy, Verdict, fuse
+from .governor import AuditRecord, Decision, Governor
 from .signal import (
     Detector,
     DetectorSignal,
@@ -24,6 +25,9 @@ from .signal import (
 
 __all__ = [
     "Detector",
+    "Governor",
+    "Decision",
+    "AuditRecord",
     "fit_platt",
     "PlattCalibrator",
     "CalibrationRegistry",

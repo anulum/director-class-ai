@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 ### Added
+- Effector-boundary Governor: mandatory fail-closed checkpoint with
+  human-approval hook and an immutable, privacy-preserving audit trail.
+- LLM-judge detector tier + JudgePanel (diverse, specialised, escalation-only,
+  self-consistency); raises risk only, never clears a deterministic block.
+- Fusion uncertainty band: borderline / split-panel risk escalates to a human.
 - Plane-agnostic detector signal and protocol (content / integrity / action).
 - Plane-aware fusion: fail-open content, fail-closed action with human escalation.
 - ParallelEnsembleScorer: concurrent, tiered detector dispatch.
