@@ -1,8 +1,27 @@
-Director-Class AI — Commercial License (identifier pending)
-
+Director-Class AI — Proprietary Commercial License
 Copyright (c) 1996-2026 Miroslav Šotek (Anulum Fortis). All rights reserved.
 
-This is a proprietary commercial product and is NOT part of the Apache-2.0
-"director-ai" base distribution. No licence to use, copy, modify, or distribute
-is granted by this file; the final commercial licence terms are pending and will
-replace this notice before release. Contact protoscience@anulum.li.
+1. OWNERSHIP. This software, including its source code, models, designs, and
+   documentation ("the Software"), is proprietary and confidential. It is NOT
+   open-source and is NOT part of the Apache-2.0 "director-ai" distribution.
+
+2. NO LICENSE BY ACCESS. Being able to view this source — including if this
+   repository is made publicly visible for evaluation or transparency — grants
+   NO licence. Source visibility is not a grant of rights. No right to use, run
+   in production, copy, modify, create derivative works of, sublicense, or
+   distribute the Software is granted except under a separate written commercial
+   agreement (EULA) signed with the copyright holder.
+
+3. EVALUATION. Where access is granted, you may read the source and run it in a
+   non-production evaluation environment for the sole purpose of assessing a
+   commercial licence. All other uses require a paid commercial licence.
+
+4. NO WARRANTY. The Software is provided "AS IS", without warranty of any kind.
+   It is a safety-assistance tool and is not a substitute for human oversight of
+   autonomous or mission-critical systems; the copyright holder is not liable for
+   any damages arising from its use.
+
+5. CONTACT. Commercial licensing: protoscience@anulum.li (www.anulum.li).
+
+Final EULA terms are subject to a signed commercial agreement and may supersede
+this notice.

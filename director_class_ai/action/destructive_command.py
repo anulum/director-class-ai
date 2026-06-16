@@ -197,9 +197,10 @@ class DestructiveCommandDetector:
         normalised = re.sub(r"\s+", " ", command)
         best: _Rule | None = None
         for rule in _RULES:
-            if rule.pattern.search(normalised):
-                if best is None or rule.severity > best.severity:
-                    best = rule
+            if rule.pattern.search(normalised) and (
+                best is None or rule.severity > best.severity
+            ):
+                best = rule
         if best is None:
             return None
         return DetectorSignal(

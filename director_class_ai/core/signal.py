@@ -106,7 +106,7 @@ class EvaluationRequest:
     context: str = ""
     action: str = ""  # the concrete effector command/payload, if any
     tenant_id: str = ""
-    metadata: dict = field(default_factory=dict)
+    metadata: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

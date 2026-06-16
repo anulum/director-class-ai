@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "director-class-ai"
-version = "0.0.0"
+version = "0.1.0"
 description = "High-assurance multi-detector governance for autonomous and mission-critical systems"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,7 +23,13 @@ dependencies = []
 # Content/integrity detectors reuse the director-ai model primitives during
 # development; pinned as an explicit dependency on extraction.
 detectors = ["director-ai>=3.15"]
-dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=5",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "bandit>=1.7",
+]
 
 [tool.setuptools.packages.find]
 include = ["director_class_ai*"]
@@ -31,3 +37,30 @@ include = ["director_class_ai*"]
 [tool.ruff]
 line-length = 90
 target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "C4"]
+
+[tool.pytest.ini_options]
+addopts = "--cov=director_class_ai --cov-report=term-missing --cov-fail-under=97 --strict-markers"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["director_class_ai"]
+
+[tool.coverage.report]
+fail_under = 97
+show_missing = true
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "\\.\\.\\.", "raise NotImplementedError"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+files = ["director_class_ai"]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
