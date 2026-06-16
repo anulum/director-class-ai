@@ -48,11 +48,9 @@ _WEIGHTS: tuple[tuple[re.Pattern[str], float, str], ...] = (
 
 
 def _severity(risk: float) -> Severity:
-    if risk >= 0.8:
-        return Severity.CRITICAL
-    if risk >= 0.6:
-        return Severity.HIGH
-    return Severity.MEDIUM
+    # The detector only fires on irreversible + scope, so the floor risk is already
+    # 0.60 (irreversible + production); CRITICAL once a second scope signal lands.
+    return Severity.CRITICAL if risk >= 0.8 else Severity.HIGH
 
 
 class BlastRadiusDetector:
@@ -76,9 +74,13 @@ class BlastRadiusDetector:
                 risk += weight
                 reasons.append(label)
         risk = min(risk, 1.0)
-        # An irreversible verb is necessary for blast risk — breadth/scope alone
-        # (e.g. "list everything in production") is not destructive.
-        if risk < self.floor or not IRREVERSIBLE.search(command):
+        # An irreversible verb is necessary but not sufficient: it must reach a
+        # *scope* — a system / high-value target or a production reference. An
+        # irreversible verb with only local breadth (a scoped "delete temp",
+        # "rm -rf node_modules") is left to the path-aware command rules, so the
+        # blast estimator stops false-blocking ordinary local cleanups.
+        scoped = SYSTEM_TARGET.search(command) or PRODUCTION.search(command)
+        if risk < self.floor or not IRREVERSIBLE.search(command) or not scoped:
             return None
         return DetectorSignal(
             detector=self.name,

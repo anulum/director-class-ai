@@ -42,7 +42,7 @@ CATASTROPHIC_CRITICAL = [
 ]
 
 HIGH = [
-    "rm -rf /var/tmp/cache",
+    "rm -rf /opt/app/releases",  # absolute, non-scratch path
     "shutdown -h now",
     "reboot",
     "chmod -R 777 /etc",
@@ -59,6 +59,11 @@ SAFE = [
     "ls -la",
     "rm file.txt",
     "rm -f stale.log",  # force but not recursive, no root/wildcard
+    "rm -rf node_modules",  # recursive but project-local — an ordinary cleanup
+    "rm -rf ./build",
+    "rm -rf dist/",
+    "rm -rf /tmp/cache/session",  # scratch space
+    "rm -rf /var/tmp/build-out",
     "cat README.md",
     "SELECT * FROM users WHERE id = 1;",
     "DELETE FROM users WHERE id = 42;",
@@ -109,7 +114,43 @@ def test_whitespace_and_flag_variants_normalised() -> None:
 
 
 def test_rationale_is_populated() -> None:
-    assert "force-delete" in detect("rm -rf /tmp/x").rationale
+    assert "force-delete" in detect("rm -rf /etc/app").rationale
+
+
+class TestPathAwareRm:
+    def test_root_and_home_and_wildcard_are_critical(self) -> None:
+        for cmd in ("rm -rf /", "rm -rf ~", "rm -rf /*", "rm -rf .", "rm -rf /root/*"):
+            assert detect(cmd).severity is Severity.CRITICAL, cmd
+
+    def test_absolute_system_path_is_high(self) -> None:
+        for cmd in ("rm -rf /etc", "rm -rf /var/lib/data", "rm -rf /opt/x"):
+            sig = detect(cmd)
+            assert sig is not None and sig.severity is Severity.HIGH, cmd
+
+    def test_long_flags_in_any_order_detected_as_recursive(self) -> None:
+        # the force flag is evaluated before the recursive one — both orders work
+        assert detect("rm --force --recursive /etc").severity is Severity.HIGH
+
+    def test_project_local_and_scratch_paths_clear(self) -> None:
+        for cmd in (
+            "rm -rf node_modules",
+            "rm -rf ./build",
+            "rm -rf dist/",
+            "rm -rf .pytest_cache",
+            "rm -rf /tmp/scratch",
+            "rm -rf /var/tmp/x",
+        ):
+            assert detect(cmd) is None, cmd
+
+    def test_non_recursive_rm_is_not_classified(self) -> None:
+        assert detect("rm secrets.env") is None
+        assert detect("rm -f one.log") is None
+
+    def test_parent_traversal_is_high(self) -> None:
+        assert detect("rm -rf ../sibling").severity is Severity.HIGH
+
+    def test_obfuscated_recursive_root_rm_still_critical(self) -> None:
+        assert detect("r''m -rf /").severity is Severity.CRITICAL
 
 
 def test_end_to_end_blocks_and_escalates_via_ensemble() -> None:

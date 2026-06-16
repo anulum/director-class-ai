@@ -54,26 +54,11 @@ def _rx(pattern: str) -> re.Pattern[str]:
 
 
 # Ordered by descending severity within a family; the highest-severity match wins.
+# Note: recursive ``rm`` is handled by the path-aware classifier below, not a rule,
+# so a scoped local cleanup (``rm -rf node_modules``) is not blocked while a system
+# / root / wildcard delete still is.
 _RULES: tuple[_Rule, ...] = (
     # ── shell: irreversible mass destruction ───────────────────────────────────
-    _Rule(
-        _rx(
-            r"\brm\s+(?:-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r|--recursive\s+--force|"
-            r"--force\s+--recursive)\b.*(?:\s/(?:\s|\*|$)|\s~|\s\*|\s\.\s*$)"
-        ),
-        "destructive_command",
-        Severity.CRITICAL,
-        "recursive force-delete of a root / home / wildcard path",
-    ),
-    _Rule(
-        _rx(
-            r"\brm\s+(?:-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r|--recursive\s+--force|"
-            r"--force\s+--recursive)\b"
-        ),
-        "destructive_command",
-        Severity.HIGH,
-        "recursive force-delete",
-    ),
     _Rule(
         _rx(r":\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:"),
         "fork_bomb",
@@ -162,10 +147,10 @@ _RULES: tuple[_Rule, ...] = (
     ),
     # ── infrastructure / cloud ─────────────────────────────────────────────────
     _Rule(
-        _rx(r"\bterraform\s+destroy\b"),
+        _rx(r"\b(?:terraform|pulumi)\s+destroy\b"),
         "infra_teardown",
         Severity.CRITICAL,
-        "terraform destroy tears down managed infrastructure",
+        "terraform / pulumi destroy tears down managed infrastructure",
     ),
     _Rule(
         _rx(r"\bkubectl\s+delete\b.*(?:--all\b|\bnamespace\b)"),
@@ -252,6 +237,12 @@ _RULES: tuple[_Rule, ...] = (
         "recursive Windows directory removal",
     ),
     _Rule(
+        _rx(r"\bformat\s+[a-z]:"),
+        "filesystem_format",
+        Severity.CRITICAL,
+        "format of a Windows drive",
+    ),
+    _Rule(
         _rx(r"\bcipher\s+/w\b"),
         "disk_overwrite",
         Severity.HIGH,
@@ -259,10 +250,13 @@ _RULES: tuple[_Rule, ...] = (
     ),
     # ── package-manager mass removal ───────────────────────────────────────────
     _Rule(
-        _rx(r"\bpip\s+uninstall\b[^\n]*\s-r\b|\bnpm\s+uninstall\s+(?:-g|--global)\b"),
+        _rx(
+            r"\bpip\s+uninstall\b[^\n]*\s-r\b|\bnpm\s+uninstall\s+(?:-g|--global)\b"
+            r"|\bapt(?:-get)?\s+(?:remove|purge|autoremove)\b[^\n]*--purge\b"
+        ),
         "dependency_removal",
         Severity.HIGH,
-        "bulk / global package uninstall",
+        "bulk / global / purging package removal",
     ),
 )
 
@@ -273,6 +267,59 @@ _SEVERITY_SCORE = {
     Severity.MEDIUM: 0.6,
     Severity.LOW: 0.4,
 }
+
+# ── path-aware classification of a recursive ``rm`` ────────────────────────────
+# A recursive rm is judged by *what it deletes*, not merely that it is recursive:
+# a project-local or scratch path is an ordinary cleanup, a system / root / home /
+# wildcard path is catastrophic. This is the precision fix for the kill-switch —
+# blocking ``rm -rf node_modules`` makes the guard unusable, missing ``rm -rf /``
+# makes it useless.
+_RM_SEGMENT = re.compile(r"\brm\b([^|;&\n]*)", re.IGNORECASE)
+_SCRATCH_ABS = re.compile(r"^/(?:tmp|var/tmp)(?:/|$)")
+_CRITICAL_TARGETS = frozenset(
+    {"/", "/*", "~", "~/", "$HOME", ".", "./", "..", "*", "./*"}
+)
+
+
+def _is_recursive_flag(token: str) -> bool:
+    """True for ``-r`` / ``-rf`` clusters and ``--recursive`` (not ``--force``)."""
+    if token == "--recursive":
+        return True
+    if token.startswith("--"):
+        return False
+    return token.startswith("-") and ("r" in token or "R" in token)
+
+
+def _target_severity(target: str) -> Severity | None:
+    """Classify a single recursive-rm target by blast radius."""
+    target = target.strip().strip("'\"")
+    if not target or target.startswith("-"):
+        return None
+    if target in _CRITICAL_TARGETS or target.startswith(("~", "$HOME")):
+        return Severity.CRITICAL
+    if target.startswith("/"):
+        if "*" in target:  # wildcard on an absolute path
+            return Severity.CRITICAL
+        if _SCRATCH_ABS.match(target):  # /tmp, /var/tmp scratch space
+            return None
+        return Severity.HIGH  # any other absolute path (system or otherwise)
+    if target.startswith(".."):  # parent-directory traversal
+        return Severity.HIGH
+    return None  # relative / project-local path — an ordinary cleanup
+
+
+def _rm_severity(form: str) -> Severity | None:
+    """Severity of a recursive ``rm`` in *form*, or None if absent / local / safe."""
+    worst: Severity | None = None
+    for segment in _RM_SEGMENT.findall(form):
+        tokens = segment.split()
+        if not any(_is_recursive_flag(t) for t in tokens):
+            continue  # not a recursive delete — a single-file rm is not a mass wipe
+        for token in tokens:
+            severity = _target_severity(token)
+            if severity is not None and (worst is None or severity > worst):
+                worst = severity
+    return worst
 
 
 class DestructiveCommandDetector:
@@ -296,14 +343,37 @@ class DestructiveCommandDetector:
                 best is None or rule.severity > best.severity
             ):
                 best = rule
-        if best is None:
+
+        # Path-aware recursive-rm classification runs alongside the rule table.
+        rm_severity = max(
+            (s for f in forms if (s := _rm_severity(f)) is not None),
+            default=None,
+        )
+
+        severity, signal_type, rationale = self._strongest(best, rm_severity)
+        if severity is None:
             return None
         return DetectorSignal(
             detector=self.name,
             plane=Plane.ACTION,
-            score=_SEVERITY_SCORE[best.severity],
+            score=_SEVERITY_SCORE[severity],
             locus=Locus.ACTION,
-            signal_type=best.signal_type,
-            severity=best.severity,
-            rationale=best.rationale,
+            signal_type=signal_type,
+            severity=severity,
+            rationale=rationale,
         )
+
+    @staticmethod
+    def _strongest(
+        rule: _Rule | None, rm_severity: Severity | None
+    ) -> tuple[Severity | None, str, str]:
+        """Pick the higher-severity of a matched rule and the rm classifier."""
+        if rule is not None and (rm_severity is None or rule.severity >= rm_severity):
+            return rule.severity, rule.signal_type, rule.rationale
+        if rm_severity is not None:
+            return (
+                rm_severity,
+                "destructive_command",
+                "recursive force-delete of a root / home / system / wildcard path",
+            )
+        return None, "", ""

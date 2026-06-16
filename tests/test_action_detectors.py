@@ -47,11 +47,15 @@ class TestBlastRadius:
     def test_empty_action(self) -> None:
         assert self.det.evaluate(EvaluationRequest(action="")) is None
 
-    def test_local_delete_below_floor(self) -> None:
-        # a plain "delete temp" — irreversible but no scope/target/breadth = 0.40,
-        # exactly the floor, emits MEDIUM
-        sig = self.det.evaluate(EvaluationRequest(action="delete temp"))
-        assert sig is not None and sig.severity is Severity.MEDIUM
+    def test_irreversible_verb_without_scope_not_flagged(self) -> None:
+        # a plain "delete temp" — irreversible but no system / production scope.
+        # The blast estimator no longer fires on a verb alone (that drove false
+        # blocks on scoped local cleanups); path-aware command rules own those.
+        assert self.det.evaluate(EvaluationRequest(action="delete temp")) is None
+
+    def test_irreversible_plus_system_target_is_flagged(self) -> None:
+        sig = self.det.evaluate(EvaluationRequest(action="wipe /etc recursively"))
+        assert sig is not None and sig.severity >= Severity.HIGH
 
 
 class TestOriginTaint:

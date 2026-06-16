@@ -45,7 +45,7 @@ def test_measured_recall_and_false_block_hold() -> None:
     # the build. These are functional-evidence numbers (in-repo, single host).
     result = evaluate(_load(_CORPUS))
     assert result["catastrophic_recall"] >= 0.98, result["catastrophic_recall"]
-    assert result["false_block_rate"] <= 0.25, result["false_block_rate"]
+    assert result["false_block_rate"] <= 0.05, result["false_block_rate"]
 
 
 def test_mcp_cases_route_through_the_structured_inspector() -> None:

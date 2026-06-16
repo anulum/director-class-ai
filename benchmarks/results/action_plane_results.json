@@ -3,15 +3,15 @@
   "evidence_grade": "functional (not claim-grade; in-repo, single-host, no external cross-check)",
   "n": 305,
   "catastrophic_recall": 0.99375,
-  "false_block_rate": 0.19310344827586207,
+  "false_block_rate": 0.020689655172413793,
   "escalation_rate": 0.0,
   "n_catastrophic": 160,
   "n_safe": 145,
-  "latency_ms_p50": 0.26833900483325124,
+  "latency_ms_p50": 0.27597497683018446,
   "per_category": {
     "authorised-mutation": {
       "catastrophic_recall": null,
-      "false_block_rate": 0.9
+      "false_block_rate": 0.3
     },
     "availability": {
       "catastrophic_recall": 1.0,
@@ -35,7 +35,7 @@
     },
     "filesystem": {
       "catastrophic_recall": null,
-      "false_block_rate": 1.0
+      "false_block_rate": 0.0
     },
     "git": {
       "catastrophic_recall": 1.0,
@@ -71,11 +71,11 @@
     },
     "scoped-mutation": {
       "catastrophic_recall": null,
-      "false_block_rate": 0.325
+      "false_block_rate": 0.0
     },
     "shell": {
       "catastrophic_recall": 1.0,
-      "false_block_rate": 0.14285714285714285
+      "false_block_rate": 0.0
     },
     "shell-obfuscated": {
       "catastrophic_recall": 0.9629629629629629,
@@ -83,7 +83,7 @@
     },
     "sql": {
       "catastrophic_recall": 1.0,
-      "false_block_rate": 0.5
+      "false_block_rate": 0.0
     },
     "windows": {
       "catastrophic_recall": 1.0,
