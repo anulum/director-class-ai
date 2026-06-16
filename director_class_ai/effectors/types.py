@@ -31,6 +31,7 @@ __all__ = [
     "EffectorRequest",
     "EffectorResult",
     "GovernedEffector",
+    "ReversibilityMetadata",
 ]
 
 
@@ -46,6 +47,26 @@ class EffectorKind(enum.Enum):
 
 
 @dataclass(frozen=True)
+class ReversibilityMetadata:
+    """Rollback evidence for mutations, carrying digests instead of raw artefacts."""
+
+    snapshot_id: str = ""
+    rollback_command: str = ""
+    transaction_id: str = ""
+    dry_run_digest: str = ""
+    diff_digest: str = ""
+
+    def to_metadata(self) -> dict[str, str]:
+        return {
+            "snapshot_id": self.snapshot_id,
+            "rollback_command": self.rollback_command,
+            "transaction_id": self.transaction_id,
+            "dry_run_digest": self.dry_run_digest,
+            "diff_digest": self.diff_digest,
+        }
+
+
+@dataclass(frozen=True)
 class EffectorRequest:
     """A concrete operation an agent proposes to run against an effector."""
 
@@ -57,15 +78,20 @@ class EffectorRequest:
     tenant_id: str = ""
     dry_run: bool = True  # default: never execute unless explicitly opted in
     metadata: dict[str, object] = field(default_factory=dict)
+    reversibility: ReversibilityMetadata = field(default_factory=ReversibilityMetadata)
 
     def to_evaluation(self) -> EvaluationRequest:
+        metadata = dict(self.metadata)
+        reversibility = self.reversibility.to_metadata()
+        if any(reversibility.values()):
+            metadata["reversibility"] = reversibility
         return EvaluationRequest(
             query=self.query,
             context=self.context,
             action=self.action,
             action_provenance=self.provenance,
             tenant_id=self.tenant_id,
-            metadata=self.metadata,
+            metadata=metadata,
         )
 
 

@@ -21,6 +21,7 @@ from director_class_ai.core import (
 from director_class_ai.effectors import (
     EffectorKind,
     EffectorRequest,
+    ReversibilityMetadata,
     ShellEffectorAdapter,
     SubprocessGuard,
     default_subprocess_runner,
@@ -123,6 +124,44 @@ def test_request_to_evaluation_maps_fields() -> None:
     )
     ev = req.to_evaluation()
     assert ev.action == "rm x" and ev.action_provenance == "retrieved" and ev.query == "q"
+
+
+def test_request_to_evaluation_includes_reversibility_digests_only() -> None:
+    metadata = ReversibilityMetadata(
+        snapshot_id="snap-1",
+        rollback_command="restore snap-1",
+        transaction_id="txn-1",
+        dry_run_digest="2d711642b726b044",
+        diff_digest="9cdb1f24d346aa61",
+    )
+    req = EffectorRequest(action="rm -rf ./build", reversibility=metadata)
+    ev = req.to_evaluation()
+    assert ev.metadata["reversibility"] == {
+        "snapshot_id": "snap-1",
+        "rollback_command": "restore snap-1",
+        "transaction_id": "txn-1",
+        "dry_run_digest": "2d711642b726b044",
+        "diff_digest": "9cdb1f24d346aa61",
+    }
+
+
+def test_shell_run_command_accepts_reversibility_metadata_without_audit_leak() -> None:
+    spy = _Spy()
+    metadata = ReversibilityMetadata(
+        snapshot_id="snap-build",
+        rollback_command="restore ./build",
+        transaction_id="txn-build",
+        dry_run_digest="2d711642b726b044",
+        diff_digest="9cdb1f24d346aa61",
+    )
+    r = _adapter(spy).run_command(
+        "rm -rf ./build",
+        reversibility=metadata,
+        dry_run=False,
+    )
+    assert r.permitted is True and r.executed is True
+    assert "restore ./build" not in r.decision.record.__dict__.values()
+    assert r.output_digest
 
 
 class TestSubprocessGuard:

@@ -16,6 +16,7 @@ from .types import (
     EffectorRequest,
     EffectorResult,
     GovernedEffector,
+    ReversibilityMetadata,
 )
 
 __all__ = [
@@ -25,6 +26,7 @@ __all__ = [
     "GovernedEffector",
     "MCPEffectorAdapter",
     "MCPExecuteFn",
+    "ReversibilityMetadata",
     "ShellEffectorAdapter",
     "SubprocessGuard",
     "default_subprocess_runner",

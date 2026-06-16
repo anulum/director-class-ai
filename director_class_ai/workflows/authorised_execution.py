@@ -20,7 +20,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..action import BlastRadiusDetector, DestructiveCommandDetector, OriginTaintDetector
+from ..action import (
+    BlastRadiusDetector,
+    DestructiveCommandDetector,
+    OriginTaintDetector,
+    ReversibilityDetector,
+)
 from ..approvals import ApprovalQueue
 from ..core import Governor, ParallelEnsembleScorer
 from ..effectors import EffectorResult, ShellEffectorAdapter
@@ -103,5 +108,6 @@ def _action_ensemble() -> ParallelEnsembleScorer:
             DestructiveCommandDetector(),
             BlastRadiusDetector(),
             OriginTaintDetector(),
+            ReversibilityDetector(),
         ]
     )

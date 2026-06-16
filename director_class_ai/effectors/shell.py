@@ -17,6 +17,7 @@ from .types import (
     EffectorResult,
     ExecuteFn,
     GovernedEffector,
+    ReversibilityMetadata,
 )
 
 __all__ = ["ShellEffectorAdapter"]
@@ -38,6 +39,7 @@ class ShellEffectorAdapter(GovernedEffector):
         query: str = "",
         context: str = "",
         dry_run: bool = True,
+        reversibility: ReversibilityMetadata | None = None,
     ) -> EffectorResult:
         return self.run(
             EffectorRequest(
@@ -47,5 +49,6 @@ class ShellEffectorAdapter(GovernedEffector):
                 query=query,
                 context=context,
                 dry_run=dry_run,
+                reversibility=reversibility or ReversibilityMetadata(),
             )
         )
