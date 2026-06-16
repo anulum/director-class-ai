@@ -12,6 +12,7 @@ from .blast_radius import BlastRadiusDetector
 from .destructive_command import DestructiveCommandDetector
 from .intent_consistency import IntentConsistencyDetector
 from .mcp_inspector import MCP_CALL_KEY, MCPCallInspector, MCPToolCall, serialise_call
+from .mcp_registry import MCPToolRegistration, MCPTrustRegistry
 from .origin_taint import OriginTaintDetector
 from .reversibility import REVERSIBILITY_KEY, ReversibilityDetector
 
@@ -22,6 +23,8 @@ __all__ = [
     "MCPCallInspector",
     "MCPToolCall",
     "MCP_CALL_KEY",
+    "MCPToolRegistration",
+    "MCPTrustRegistry",
     "OriginTaintDetector",
     "REVERSIBILITY_KEY",
     "ReversibilityDetector",

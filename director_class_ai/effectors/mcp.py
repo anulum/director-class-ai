@@ -56,6 +56,9 @@ class MCPEffectorAdapter(GovernedEffector):
         arguments: Mapping[str, object] | None = None,
         *,
         arg_provenance: Mapping[str, str] | None = None,
+        server_identity: Mapping[str, object] | None = None,
+        tool_schema: Mapping[str, object] | None = None,
+        argument_schema: Mapping[str, object] | None = None,
         provenance: str = "",
         query: str = "",
         context: str = "",
@@ -67,6 +70,9 @@ class MCPEffectorAdapter(GovernedEffector):
             arguments=dict(arguments or {}),
             arg_provenance=dict(arg_provenance or {}),
             default_provenance=provenance,
+            server_identity=dict(server_identity or {}),
+            tool_schema=dict(tool_schema or {}),
+            argument_schema=dict(argument_schema or {}),
         )
         request = EffectorRequest(
             action=serialise_call(call),

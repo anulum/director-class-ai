@@ -17,6 +17,7 @@ from director_class_ai.action import (
     serialise_call,
 )
 from director_class_ai.action.mcp_inspector import MCP_CALL_KEY
+from director_class_ai.action.mcp_registry import MCPToolRegistration, MCPTrustRegistry
 from director_class_ai.core import (
     EvaluationRequest,
     Governor,
@@ -184,6 +185,60 @@ class TestSignalShape:
         assert sig.severity is Severity.HIGH and sig.score == 0.85
         assert 1 <= len(sig.rationale.split(";")) <= 3
 
+    def test_registry_finding_precedes_structural_findings(self) -> None:
+        registry = MCPTrustRegistry(
+            [
+                MCPToolRegistration(
+                    server="fs",
+                    tool="read_file",
+                    server_identity={"name": "fs"},
+                    tool_schema={"mode": "read"},
+                    argument_schema={"properties": {"path": {"type": "string"}}},
+                )
+            ]
+        )
+        call = MCPToolCall(
+            "fs",
+            "read-file",
+            {"path": "/etc/shadow"},
+            server_identity={"name": "fs"},
+            tool_schema={"mode": "read"},
+            argument_schema={"properties": {"path": {"type": "string"}}},
+        )
+        sig = MCPCallInspector(registry=registry).evaluate(
+            EvaluationRequest(metadata={MCP_CALL_KEY: call})
+        )
+        assert sig is not None
+        assert sig.signal_type == "mcp_lookalike_tool"
+
+    def test_registry_preserves_existing_taint_checks_for_trusted_tool(self) -> None:
+        registry = MCPTrustRegistry(
+            [
+                MCPToolRegistration(
+                    server="chat",
+                    tool="send_message",
+                    server_identity={"name": "chat"},
+                    tool_schema={"mode": "write"},
+                    argument_schema={"properties": {"body": {"type": "string"}}},
+                )
+            ]
+        )
+        call = MCPToolCall(
+            "chat",
+            "send_message",
+            {"body": "hi"},
+            arg_provenance={"body": "retrieved"},
+            server_identity={"name": "chat"},
+            tool_schema={"mode": "write"},
+            argument_schema={"properties": {"body": {"type": "string"}}},
+        )
+        sig = MCPCallInspector(registry=registry).evaluate(
+            EvaluationRequest(metadata={MCP_CALL_KEY: call})
+        )
+        assert sig is not None
+        assert sig.signal_type == "mcp_tool_call"
+        assert sig.severity is Severity.HIGH
+
 
 def _governor(approval=None) -> Governor:
     ensemble = ParallelEnsembleScorer(
@@ -256,3 +311,30 @@ class TestMCPEffectorAdapter:
         from director_class_ai.effectors import EffectorKind
 
         assert MCPEffectorAdapter(_governor()).kind is EffectorKind.MCP
+
+    def test_call_tool_carries_schema_identity_for_registry(self) -> None:
+        seen: list[MCPToolCall] = []
+
+        class _Recorder(MCPCallInspector):
+            def evaluate(self, request: EvaluationRequest):
+                call = request.metadata.get(MCP_CALL_KEY)
+                if isinstance(call, MCPToolCall):
+                    seen.append(call)
+                return None
+
+        adapter = MCPEffectorAdapter(
+            Governor(ensemble=ParallelEnsembleScorer([_Recorder()])),
+            execute=_Spy(),
+        )
+        adapter.call_tool(
+            "fs",
+            "read_file",
+            {"path": "README.md"},
+            server_identity={"name": "fs"},
+            tool_schema={"mode": "read"},
+            argument_schema={"properties": {"path": {"type": "string"}}},
+            dry_run=False,
+        )
+        assert seen[0].server_identity == {"name": "fs"}
+        assert seen[0].tool_schema == {"mode": "read"}
+        assert seen[0].argument_schema == {"properties": {"path": {"type": "string"}}}

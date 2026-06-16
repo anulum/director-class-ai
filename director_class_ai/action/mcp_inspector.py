@@ -143,6 +143,9 @@ class MCPToolCall:
     arguments: Mapping[str, object] = field(default_factory=dict)
     arg_provenance: Mapping[str, str] = field(default_factory=dict)
     default_provenance: str = ""
+    server_identity: Mapping[str, object] = field(default_factory=dict)
+    tool_schema: Mapping[str, object] = field(default_factory=dict)
+    argument_schema: Mapping[str, object] = field(default_factory=dict)
 
     def provenance_of(self, key: str) -> str:
         return (self.arg_provenance.get(key) or self.default_provenance).strip().lower()
@@ -276,10 +279,17 @@ class MCPCallInspector:
     plane = Plane.ACTION
     tier = 0
 
+    def __init__(self, registry: object | None = None) -> None:
+        self._registry = registry
+
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
         call = request.metadata.get(MCP_CALL_KEY)
         if not isinstance(call, MCPToolCall):
             return None
+        if self._registry is not None and hasattr(self._registry, "evaluate"):
+            registry_signal = self._registry.evaluate(request)
+            if isinstance(registry_signal, DetectorSignal):
+                return registry_signal
         findings = (
             _taint_findings(call)
             + _confused_deputy_findings(call)
