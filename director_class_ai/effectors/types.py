@@ -104,20 +104,24 @@ class GovernedEffector:
 
     def run(self, request: EffectorRequest) -> EffectorResult:
         decision = self._governor.review(request.to_evaluation())
-        if not decision.permitted:
-            # blocked or escalated-without-approval -> never touch the effector
-            return EffectorResult(permitted=False, executed=False, decision=decision)
-        if request.dry_run or self._execute is None:
-            # permitted, but a dry run (or no executor wired) does not execute
-            return EffectorResult(permitted=True, executed=False, decision=decision)
+        # blocked, dry-run, or no executor wired -> never touch the effector
+        if not decision.permitted or request.dry_run or self._execute is None:
+            return EffectorResult(
+                permitted=decision.permitted, executed=False, decision=decision
+            )
         output, exit_code = self._execute(request.action)
-        return EffectorResult(
-            permitted=True,
-            executed=True,
-            decision=decision,
-            output_digest=_digest(output),
-            exit_code=exit_code,
-        )
+        return _executed_result(decision, output, exit_code)
+
+
+def _executed_result(decision: Decision, output: str, exit_code: int) -> EffectorResult:
+    """Build the result of a permitted, real (non-dry-run) execution."""
+    return EffectorResult(
+        permitted=True,
+        executed=True,
+        decision=decision,
+        output_digest=_digest(output),
+        exit_code=exit_code,
+    )
 
 
 def _digest(text: str) -> str:

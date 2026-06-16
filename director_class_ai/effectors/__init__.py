@@ -8,6 +8,7 @@
 
 """Typed effector boundary: govern what an agent *does* before the effector runs it."""
 
+from .mcp import MCPEffectorAdapter, MCPExecuteFn
 from .shell import ShellEffectorAdapter
 from .subprocess_guard import SubprocessGuard, default_subprocess_runner
 from .types import (
@@ -22,6 +23,8 @@ __all__ = [
     "EffectorRequest",
     "EffectorResult",
     "GovernedEffector",
+    "MCPEffectorAdapter",
+    "MCPExecuteFn",
     "ShellEffectorAdapter",
     "SubprocessGuard",
     "default_subprocess_runner",

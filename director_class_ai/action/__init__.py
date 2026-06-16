@@ -11,11 +11,16 @@
 from .blast_radius import BlastRadiusDetector
 from .destructive_command import DestructiveCommandDetector
 from .intent_consistency import IntentConsistencyDetector
+from .mcp_inspector import MCP_CALL_KEY, MCPCallInspector, MCPToolCall, serialise_call
 from .origin_taint import OriginTaintDetector
 
 __all__ = [
     "BlastRadiusDetector",
     "DestructiveCommandDetector",
     "IntentConsistencyDetector",
+    "MCPCallInspector",
+    "MCPToolCall",
+    "MCP_CALL_KEY",
     "OriginTaintDetector",
+    "serialise_call",
 ]
