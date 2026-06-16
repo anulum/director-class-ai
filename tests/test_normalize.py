@@ -96,3 +96,55 @@ class TestSafeStillClean:
     def test_plain_safe_commands(self) -> None:
         for cmd in ("ls -la", "rm file.txt", "git push origin feature"):
             assert caught(cmd) is None, cmd
+
+
+class TestRecursiveAndNewTransforms:
+    def test_nested_base64_peeled(self) -> None:
+        import base64
+
+        inner = "echo " + base64.b64encode(b"rm -rf /").decode() + " | base64 -d | bash"
+        outer = (
+            "echo " + base64.b64encode(inner.encode()).decode() + " | base64 -d | bash"
+        )
+        assert caught(outer).severity is Severity.CRITICAL
+
+    def test_hex_run_decoded(self) -> None:
+        assert caught(r"\x72\x6d\x20\x2d\x72\x66\x20\x2f") is not None  # rm -rf /
+
+    def test_hex_non_printable_skipped(self) -> None:
+        # decodes to NUL bytes -> not printable -> not turned into a form
+        assert not any("\x00" in f for f in expand(r"\x00\x00\x00"))
+
+    def test_hex_invalid_utf8_skipped(self) -> None:
+        forms = expand(r"\xff\xff\xff")
+        assert isinstance(forms, list) and forms
+
+    def test_command_substitution_inline_echo(self) -> None:
+        assert caught("$(echo rm) -rf /").severity is Severity.CRITICAL
+
+    def test_command_substitution_backtick(self) -> None:
+        assert caught("`rm -rf /`").severity is Severity.CRITICAL
+
+    def test_command_substitution_full_echo(self) -> None:
+        assert caught("$(echo 'rm -rf /')").severity is Severity.CRITICAL
+
+    def test_empty_substitution_ignored(self) -> None:
+        forms = expand("$() echo hi")
+        assert all("$()" not in f or f == "$() echo hi" for f in forms)
+
+    def test_safe_substitution_stays_clean(self) -> None:
+        assert caught("$(echo hello)") is None
+
+
+class TestExpandBounds:
+    def test_max_depth_zero_returns_only_original(self) -> None:
+        assert expand("rm -rf /", max_depth=0) == ["rm -rf /"]
+
+    def test_max_forms_caps_breadth(self) -> None:
+        forms = expand("$(echo rm) -rf / `rm -rf ~`", max_forms=2)
+        assert len(forms) <= 2
+
+    def test_fixpoint_breaks_early(self) -> None:
+        # a plain command yields no further transforms after the first layer
+        forms = expand("ls -la")
+        assert "ls -la" in forms

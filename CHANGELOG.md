@@ -7,6 +7,8 @@
 - ParallelEnsembleScorer: concurrent, tiered detector dispatch.
 - Destructive-command detector (action-plane kill-switch core).
 - Repository engineering gates: CI (test/lint/types/SAST), pre-commit, coverage gate.
+- Recursive multi-layer command decoder (nested base64, hex escapes, command
+  substitution), bounded depth/breadth.
 - Action-command de-obfuscation pre-layer (split-flag merge, quote/backslash-break
   removal, base64-of-shell-pipe decode, alias extraction) + find -delete/-exec rule;
   5/5 previously-missed evasions now caught, safe lookalikes stay clean.
