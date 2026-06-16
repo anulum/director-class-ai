@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "director-class-ai"
+version = "0.0.0"
+description = "High-assurance multi-detector governance for autonomous and mission-critical systems"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "LicenseRef-Director-Class-AI-Commercial" }
+authors = [{ name = "Miroslav Šotek", email = "protoscience@anulum.li" }]
+keywords = [
+    "ai-safety",
+    "guardrails",
+    "agent-governance",
+    "kill-switch",
+    "hallucination-detection",
+]
+dependencies = []
+
+[project.optional-dependencies]
+# Content/integrity detectors reuse the director-ai model primitives during
+# development; pinned as an explicit dependency on extraction.
+detectors = ["director-ai>=3.15"]
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
+
+[tool.setuptools.packages.find]
+include = ["director_class_ai*"]
+
+[tool.ruff]
+line-length = 90
+target-version = "py311"
