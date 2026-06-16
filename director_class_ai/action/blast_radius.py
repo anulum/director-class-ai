@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial
+# Director-Class AI — commercial product (licence pending); not the Apache base.
+# © Concepts 1996–2026 Miroslav Šotek. All rights reserved.
+# © Code 2020–2026 Miroslav Šotek. All rights reserved.
+# ORCID: 0009-0009-3560-0851
+# Contact: www.anulum.li | protoscience@anulum.li
+# Director-Class AI — blast-radius detector (action plane, tier 0)
+
+"""Estimate how far an action reaches and how reversible it is.
+
+Where the destructive-command detector matches *known* catastrophic patterns,
+this scores the *general* risk dimensions of any action, so a dangerous command
+with no exact rule — "delete the production database backups", "overwrite every
+config under /etc" — is still flagged by the shape of what it does:
+
+* irreversibility — the verb destroys rather than reads;
+* scope — it names production / live / main;
+* system target — it touches /etc, /var, /, ~, C:\\Windows;
+* breadth — recursion, wildcards, --all, --force, "everything".
+
+The dimensions are summed into a risk in [0, 1] and mapped to a severity band.
+Low-risk actions emit nothing (no noise on ``ls`` or a scoped read); the detector
+fires from the MEDIUM band up, and the fail-closed fusion decides from there.
+"""
+
+from __future__ import annotations
+
+import re
+
+from ..core.signal import (
+    DetectorSignal,
+    EvaluationRequest,
+    Locus,
+    Plane,
+    Severity,
+)
+from ._lexicon import BREADTH, IRREVERSIBLE, PRODUCTION, SYSTEM_TARGET
+
+__all__ = ["BlastRadiusDetector"]
+
+# Dimension weights — irreversibility dominates, scope and target next.
+_WEIGHTS: tuple[tuple[re.Pattern[str], float, str], ...] = (
+    (IRREVERSIBLE, 0.40, "irreversible operation"),
+    (SYSTEM_TARGET, 0.25, "system / high-value target"),
+    (PRODUCTION, 0.20, "production scope"),
+    (BREADTH, 0.15, "recursive / wildcard / force breadth"),
+)
+
+
+def _severity(risk: float) -> Severity:
+    if risk >= 0.8:
+        return Severity.CRITICAL
+    if risk >= 0.6:
+        return Severity.HIGH
+    return Severity.MEDIUM
+
+
+class BlastRadiusDetector:
+    """Tier-0 action-plane detector scoring an action's reach and reversibility."""
+
+    name = "blast_radius"
+    plane = Plane.ACTION
+    tier = 0
+
+    #: minimum risk before the detector emits a signal (below this = low blast)
+    floor: float = 0.4
+
+    def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
+        command = (request.action or "").strip()
+        if not command:
+            return None
+        risk = 0.0
+        reasons: list[str] = []
+        for pattern, weight, label in _WEIGHTS:
+            if pattern.search(command):
+                risk += weight
+                reasons.append(label)
+        risk = min(risk, 1.0)
+        # An irreversible verb is necessary for blast risk — breadth/scope alone
+        # (e.g. "list everything in production") is not destructive.
+        if risk < self.floor or not IRREVERSIBLE.search(command):
+            return None
+        return DetectorSignal(
+            detector=self.name,
+            plane=Plane.ACTION,
+            score=risk,
+            locus=Locus.ACTION,
+            signal_type="blast_radius",
+            severity=_severity(risk),
+            rationale=", ".join(reasons),
+        )

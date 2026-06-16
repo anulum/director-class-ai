@@ -98,13 +98,18 @@ class EvaluationRequest:
 
     ``action`` is populated when an autonomous agent is about to invoke an
     effector (a shell command, SQL statement, API call); content/integrity
-    detectors ignore it and action detectors key off it.
+    detectors ignore it and action detectors key off it. ``action_provenance``
+    records where that action originated — ``"user"`` (a human asked for it),
+    ``"untrusted"`` / ``"retrieved"`` / ``"tool_output"`` (it came from content the
+    model ingested, which is how a prompt injection reaches the effector). An
+    empty value means provenance is unknown.
     """
 
     query: str = ""
     response: str = ""
     context: str = ""
     action: str = ""  # the concrete effector command/payload, if any
+    action_provenance: str = ""  # user | untrusted | retrieved | tool_output | ""
     tenant_id: str = ""
     metadata: dict[str, object] = field(default_factory=dict)
 

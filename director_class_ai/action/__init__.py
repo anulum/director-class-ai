@@ -8,6 +8,14 @@
 
 """Action-plane detectors: govern what an autonomous system *does*, not just says."""
 
+from .blast_radius import BlastRadiusDetector
 from .destructive_command import DestructiveCommandDetector
+from .intent_consistency import IntentConsistencyDetector
+from .origin_taint import OriginTaintDetector
 
-__all__ = ["DestructiveCommandDetector"]
+__all__ = [
+    "BlastRadiusDetector",
+    "DestructiveCommandDetector",
+    "IntentConsistencyDetector",
+    "OriginTaintDetector",
+]
