@@ -1,0 +1,126 @@
+# SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial
+# Director-Class AI — commercial product (licence pending); not the Apache base.
+# © Concepts 1996–2026 Miroslav Šotek. All rights reserved.
+# © Code 2020–2026 Miroslav Šotek. All rights reserved.
+# ORCID: 0009-0009-3560-0851
+# Contact: www.anulum.li | protoscience@anulum.li
+# Director-Class AI — effector boundary types
+
+"""The typed boundary an autonomous agent's action must cross to reach an effector.
+
+The Governor returns a verdict; these types make it the *unavoidable* pre-execution
+choke point. An :class:`EffectorRequest` describes the concrete operation (a shell
+command, SQL statement, HTTP call, MCP tool call); a :class:`GovernedEffector`
+reviews it through the Governor and only then — if permitted and not a dry run —
+invokes the injected execution function. The execution side is always injected, so
+the boundary logic is testable without ever touching a real shell or database, and
+**dry-run is the default**: nothing executes until a deployment explicitly opts in.
+"""
+
+from __future__ import annotations
+
+import enum
+from collections.abc import Callable
+from dataclasses import dataclass, field
+
+from ..core.governor import Decision, Governor
+from ..core.signal import EvaluationRequest
+
+__all__ = [
+    "EffectorKind",
+    "EffectorRequest",
+    "EffectorResult",
+    "GovernedEffector",
+]
+
+
+class EffectorKind(enum.Enum):
+    """The class of real-world effector an action targets."""
+
+    SHELL = "shell"
+    SQL = "sql"
+    HTTP = "http"
+    MCP = "mcp"
+    INFRA = "infra"
+    CUSTOM = "custom"
+
+
+@dataclass(frozen=True)
+class EffectorRequest:
+    """A concrete operation an agent proposes to run against an effector."""
+
+    action: str
+    kind: EffectorKind = EffectorKind.SHELL
+    provenance: str = ""  # user | untrusted | retrieved | tool_output | ""
+    query: str = ""  # the task the agent was given, for intent checks
+    context: str = ""
+    tenant_id: str = ""
+    dry_run: bool = True  # default: never execute unless explicitly opted in
+    metadata: dict[str, object] = field(default_factory=dict)
+
+    def to_evaluation(self) -> EvaluationRequest:
+        return EvaluationRequest(
+            query=self.query,
+            context=self.context,
+            action=self.action,
+            action_provenance=self.provenance,
+            tenant_id=self.tenant_id,
+            metadata=self.metadata,
+        )
+
+
+@dataclass(frozen=True)
+class EffectorResult:
+    """The outcome of taking an EffectorRequest through the boundary."""
+
+    permitted: bool
+    executed: bool
+    decision: Decision
+    output_digest: str = ""  # digest of execution output — never raw stdout/stderr
+    exit_code: int | None = None
+
+    @property
+    def decision_id(self) -> str:
+        return self.decision.record.request_digest
+
+
+# An execution function turns an action into (output_text, exit_code). It is only
+# ever called for a permitted, non-dry-run request.
+ExecuteFn = Callable[[str], tuple[str, int]]
+
+
+class GovernedEffector:
+    """Run effector requests through the Governor — fail-closed, dry-run default."""
+
+    kind: EffectorKind = EffectorKind.CUSTOM
+
+    def __init__(
+        self,
+        governor: Governor,
+        execute: ExecuteFn | None = None,
+    ) -> None:
+        self._governor = governor
+        self._execute = execute
+
+    def run(self, request: EffectorRequest) -> EffectorResult:
+        decision = self._governor.review(request.to_evaluation())
+        if not decision.permitted:
+            # blocked or escalated-without-approval -> never touch the effector
+            return EffectorResult(permitted=False, executed=False, decision=decision)
+        if request.dry_run or self._execute is None:
+            # permitted, but a dry run (or no executor wired) does not execute
+            return EffectorResult(permitted=True, executed=False, decision=decision)
+        output, exit_code = self._execute(request.action)
+        return EffectorResult(
+            permitted=True,
+            executed=True,
+            decision=decision,
+            output_digest=_digest(output),
+            exit_code=exit_code,
+        )
+
+
+def _digest(text: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
