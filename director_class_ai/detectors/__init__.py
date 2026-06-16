@@ -4,17 +4,32 @@
 # © Code 2020–2026 Miroslav Šotek. All rights reserved.
 # ORCID: 0009-0009-3560-0851
 # Contact: www.anulum.li | protoscience@anulum.li
-# Director-Class AI — content/integrity detector adapters
+# Director-Class AI — content/integrity detector adapters and LLM judges
 
-"""Adapters wrapping director-ai model detectors as ensemble Detectors.
+"""Adapters wrapping director-ai model detectors, and the LLM-judge tier.
 
-These require the ``[detectors]`` extra (director-ai + its model stack). The
-adapter glue itself imports nothing heavy — the director-ai model is loaded only
-in ``from_pretrained`` — so this package imports cleanly without director-ai, and
-the glue is unit-tested with an injected scorer.
+The model adapters require the ``[detectors]`` extra (director-ai + its model
+stack); the LLM judge is provider-agnostic (an injected callable). Adapter glue
+imports nothing heavy, so this package imports cleanly without director-ai and is
+unit-tested with injected scorers / judge functions.
 """
 
 from .contradiction import ContradictionContentDetector
+from .llm_judge import (
+    JudgePanel,
+    JudgeResult,
+    JudgeSpec,
+    LLMJudgeDetector,
+    prompt_judge,
+)
 from .token_span import TokenSpanContentDetector
 
-__all__ = ["ContradictionContentDetector", "TokenSpanContentDetector"]
+__all__ = [
+    "ContradictionContentDetector",
+    "JudgePanel",
+    "JudgeResult",
+    "JudgeSpec",
+    "LLMJudgeDetector",
+    "TokenSpanContentDetector",
+    "prompt_judge",
+]
