@@ -1,0 +1,8 @@
+# Director-Class AI — local development profile (dry-run, permissive thresholds)
+name = "local_dev"
+default_dry_run = true
+content_threshold = 0.5
+action_block_threshold = 0.3
+uncertainty_margin = 0.15
+require_audit = false
+require_approval = false
