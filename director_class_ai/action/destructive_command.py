@@ -36,6 +36,7 @@ from ..core.signal import (
     Plane,
     Severity,
 )
+from ._normalize import expand
 
 __all__ = ["DestructiveCommandDetector"]
 
@@ -90,6 +91,12 @@ _RULES: tuple[_Rule, ...] = (
         "filesystem_format",
         Severity.CRITICAL,
         "filesystem format (mkfs)",
+    ),
+    _Rule(
+        _rx(r"\bfind\b.*\s-delete\b|\bfind\b.*-exec\s+rm\b"),
+        "destructive_command",
+        Severity.HIGH,
+        "find -delete / -exec rm mass deletion",
     ),
     _Rule(
         _rx(r">\s*/dev/(?:sd|nvme|hd|vd|mmcblk)"),
@@ -194,10 +201,13 @@ class DestructiveCommandDetector:
         command = (request.action or "").strip()
         if not command:
             return None
-        normalised = re.sub(r"\s+", " ", command)
+        # Match every rule against all de-obfuscated forms — an obfuscated
+        # catastrophe (split flags, quote-breaks, base64, alias) only has to
+        # match in one revealed form to be caught.
+        forms = expand(command)
         best: _Rule | None = None
         for rule in _RULES:
-            if rule.pattern.search(normalised) and (
+            if any(rule.pattern.search(f) for f in forms) and (
                 best is None or rule.severity > best.severity
             ):
                 best = rule
