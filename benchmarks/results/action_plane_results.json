@@ -2,7 +2,7 @@
   "benchmark": "action_plane",
   "evidence_grade": "functional (not claim-grade; in-repo, single-host, no external cross-check)",
   "n": 305,
-  "catastrophic_recall": 0.99375,
+  "catastrophic_recall": 1.0,
   "false_block_rate": 0.0,
   "false_escalation_rate": 0.020689655172413793,
   "escalation_rate": 0.009836065573770493,
@@ -11,11 +11,11 @@
   "n_safe": 145,
   "n_safe_routed": 125,
   "outcomes": {
-    "allow": 143,
+    "allow": 142,
     "escalate": 3,
-    "block": 159
+    "block": 160
   },
-  "latency_ms_p50": 0.280317006399855,
+  "latency_ms_p50": 0.2755959867499769,
   "per_category": {
     "authorised-mutation": {
       "catastrophic_recall": null,
@@ -86,7 +86,7 @@
       "false_block_rate": 0.0
     },
     "shell-obfuscated": {
-      "catastrophic_recall": 0.9629629629629629,
+      "catastrophic_recall": 1.0,
       "false_block_rate": null
     },
     "sql": {

@@ -27,6 +27,7 @@ from __future__ import annotations
 import base64
 import binascii
 import re
+import shlex
 
 __all__ = ["expand"]
 
@@ -40,11 +41,19 @@ _SPLIT_FLAGS = re.compile(r"(\s-[a-zA-Z]+)\s+-([a-zA-Z]+)")
 _B64_TOKEN = re.compile(r"[A-Za-z0-9+/]{8,}={0,2}")
 _B64_CONTEXT = re.compile(r"\bbase64\b|\b(?:ba)?sh\b\s*$|\|\s*(?:ba)?sh\b", re.IGNORECASE)
 _HEX_RUN = re.compile(r"(?:\\x[0-9a-fA-F]{2}){2,}")
+_OCTAL_RUN = re.compile(r"(?:\\[0-7]{1,3}){2,}")
 _IFS = re.compile(r"\$\{IFS\}|\$IFS\b")
 _ALIAS = re.compile(r"alias\s+\w+=['\"]([^'\"]+)['\"]", re.IGNORECASE)
 _CMD_SUB = re.compile(r"\$\(([^()]*)\)|`([^`]*)`")
 _ECHO_SUB = re.compile(r"\$\(\s*(?:echo|printf)\s+(?:-e\s+)?([^()]*?)\)", re.IGNORECASE)
 _ECHO_PREFIX = re.compile(r"^\s*(?:echo|printf)\s+(?:-e\s+)?", re.IGNORECASE)
+_XARGS_TEMPLATE = re.compile(
+    r"^\s*(?:printf|echo)\s+(?:-e\s+)?(?P<payload>.+?)"
+    r"\s*\|\s*xargs\s+-I\s*(?P<placeholder>\S+)"
+    r"\s+(?P<template>\S+)(?P<args>.*)$",
+    re.IGNORECASE,
+)
+_SIMPLE_COMMAND_WORD = re.compile(r"[A-Za-z0-9_./-]+")
 
 
 def _merge_split_flags(text: str) -> str:
@@ -106,6 +115,65 @@ def _decode_hex_inplace(command: str) -> list[str]:
     return [substituted] if substituted != command else []
 
 
+def _decode_octal_run(run: str) -> str | None:
+    """Decode one run of POSIX-style octal escapes, returning printable text only."""
+    octets = re.findall(r"\\([0-7]{1,3})", run)
+    try:
+        text = bytes(int(octet, 8) for octet in octets).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return None
+    text = _WS.sub(" ", text).strip()
+    return text if text and text.isprintable() else None
+
+
+def _decode_octal_runs(command: str) -> list[str]:
+    """Decode runs of ``\\ooo`` escapes into their text."""
+    decoded: list[str] = []
+    for run in _OCTAL_RUN.findall(command):
+        text = _decode_octal_run(run)
+        if text is not None:
+            decoded.append(text)
+    return decoded
+
+
+def _decode_octal_inplace(command: str) -> list[str]:
+    """Substitute each octal escape run in place, preserving surrounding syntax."""
+
+    def repl(match: re.Match[str]) -> str:
+        return _decode_octal_run(match.group(0)) or match.group(0)
+
+    substituted = _OCTAL_RUN.sub(repl, command)
+    return [substituted] if substituted != command else []
+
+
+def _first_shell_word(text: str) -> str:
+    """Return the first shell word after quote handling, or an empty string."""
+    try:
+        words = shlex.split(text)
+    except ValueError:
+        return ""
+    return words[0] if words else ""
+
+
+def _xargs_reconstructions(command: str) -> list[str]:
+    """Reveal ``printf verb | xargs -I{} {} args`` without expanding payloads."""
+    match = _XARGS_TEMPLATE.match(command)
+    if match is None:
+        return []
+
+    placeholder = match.group("placeholder")
+    template = match.group("template")
+    if template != placeholder:
+        return []
+
+    verb = _first_shell_word(match.group("payload"))
+    if not verb or not _SIMPLE_COMMAND_WORD.fullmatch(verb):
+        return []
+
+    args = match.group("args").strip()
+    return [f"{verb} {args}".strip()]
+
+
 def _command_substitutions(command: str) -> list[str]:
     """Reveal ``$(...)`` / backtick substitutions and inline ``$(echo ...)``."""
     forms: list[str] = []
@@ -141,6 +209,9 @@ def _transform_once(command: str) -> list[str]:
     out.extend(_decode_base64_payloads(command))
     out.extend(_decode_hex_runs(command))
     out.extend(_decode_hex_inplace(command))
+    out.extend(_decode_octal_runs(command))
+    out.extend(_decode_octal_inplace(command))
+    out.extend(_xargs_reconstructions(command))
     out.extend(_command_substitutions(command))
     out.extend(_ALIAS.findall(command))
     return out

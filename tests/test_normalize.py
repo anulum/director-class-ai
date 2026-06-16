@@ -134,6 +134,24 @@ class TestRecursiveAndNewTransforms:
         # $'\x72\x6d' is the ANSI-C hex form of "rm"; in-place decode + quote-strip
         assert caught(r"$'\x72\x6d' -rf /") is not None
 
+    def test_octal_run_decoded(self) -> None:
+        assert any(f == "rm" for f in expand(r"\162\155"))
+
+    def test_octal_invalid_utf8_skipped(self) -> None:
+        forms = expand(r"\377\377")
+        assert isinstance(forms, list) and forms
+
+    def test_octal_non_printable_skipped(self) -> None:
+        assert not any("\x00" in f for f in expand(r"\000\000"))
+
+    def test_xargs_octal_printf_reconstructs_command(self) -> None:
+        forms = expand(r"printf '\162\155' | xargs -I{} {} -rf /")
+        assert "rm -rf /" in forms
+
+    def test_xargs_malformed_payload_stays_clean(self) -> None:
+        forms = expand(r"printf \ | xargs -I{} {} -rf /")
+        assert "rm -rf /" not in forms
+
     def test_full_quote_strip_keeps_safe_safe(self) -> None:
         # stripping quotes from a benign command yields another benign form
         assert caught('echo "hello world"') is None
@@ -150,6 +168,15 @@ class TestRecursiveAndNewTransforms:
 
     def test_safe_substitution_stays_clean(self) -> None:
         assert caught("$(echo hello)") is None
+
+    def test_safe_octal_printf_stays_clean(self) -> None:
+        assert caught(r"printf '\154\163'") is None
+
+    def test_xargs_echo_lookalike_stays_clean(self) -> None:
+        assert caught(r"printf '\162\155' | xargs -I{} echo {} -rf /") is None
+
+    def test_xargs_project_local_cleanup_stays_clean(self) -> None:
+        assert caught(r"printf '\162\155' | xargs -I{} {} -rf ./build") is None
 
 
 class TestExpandBounds:

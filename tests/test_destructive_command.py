@@ -39,6 +39,7 @@ CATASTROPHIC_CRITICAL = [
     "drop database production;",
     "TRUNCATE TABLE orders;",
     "terraform destroy -auto-approve",
+    r"printf '\162\155' | xargs -I{} {} -rf /",
 ]
 
 HIGH = [
@@ -73,6 +74,9 @@ SAFE = [
     "mkdir build",
     "echo hello",
     "kubectl get pods",
+    r"printf '\154\163'",
+    r"printf '\162\155' | xargs -I{} echo {} -rf /",
+    r"printf '\162\155' | xargs -I{} {} -rf ./build",
 ]
 
 
