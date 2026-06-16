@@ -46,6 +46,9 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["director_class_ai*"]
 
+[tool.setuptools.package-data]
+director_class_ai = ["py.typed"]
+
 [tool.ruff]
 line-length = 90
 target-version = "py311"
