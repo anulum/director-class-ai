@@ -62,6 +62,11 @@ class FusionPolicy:
     content_threshold: float = 0.5
     integrity_threshold: float = 0.5
     action_block_threshold: float = 0.3  # low: fail-closed leans to blocking
+    # A risk landing within this band of a plane's threshold is "borderline" —
+    # neither confidently safe nor confidently a problem — and is escalated to a
+    # human. A split judge panel lands here, which is exactly when a person should
+    # look. Set to 0 to disable borderline escalation.
+    uncertainty_margin: float = 0.15
     plane_mode: dict[Plane, FusionMode] = field(
         default_factory=lambda: {
             Plane.CONTENT: FusionMode.FAIL_OPEN,
@@ -89,6 +94,10 @@ def fuse(
     requires_human = False
     allow = True
     reasons: list[str] = []
+    margin = policy.uncertainty_margin
+
+    def borderline(risk: float, threshold: float) -> bool:
+        return margin > 0 and abs(risk - threshold) <= margin
 
     # Content + integrity: fail-open, flag only above threshold.
     for plane, threshold in (
@@ -104,9 +113,12 @@ def fuse(
             allow = False
             firing.extend(s for s in plane_signals if s.weighted_score > 0)
             reasons.append(f"{plane.value} risk {risk:.2f} >= {threshold:.2f}")
+        elif borderline(risk, threshold):
+            requires_human = True
+            reasons.append(f"{plane.value} risk {risk:.2f} borderline → review")
 
-    # Action: fail-closed. Any credible objection blocks; CRITICAL uncertainty
-    # escalates to a human instead of silently allowing.
+    # Action: fail-closed. Any credible objection blocks; a CRITICAL objection or a
+    # borderline risk escalates to a human rather than being silently allowed.
     action_signals = by_plane.get(Plane.ACTION, [])
     if action_signals:
         risk = max(s.weighted_score for s in action_signals)
@@ -123,6 +135,9 @@ def fuse(
             if any(s.severity >= Severity.CRITICAL for s in objectors):
                 requires_human = True
                 reasons.append("CRITICAL severity → human approval required")
+        elif borderline(risk, policy.action_block_threshold):
+            requires_human = True
+            reasons.append(f"action risk {risk:.2f} borderline → human approval")
 
     overall = max(plane_risk.values(), default=0.0)
     return Verdict(

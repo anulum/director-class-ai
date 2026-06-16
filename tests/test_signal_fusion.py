@@ -112,3 +112,33 @@ class TestVerdictShape:
         )
         assert v.risk == pytest.approx(0.95)
         assert v.allow is False
+
+
+class TestUncertaintyEscalation:
+    def test_content_borderline_allows_but_flags_for_review(self) -> None:
+        # risk 0.42 is below 0.5 but within the 0.15 band -> allow + requires_human
+        v = fuse([sig(Plane.CONTENT, 0.42)])
+        assert v.allow is True
+        assert v.requires_human is True
+        assert "borderline" in v.rationale
+
+    def test_action_borderline_escalates(self) -> None:
+        # action risk 0.2 is below the 0.3 block threshold but within the band
+        v = fuse([sig(Plane.ACTION, 0.2, locus=Locus.ACTION)])
+        assert v.allow is True
+        assert v.requires_human is True
+
+    def test_confidently_safe_not_escalated(self) -> None:
+        v = fuse([sig(Plane.CONTENT, 0.1)])
+        assert v.allow is True and v.requires_human is False
+
+    def test_margin_zero_disables_borderline(self) -> None:
+        policy = FusionPolicy(uncertainty_margin=0.0)
+        v = fuse([sig(Plane.CONTENT, 0.42)], policy)
+        assert v.requires_human is False
+
+    def test_split_panel_lands_in_band(self) -> None:
+        # a split panel produces a mid-range fused risk that lands in the band,
+        # which is exactly when a human should review it
+        v = fuse([sig(Plane.CONTENT, 0.4)])
+        assert v.allow is True and v.requires_human is True
