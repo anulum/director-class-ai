@@ -62,5 +62,11 @@ warn_redundant_casts = true
 disallow_untyped_defs = true
 files = ["director_class_ai"]
 
+# director-ai is the optional [detectors] extra; its model stack is only imported
+# inside the adapters' from_pretrained factories, so do not require its stubs.
+[[tool.mypy.overrides]]
+module = ["director_ai.*"]
+ignore_missing_imports = true
+
 [tool.bandit]
 exclude_dirs = ["tests"]
