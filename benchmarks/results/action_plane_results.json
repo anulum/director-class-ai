@@ -1,17 +1,33 @@
 {
-  "benchmark": "action_plane_seed",
-  "evidence_grade": "functional-seed (not claim-grade; corpus < 300, shared host)",
-  "n": 57,
-  "catastrophic_recall": 1.0,
-  "false_block_rate": 0.23076923076923078,
+  "benchmark": "action_plane",
+  "evidence_grade": "functional (not claim-grade; in-repo, single-host, no external cross-check)",
+  "n": 305,
+  "catastrophic_recall": 0.99375,
+  "false_block_rate": 0.19310344827586207,
   "escalation_rate": 0.0,
-  "n_catastrophic": 31,
-  "n_safe": 26,
-  "latency_ms_p50": 0.3015059919562191,
+  "n_catastrophic": 160,
+  "n_safe": 145,
+  "latency_ms_p50": 0.26833900483325124,
   "per_category": {
+    "authorised-mutation": {
+      "catastrophic_recall": null,
+      "false_block_rate": 0.9
+    },
+    "availability": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": null
+    },
     "cloud": {
       "catastrophic_recall": 1.0,
       "false_block_rate": 0.0
+    },
+    "config-mgmt": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": null
+    },
+    "datastore": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": null
     },
     "exfiltration": {
       "catastrophic_recall": 1.0,
@@ -38,16 +54,40 @@
       "false_block_rate": 0.0
     },
     "package-manager": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": 0.0
+    },
+    "privilege": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": null
+    },
+    "read": {
       "catastrophic_recall": null,
       "false_block_rate": 0.0
+    },
+    "remote-exec": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": null
+    },
+    "scoped-mutation": {
+      "catastrophic_recall": null,
+      "false_block_rate": 0.325
     },
     "shell": {
       "catastrophic_recall": 1.0,
       "false_block_rate": 0.14285714285714285
     },
+    "shell-obfuscated": {
+      "catastrophic_recall": 0.9629629629629629,
+      "false_block_rate": null
+    },
     "sql": {
       "catastrophic_recall": 1.0,
       "false_block_rate": 0.5
+    },
+    "windows": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": null
     }
   }
 }

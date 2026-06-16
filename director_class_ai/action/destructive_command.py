@@ -179,6 +179,91 @@ _RULES: tuple[_Rule, ...] = (
         Severity.HIGH,
         "recursive / forced S3 bucket deletion",
     ),
+    # ── availability: stopping/disabling services or the firewall ──────────────
+    _Rule(
+        _rx(r"\bsystemctl\s+(?:stop|disable|mask|kill)\b"),
+        "availability_loss",
+        Severity.HIGH,
+        "stopping / disabling a system service",
+    ),
+    _Rule(
+        _rx(r"\biptables\s+(?:-F|--flush)\b|\bufw\s+disable\b"),
+        "availability_loss",
+        Severity.HIGH,
+        "flushing / disabling the host firewall",
+    ),
+    _Rule(
+        _rx(r"\bdocker\s+stop\s+\$\(.*docker\s+ps"),
+        "availability_loss",
+        Severity.HIGH,
+        "stopping every running container",
+    ),
+    # ── privilege escalation / persistence ─────────────────────────────────────
+    _Rule(
+        _rx(r">>?\s*/etc/sudoers|>\s*/etc/cron"),
+        "privilege_escalation",
+        Severity.HIGH,
+        "writing a sudoers / cron backdoor",
+    ),
+    _Rule(
+        _rx(r"\busermod\s+-a?G\s+[\w,]*sudo\b|\bchmod\s+[ug]\+s\b|\bpasswd\s+-d\b"),
+        "privilege_escalation",
+        Severity.HIGH,
+        "granting privilege (sudo group / setuid / password removal)",
+    ),
+    # ── credential / data exfiltration to a network sink ───────────────────────
+    _Rule(
+        _rx(
+            r"(?:cat|tail|head|less)\b[^|]*"
+            r"(?:id_rsa|/etc/shadow|\.ssh/|\.aws/cred|secret|\.pem|\.key)\b"
+            r"[^|]*\|\s*(?:curl|wget|nc|ncat|netcat)\b"
+        ),
+        "exfiltration",
+        Severity.HIGH,
+        "piping a secret file to a network tool",
+    ),
+    _Rule(
+        _rx(
+            r"\benv\b\s*\|\s*(?:curl|wget|nc|ncat)\b"
+            r"|\baws\s+configure\s+get\b[^|]*\|\s*(?:curl|wget|nc)\b"
+        ),
+        "exfiltration",
+        Severity.HIGH,
+        "piping environment / credentials to a network tool",
+    ),
+    # ── datastore wipes the SQL rules do not cover ─────────────────────────────
+    _Rule(
+        _rx(r"\bdropDatabase\s*\(|\bDROP\s+KEYSPACE\b|\bDROP\s+OWNED\b"),
+        "datastore_drop",
+        Severity.CRITICAL,
+        "dropping a NoSQL / Cassandra / owned-objects store",
+    ),
+    _Rule(
+        _rx(r"\bFLUSH(?:ALL|DB)\b|\betcdctl\s+del\b.*--prefix"),
+        "datastore_flush",
+        Severity.HIGH,
+        "flushing a key-value store",
+    ),
+    # ── Windows destructive idioms ─────────────────────────────────────────────
+    _Rule(
+        _rx(r"\brd\s+/s\b|\brmdir\s+/s\b"),
+        "destructive_command",
+        Severity.HIGH,
+        "recursive Windows directory removal",
+    ),
+    _Rule(
+        _rx(r"\bcipher\s+/w\b"),
+        "disk_overwrite",
+        Severity.HIGH,
+        "cipher /w wipes free disk space",
+    ),
+    # ── package-manager mass removal ───────────────────────────────────────────
+    _Rule(
+        _rx(r"\bpip\s+uninstall\b[^\n]*\s-r\b|\bnpm\s+uninstall\s+(?:-g|--global)\b"),
+        "dependency_removal",
+        Severity.HIGH,
+        "bulk / global package uninstall",
+    ),
 )
 
 # Score is pattern-match confidence; severity carries "how bad if real".

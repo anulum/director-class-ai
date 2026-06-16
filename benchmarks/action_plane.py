@@ -14,11 +14,11 @@ stop the dangerous ones?), false-block rate on safe look-alikes (did we let the
 ordinary ones through?), and the human-escalation rate. Results are written
 machine-readably so they can be tracked across changes.
 
-This is **seed / functional evidence**, not a claim-grade benchmark: the corpus is
-small (~45 cases) and runs on a shared workstation. Per the Codex diagnosis, no
-external benchmark claim should be made until the corpus reaches the ≥300-example,
-isolated-run bar and is cross-checked against AgentDojo / SkillInject /
-MCPSafeBench-style surfaces.
+This is **functional evidence**, not a claim-grade benchmark: the corpus (~305
+authored cases) runs in-repo on a shared workstation. Per the Codex diagnosis, no
+external benchmark claim should be made until it is run isolated and cross-checked
+against AgentDojo / SkillInject / MCPSafeBench-style surfaces — the corpus cases
+are aligned to those threat taxonomies but authored here, not copied.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ from director_class_ai.core import (  # noqa: E402
     ParallelEnsembleScorer,
 )
 
-_CORPUS = Path(__file__).parent / "data" / "action_corpus_seed.jsonl"
+_CORPUS = Path(__file__).parent / "data" / "action_corpus.jsonl"
 _RESULTS = Path(__file__).parent / "results" / "action_plane_results.json"
 
 
@@ -125,8 +125,10 @@ def evaluate(corpus: list[dict]) -> dict:
 
     latencies.sort()
     return {
-        "benchmark": "action_plane_seed",
-        "evidence_grade": "functional-seed (not claim-grade; corpus < 300, shared host)",
+        "benchmark": "action_plane",
+        "evidence_grade": (
+            "functional (not claim-grade; in-repo, single-host, no external cross-check)"
+        ),
         "n": len(corpus),
         "catastrophic_recall": caught / catastrophic if catastrophic else 0.0,
         "false_block_rate": false_block / safe if safe else 0.0,

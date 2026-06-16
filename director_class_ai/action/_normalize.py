@@ -39,7 +39,8 @@ _BACKSLASH_BREAK = re.compile(r"(?<=\w)\\(?=\w)")
 _SPLIT_FLAGS = re.compile(r"(\s-[a-zA-Z]+)\s+-([a-zA-Z]+)")
 _B64_TOKEN = re.compile(r"[A-Za-z0-9+/]{8,}={0,2}")
 _B64_CONTEXT = re.compile(r"\bbase64\b|\b(?:ba)?sh\b\s*$|\|\s*(?:ba)?sh\b", re.IGNORECASE)
-_HEX_RUN = re.compile(r"(?:\\x[0-9a-fA-F]{2}){3,}")
+_HEX_RUN = re.compile(r"(?:\\x[0-9a-fA-F]{2}){2,}")
+_IFS = re.compile(r"\$\{IFS\}|\$IFS\b")
 _ALIAS = re.compile(r"alias\s+\w+=['\"]([^'\"]+)['\"]", re.IGNORECASE)
 _CMD_SUB = re.compile(r"\$\(([^()]*)\)|`([^`]*)`")
 _ECHO_SUB = re.compile(r"\$\(\s*(?:echo|printf)\s+(?:-e\s+)?([^()]*?)\)", re.IGNORECASE)
@@ -86,6 +87,25 @@ def _decode_hex_runs(command: str) -> list[str]:
     return decoded
 
 
+def _decode_hex_inplace(command: str) -> list[str]:
+    """Substitute each ``\\xHH`` run with its text *in place*, keeping the rest.
+
+    Reveals ANSI-C forms like ``$'\\x72\\x6d' -rf /`` where the hidden verb is
+    embedded among literal arguments (extracting the run alone would lose them).
+    """
+
+    def repl(match: re.Match[str]) -> str:
+        pairs = match.group(0).split("\\x")[1:]
+        try:
+            text = bytes(int(h, 16) for h in pairs).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return match.group(0)
+        return text if text.isprintable() else match.group(0)
+
+    substituted = _HEX_RUN.sub(repl, command)
+    return [substituted] if substituted != command else []
+
+
 def _command_substitutions(command: str) -> list[str]:
     """Reveal ``$(...)`` / backtick substitutions and inline ``$(echo ...)``."""
     forms: list[str] = []
@@ -113,8 +133,14 @@ def _transform_once(command: str) -> list[str]:
     dequoted = dequoted.replace("''", "").replace('""', "")
     out.append(dequoted)
     out.append(_merge_split_flags(dequoted))
+    # Full quote-strip reveals embedded-quote breaks ('r"m"', "$'rm'") that the
+    # empty-pair dequote misses; additive, so a safe command stays safe.
+    out.append(norm.replace("$'", "").replace("'", "").replace('"', ""))
+    # ${IFS} is a space substitute attackers use to avoid literal whitespace.
+    out.append(_WS.sub(" ", _IFS.sub(" ", norm)).strip())
     out.extend(_decode_base64_payloads(command))
     out.extend(_decode_hex_runs(command))
+    out.extend(_decode_hex_inplace(command))
     out.extend(_command_substitutions(command))
     out.extend(_ALIAS.findall(command))
     return out

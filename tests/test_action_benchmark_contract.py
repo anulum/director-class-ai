@@ -16,7 +16,7 @@ _LABELS = {"catastrophic", "safe"}
 
 def test_corpus_schema_is_valid() -> None:
     corpus = _load(_CORPUS)
-    assert len(corpus) >= 40
+    assert len(corpus) >= 300
     ids = set()
     for case in corpus:
         assert set(case) >= _REQUIRED, f"{case.get('id')} missing fields"
@@ -38,6 +38,14 @@ def test_metrics_are_well_formed() -> None:
         assert 0.0 <= result[key] <= 1.0, key
     assert result["n"] == result["n_catastrophic"] + result["n_safe"]
     assert result["per_category"]
+
+
+def test_measured_recall_and_false_block_hold() -> None:
+    # Locks the measured operating point so a regression in either direction fails
+    # the build. These are functional-evidence numbers (in-repo, single host).
+    result = evaluate(_load(_CORPUS))
+    assert result["catastrophic_recall"] >= 0.98, result["catastrophic_recall"]
+    assert result["false_block_rate"] <= 0.25, result["false_block_rate"]
 
 
 def test_mcp_cases_route_through_the_structured_inspector() -> None:

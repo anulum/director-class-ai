@@ -117,6 +117,13 @@ _READ_VERBS = frozenset(
         "lookup",
         "count",
         "inspect",
+        "grep",
+        "open",
+        "cat",
+        "load",
+        "download",
+        "scan",
+        "stat",
     }
 )
 

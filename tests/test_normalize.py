@@ -122,6 +122,22 @@ class TestRecursiveAndNewTransforms:
     def test_command_substitution_inline_echo(self) -> None:
         assert caught("$(echo rm) -rf /").severity is Severity.CRITICAL
 
+    def test_ifs_substitution_revealed(self) -> None:
+        # ${IFS} replaces literal spaces between complete tokens
+        assert caught("rm${IFS}-rf${IFS}/").severity is Severity.CRITICAL
+
+    def test_double_quote_break_in_verb_revealed(self) -> None:
+        # embedded-quote break the empty-pair dequote misses
+        assert caught('r"m" -rf /') is not None
+
+    def test_ansi_c_hex_quote_revealed(self) -> None:
+        # $'\x72\x6d' is the ANSI-C hex form of "rm"; in-place decode + quote-strip
+        assert caught(r"$'\x72\x6d' -rf /") is not None
+
+    def test_full_quote_strip_keeps_safe_safe(self) -> None:
+        # stripping quotes from a benign command yields another benign form
+        assert caught('echo "hello world"') is None
+
     def test_command_substitution_backtick(self) -> None:
         assert caught("`rm -rf /`").severity is Severity.CRITICAL
 
