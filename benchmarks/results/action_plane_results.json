@@ -1,0 +1,49 @@
+{
+  "benchmark": "action_plane_seed",
+  "evidence_grade": "functional-seed (not claim-grade; corpus < 300, shared host)",
+  "n": 45,
+  "catastrophic_recall": 1.0,
+  "false_block_rate": 0.3,
+  "escalation_rate": 0.0,
+  "n_catastrophic": 25,
+  "n_safe": 20,
+  "latency_ms_p50": 1.108788012061268,
+  "per_category": {
+    "cloud": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": 0.0
+    },
+    "exfiltration": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": null
+    },
+    "filesystem": {
+      "catastrophic_recall": null,
+      "false_block_rate": 1.0
+    },
+    "git": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": 0.0
+    },
+    "injected": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": null
+    },
+    "k8s": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": 0.0
+    },
+    "package-manager": {
+      "catastrophic_recall": null,
+      "false_block_rate": 0.0
+    },
+    "shell": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": 0.14285714285714285
+    },
+    "sql": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": 0.5
+    }
+  }
+}
