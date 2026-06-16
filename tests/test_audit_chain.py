@@ -1,0 +1,230 @@
+# SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial
+# Director-Class AI — commercial product (licence pending); not the Apache base.
+# © Concepts 1996–2026 Miroslav Šotek. All rights reserved.
+# © Code 2020–2026 Miroslav Šotek. All rights reserved.
+# ORCID: 0009-0009-3560-0851
+# Contact: www.anulum.li | protoscience@anulum.li
+# Director-Class AI — hash-chained audit tests
+
+from __future__ import annotations
+
+import json
+import threading
+
+from director_class_ai.action import DestructiveCommandDetector
+from director_class_ai.audit import AuditChainSink, verify_chain
+from director_class_ai.core import (
+    EvaluationRequest,
+    Governor,
+    ParallelEnsembleScorer,
+)
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.t = 0.0
+
+    def __call__(self) -> float:
+        self.t += 1.0
+        return self.t
+
+
+def _governor(path) -> Governor:
+    sink = AuditChainSink(path=path, policy_profile="test", clock=_Clock())
+    ensemble = ParallelEnsembleScorer([DestructiveCommandDetector()])
+    return Governor(ensemble=ensemble, audit_sink=sink)
+
+
+def _populate(path, n: int = 4) -> Governor:
+    gov = _governor(path)
+    gov.review(EvaluationRequest(action="rm -rf /"))
+    gov.review(EvaluationRequest(action="ls -la"))
+    gov.review(EvaluationRequest(action="DROP TABLE t;"))
+    gov.review(EvaluationRequest(action="cat x"))
+    return gov
+
+
+def test_appends_and_verifies(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _populate(p)
+    assert p.read_text().count("\n") == 4
+    assert verify_chain(p).ok is True
+
+
+def test_genesis_and_linkage(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _populate(p)
+    lines = [json.loads(line) for line in p.read_text().splitlines()]
+    assert lines[0]["prev_hash"] == "0" * 64
+    assert lines[1]["prev_hash"] == lines[0]["entry_hash"]
+    assert [line["seq"] for line in lines] == [0, 1, 2, 3]
+
+
+def test_mutation_detected(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _populate(p)
+    lines = p.read_text().splitlines()
+    rec = json.loads(lines[1])
+    rec["permitted"] = not rec["permitted"]  # tamper
+    lines[1] = json.dumps(rec)
+    p.write_text("\n".join(lines) + "\n")
+    v = verify_chain(p)
+    assert v.ok is False and v.first_bad_index == 1
+
+
+def test_reordering_detected(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _populate(p)
+    lines = p.read_text().splitlines()
+    lines[1], lines[2] = lines[2], lines[1]
+    p.write_text("\n".join(lines) + "\n")
+    assert verify_chain(p).ok is False
+
+
+def test_deletion_detected(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _populate(p)
+    lines = p.read_text().splitlines()
+    del lines[1]  # remove a middle entry
+    p.write_text("\n".join(lines) + "\n")
+    assert verify_chain(p).ok is False
+
+
+def test_tail_truncation_detected_via_head(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _populate(p)
+    lines = p.read_text().splitlines()
+    p.write_text(
+        "\n".join(lines[:-1]) + "\n"
+    )  # drop the last entry; head still points at it
+    v = verify_chain(p)
+    assert v.ok is False and "truncated" in v.reason
+
+
+def test_corrupt_line_detected(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _populate(p)
+    p.write_text(p.read_text() + "{ this is not json\n")
+    assert verify_chain(p).ok is False
+
+
+def test_restart_continuity(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _populate(p)  # first process
+    _populate(p)  # a fresh sink/Governor on the same file continues the chain
+    lines = [json.loads(line) for line in p.read_text().splitlines()]
+    assert [line["seq"] for line in lines] == list(range(8))
+    assert verify_chain(p).ok is True
+
+
+def test_no_raw_action_text_in_log(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _populate(p)
+    body = p.read_text()
+    assert "rm -rf /" not in body and "DROP TABLE" not in body
+
+
+def test_concurrent_writes(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    gov = _governor(p)
+
+    def work() -> None:
+        for _ in range(10):
+            gov.review(EvaluationRequest(action="rm -rf /"))
+
+    threads = [threading.Thread(target=work) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    lines = p.read_text().splitlines()
+    assert len(lines) == 40
+    assert verify_chain(p).ok is True
+
+
+def test_missing_log_is_not_ok(tmp_path) -> None:
+    assert verify_chain(tmp_path / "nope.jsonl").ok is False
+
+
+from director_class_ai.core import DetectorSignal, Locus, Plane, Severity  # noqa: E402
+
+
+class _BorderlineAction:
+    name = "border"
+    plane = Plane.ACTION
+    tier = 0
+
+    def evaluate(self, request):
+        if "maybe" not in request.action:
+            return None
+        return DetectorSignal(
+            detector=self.name,
+            plane=Plane.ACTION,
+            score=0.2,
+            locus=Locus.ACTION,
+            signal_type="border",
+            severity=Severity.MEDIUM,
+        )
+
+
+def _escalating(path, approval):
+    sink = AuditChainSink(path=path, clock=_Clock())
+    ens = ParallelEnsembleScorer([_BorderlineAction()])
+    return Governor(ensemble=ens, audit_sink=sink, approval=approval)
+
+
+def test_approval_state_approved(tmp_path) -> None:
+    p = tmp_path / "a.jsonl"
+    _escalating(p, lambda _v, _r: True).review(EvaluationRequest(action="maybe op"))
+    rec = json.loads(p.read_text().splitlines()[0])
+    assert rec["approval_state"] == "approved" and rec["escalated"] is True
+
+
+def test_approval_state_denied_or_pending(tmp_path) -> None:
+    p = tmp_path / "a.jsonl"
+    _escalating(p, None).review(EvaluationRequest(action="maybe op"))
+    rec = json.loads(p.read_text().splitlines()[0])
+    assert rec["approval_state"] == "denied_or_pending"
+
+
+def test_append_continues_from_preexisting_empty_file(tmp_path) -> None:
+    p = tmp_path / "a.jsonl"
+    p.write_text("")  # exists but empty
+    _populate(p)
+    assert verify_chain(p).ok is True
+    assert json.loads(p.read_text().splitlines()[0])["seq"] == 0
+
+
+def test_blank_lines_tolerated(tmp_path) -> None:
+    p = tmp_path / "a.jsonl"
+    _populate(p)
+    p.write_text(p.read_text().replace("\n", "\n\n", 1))  # inject a blank line
+    assert verify_chain(p).ok is True
+
+
+def test_prev_hash_only_mutation_detected(tmp_path) -> None:
+    p = tmp_path / "a.jsonl"
+    _populate(p)
+    lines = p.read_text().splitlines()
+    rec = json.loads(lines[2])
+    rec["prev_hash"] = "f" * 64  # break linkage but keep seq
+    lines[2] = json.dumps(rec)
+    p.write_text("\n".join(lines) + "\n")
+    v = verify_chain(p)
+    assert v.ok is False and "prev_hash" in v.reason
+
+
+def test_missing_head_sidecar_still_verifies(tmp_path) -> None:
+    p = tmp_path / "a.jsonl"
+    _populate(p)
+    p.with_suffix(".jsonl.head").unlink()  # remove the sidecar
+    assert verify_chain(p).ok is True
+
+
+def test_last_skips_blank_lines_on_append(tmp_path) -> None:
+    p = tmp_path / "a.jsonl"
+    _populate(p)
+    p.write_text(p.read_text() + "\n")  # trailing blank line
+    _governor(p).review(EvaluationRequest(action="ls"))  # _last must skip the blank
+    assert verify_chain(p).ok is True
+    assert json.loads(p.read_text().splitlines()[-1])["seq"] == 4
