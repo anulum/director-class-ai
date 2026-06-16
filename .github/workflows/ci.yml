@@ -47,3 +47,18 @@ jobs:
       - run: python -m pip install "bandit>=1.7" semgrep
       - run: bandit -r director_class_ai/ -ll
       - run: semgrep scan --config p/python --config p/security-audit --error director_class_ai/
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install build
+      - run: python -m build --sdist --wheel --outdir dist
+      # install the built wheel in a clean venv and import it — proves the
+      # package is shippable, not just that the source tree imports
+      - run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install dist/*.whl
+          /tmp/smoke/bin/python -c "import director_class_ai as d; assert d.__version__ == '0.1.0', d.__version__; print('wheel import OK', d.__version__)"

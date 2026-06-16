@@ -38,3 +38,15 @@ resolves them into one `Verdict`. Architecture and roadmap: `docs/internal/`.
 
 Proprietary commercial — see `LICENSE`. Source visibility is **not** a grant of
 rights; production use requires a commercial agreement (protoscience@anulum.li).
+
+## Local verification
+
+```bash
+python -m pytest                       # tests + 100% coverage gate
+ruff check director_class_ai tests benchmarks
+ruff format --check director_class_ai tests benchmarks
+mypy --strict director_class_ai
+bandit -r director_class_ai -ll
+uvx semgrep scan --config p/python --config p/security-audit director_class_ai   # SAST, no local install
+python -m build --sdist --wheel        # packaging
+```

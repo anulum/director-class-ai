@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "High-assurance multi-detector governance for autonomous and mission-critical systems"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "LicenseRef-Director-Class-AI-Commercial" }
+license-files = ["LICENSE"]
 authors = [{ name = "Miroslav Šotek", email = "protoscience@anulum.li" }]
 keywords = [
     "ai-safety",
@@ -16,6 +16,17 @@ keywords = [
     "agent-governance",
     "kill-switch",
     "hallucination-detection",
+]
+# Proprietary commercial product. "Private :: Do Not Upload" makes PyPI reject an
+# accidental publish; the licence terms live in LICENSE (declared via license-files).
+classifiers = [
+    "Private :: Do Not Upload",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 dependencies = []
 

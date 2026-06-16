@@ -14,4 +14,4 @@ integrity (was the input tampered with?), and action (is this effector command
 safe to run?) — and fuses them into one fail-open/fail-closed governance verdict.
 """
 
-__version__ = "0.0.0"
+__version__ = "0.1.0"
