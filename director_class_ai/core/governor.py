@@ -35,10 +35,20 @@ from .ensemble import ParallelEnsembleScorer
 from .fusion import Verdict
 from .signal import EvaluationRequest
 
-__all__ = ["AuditRecord", "Decision", "Governor"]
+__all__ = ["AuditRecord", "Decision", "Governor", "digest_request"]
 
 ApprovalHook = Callable[[Verdict, EvaluationRequest], bool]
 AuditSink = Callable[["AuditRecord"], None]
+
+
+def digest_request(request: EvaluationRequest) -> str:
+    """Privacy-preserving identifier for a request — no raw content / PII.
+
+    The single source of truth for the digest, so the audit chain and the approval
+    queue bind to the *same* value for the same request.
+    """
+    payload = f"{request.action}\x1f{request.response}\x1f{request.context}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
 @dataclass(frozen=True)
@@ -64,9 +74,7 @@ class Decision:
     record: AuditRecord
 
 
-def _digest(request: EvaluationRequest) -> str:
-    payload = f"{request.action}\x1f{request.response}\x1f{request.context}"
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+_digest = digest_request
 
 
 @dataclass
