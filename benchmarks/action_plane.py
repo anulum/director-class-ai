@@ -32,10 +32,14 @@ from pathlib import Path
 sys.path.insert(0, ".")
 
 from director_class_ai.action import (  # noqa: E402
+    MCP_CALL_KEY,
     BlastRadiusDetector,
     DestructiveCommandDetector,
     IntentConsistencyDetector,
+    MCPCallInspector,
+    MCPToolCall,
     OriginTaintDetector,
+    serialise_call,
 )
 from director_class_ai.core import (  # noqa: E402
     EvaluationRequest,
@@ -58,9 +62,36 @@ def _governor() -> Governor:
             BlastRadiusDetector(),
             OriginTaintDetector(),
             IntentConsistencyDetector(),
+            MCPCallInspector(),
         ]
     )
     return Governor(ensemble=ensemble)  # no approver: escalation => not permitted
+
+
+def _request(case: dict) -> EvaluationRequest:
+    """Build the evaluation request, with the structured MCP path when present."""
+    mcp = case.get("mcp_call")
+    if mcp:
+        call = MCPToolCall(
+            server=mcp.get("server", ""),
+            tool=mcp.get("tool", ""),
+            arguments=mcp.get("arguments", {}),
+            arg_provenance=mcp.get("arg_provenance", {}),
+            default_provenance=mcp.get("default_provenance", case.get("provenance", "")),
+        )
+        return EvaluationRequest(
+            action=serialise_call(call),
+            query=case.get("query", ""),
+            context=case.get("context", ""),
+            action_provenance=call.default_provenance,
+            metadata={MCP_CALL_KEY: call},
+        )
+    return EvaluationRequest(
+        action=case["action"],
+        query=case.get("query", ""),
+        context=case.get("context", ""),
+        action_provenance=case.get("provenance", ""),
+    )
 
 
 def evaluate(corpus: list[dict]) -> dict:
@@ -73,14 +104,7 @@ def evaluate(corpus: list[dict]) -> dict:
 
     for case in corpus:
         t0 = time.perf_counter()
-        decision = gov.review(
-            EvaluationRequest(
-                action=case["action"],
-                query=case.get("query", ""),
-                context=case.get("context", ""),
-                action_provenance=case.get("provenance", ""),
-            )
-        )
+        decision = gov.review(_request(case))
         latencies.append((time.perf_counter() - t0) * 1000)
         flagged = not decision.permitted  # blocked or escalated
         cat = case.get("category", "other")

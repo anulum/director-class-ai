@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from benchmarks.action_plane import _CORPUS, _load, evaluate
+from benchmarks.action_plane import _CORPUS, _governor, _load, _request, evaluate
 
 _REQUIRED = {"id", "action", "label", "category", "severity"}
 _LABELS = {"catastrophic", "safe"}
@@ -38,6 +38,18 @@ def test_metrics_are_well_formed() -> None:
         assert 0.0 <= result[key] <= 1.0, key
     assert result["n"] == result["n_catastrophic"] + result["n_safe"]
     assert result["per_category"]
+
+
+def test_mcp_cases_route_through_the_structured_inspector() -> None:
+    corpus = _load(_CORPUS)
+    mcp = [c for c in corpus if c.get("category") == "mcp"]
+    assert mcp, "corpus must include MCP tool-call cases"
+    assert any(c.get("mcp_call") for c in mcp)
+    gov = _governor()
+    for case in mcp:
+        decision = gov.review(_request(case))
+        flagged = not decision.permitted
+        assert flagged is (case["label"] == "catastrophic"), case["id"]
 
 
 def test_catastrophic_recall_on_known_dangerous() -> None:
