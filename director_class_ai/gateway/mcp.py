@@ -66,6 +66,75 @@ _DISCOVERY_POISONING = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_PARAMETER_POISONING = re.compile(
+    r"(?:^|[_\-.])("
+    r"ignore(?:[_\-.]?previous)?(?:[_\-.]?instructions?)?|"
+    r"system(?:[_\-.]?prompt|[_\-.]?message)?|"
+    r"developer(?:[_\-.]?message)?|"
+    r"hidden(?:[_\-.]?instruction)?|"
+    r"override(?:[_\-.]?policy)?|"
+    r"jailbreak|"
+    r"always(?:[_\-.]?(?:use|call|choose))"
+    r")(?:$|[_\-.])",
+    re.IGNORECASE,
+)
+_PREFERENCE_MANIPULATION = re.compile(
+    r"\b("
+    r"always\s+(?:choose|use|call)|"
+    r"prefer\s+this\s+tool|"
+    r"highest\s+priority|"
+    r"more\s+trusted\s+than|"
+    r"bypass\s+(?:policy|approval|review)"
+    r")\b",
+    re.IGNORECASE,
+)
+_FALSE_ERROR_ESCALATION = re.compile(
+    r"\b("
+    r"(?:if|when)\s+(?:an?\s+)?(?:error|failure|exception)\b.{0,80}"
+    r"(?:run|execute|call|invoke|use)\s+"
+    r"(?:shell|terminal|bash|cmd|powershell|rm|curl|wget|delete|drop)|"
+    r"on\s+(?:error|failure)\b.{0,80}(?:ask|tell)\s+the\s+user\s+to\s+run"
+    r")\b",
+    re.IGNORECASE,
+)
+_TOOL_TRANSFER = re.compile(
+    r"\b("
+    r"(?:call|invoke|delegate\s+to|transfer\s+to|chain\s+to)\s+"
+    r"(?:another\s+)?(?:tool|server|agent)|"
+    r"after\s+this\s+tool\b.{0,80}(?:call|invoke|use)\b"
+    r")\b",
+    re.IGNORECASE,
+)
+_MUTATING_PARAMETER = re.compile(
+    r"(?:^|[_\-.])("
+    r"command|cmd|shell|script|exec|execute|delete|remove|write|update|patch|"
+    r"drop|truncate|query|sql|payload|body|url|webhook|callback|destination"
+    r")(?:$|[_\-.])",
+    re.IGNORECASE,
+)
+_READ_TOOL = re.compile(
+    r"(?:^|[_\-.])(?:read|get|list|search|fetch|view|show|describe|query|find|"
+    r"lookup|inspect|open|stat)(?:$|[_\-.])",
+    re.IGNORECASE,
+)
+_READ_ALLOWED_PARAMETERS = frozenset(
+    {
+        "path",
+        "file",
+        "filename",
+        "pattern",
+        "glob",
+        "query",
+        "limit",
+        "offset",
+        "cursor",
+        "encoding",
+        "format",
+        "include",
+        "exclude",
+        "recursive",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -324,6 +393,106 @@ def _discovery_text(descriptor: MCPToolDescriptor) -> str:
     )
 
 
+def _iter_schema_names(value: object) -> tuple[str, ...]:
+    names: list[str] = []
+
+    def visit(node: object) -> None:
+        if isinstance(node, Mapping):
+            for key, child in node.items():
+                named_mapping = key in {"properties", "$defs", "definitions"}
+                named_sequence = key in {"required", "dependentRequired"}
+                if (named_mapping and isinstance(child, Mapping)) or (
+                    named_sequence
+                    and isinstance(child, Sequence)
+                    and not isinstance(child, str)
+                ):
+                    names.extend(str(name) for name in child)
+                visit(child)
+        elif isinstance(node, Sequence) and not isinstance(node, str):
+            for item in node:
+                visit(item)
+
+    visit(value)
+    return tuple(dict.fromkeys(names))
+
+
+def _iter_default_text(value: object) -> tuple[str, ...]:
+    texts: list[str] = []
+
+    def visit(node: object) -> None:
+        if isinstance(node, Mapping):
+            for key, child in node.items():
+                if key in {"default", "const", "examples", "example", "enum"}:
+                    texts.append(_canonical(child))
+                visit(child)
+        elif isinstance(node, Sequence) and not isinstance(node, str):
+            for item in node:
+                visit(item)
+
+    visit(value)
+    return tuple(texts)
+
+
+def _parameter_names(descriptor: MCPToolDescriptor) -> tuple[str, ...]:
+    names = [
+        *_iter_schema_names(descriptor.input_schema),
+        *_iter_schema_names(descriptor.argument_schema),
+    ]
+    return tuple(dict.fromkeys(name for name in names if name.strip()))
+
+
+def _default_texts(descriptor: MCPToolDescriptor) -> tuple[str, ...]:
+    return (
+        *_iter_default_text(descriptor.input_schema),
+        *_iter_default_text(descriptor.argument_schema),
+    )
+
+
+def _descriptor_poisoning_findings(descriptor: MCPToolDescriptor) -> tuple[str, ...]:
+    findings: list[str] = []
+    text = _discovery_text(descriptor)
+    hidden_text = _canonical(descriptor.hidden_metadata)
+    parameter_names = _parameter_names(descriptor)
+    default_texts = _default_texts(descriptor)
+
+    if _DISCOVERY_POISONING.search(text):
+        findings.append("discovery_poisoning")
+    if any(_PARAMETER_POISONING.search(name) for name in parameter_names):
+        findings.append("parameter_name_poisoning")
+    if any(_DISCOVERY_POISONING.search(default) for default in default_texts):
+        findings.append("schema_default_poisoning")
+    if descriptor.hidden_metadata and (
+        _DISCOVERY_POISONING.search(hidden_text)
+        or _PREFERENCE_MANIPULATION.search(hidden_text)
+    ):
+        findings.append("hidden_metadata_poisoning")
+    if _PREFERENCE_MANIPULATION.search(text):
+        findings.append("preference_manipulation")
+    if _FALSE_ERROR_ESCALATION.search(text):
+        findings.append("false_error_escalation")
+    if _TOOL_TRANSFER.search(text):
+        findings.append("tool_transfer")
+    if _out_of_scope_parameters(descriptor, parameter_names):
+        findings.append("out_of_scope_parameter")
+
+    return tuple(dict.fromkeys(findings))
+
+
+def _out_of_scope_parameters(
+    descriptor: MCPToolDescriptor,
+    parameter_names: tuple[str, ...],
+) -> bool:
+    if not _READ_TOOL.search(descriptor.tool):
+        return False
+    for name in parameter_names:
+        normalised = name.strip().lower().replace("-", "_").replace(".", "_")
+        if normalised in _READ_ALLOWED_PARAMETERS:
+            continue
+        if _MUTATING_PARAMETER.search(normalised):
+            return True
+    return False
+
+
 def _review_discovery(request: MCPDiscoveryRequest) -> tuple[str, ...]:
     findings: list[str] = []
     if not request.server.strip():
@@ -352,8 +521,7 @@ def _review_discovery(request: MCPDiscoveryRequest) -> tuple[str, ...]:
             findings.append("tool_name_collision")
         seen_normalised[normalised] = descriptor.tool
 
-        if _DISCOVERY_POISONING.search(_discovery_text(descriptor)):
-            findings.append("discovery_poisoning")
+        findings.extend(_descriptor_poisoning_findings(descriptor))
 
     return tuple(dict.fromkeys(findings))
 
