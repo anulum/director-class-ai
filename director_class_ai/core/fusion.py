@@ -76,6 +76,7 @@ class FusionPolicy:
     taint_signal_types: frozenset[str] = field(
         default_factory=lambda: frozenset(
             {"origin_taint", "mcp_tool_call", "exfiltration"}
+            | {"causal_takeover"}
         )
     )
     plane_mode: dict[Plane, FusionMode] = field(

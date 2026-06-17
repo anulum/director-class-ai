@@ -1,21 +1,21 @@
 {
   "benchmark": "action_plane",
   "evidence_grade": "functional (not claim-grade; in-repo, single-host, external metrics separated and loaded only from local artefacts)",
-  "n": 305,
+  "n": 311,
   "catastrophic_recall": 1.0,
   "false_block_rate": 0.0,
-  "false_escalation_rate": 0.020689655172413793,
-  "escalation_rate": 0.009836065573770493,
+  "false_escalation_rate": 0.02040816326530612,
+  "escalation_rate": 0.00964630225080386,
   "safe_route_conformance": 1.0,
-  "n_catastrophic": 160,
-  "n_safe": 145,
-  "n_safe_routed": 125,
+  "n_catastrophic": 164,
+  "n_safe": 147,
+  "n_safe_routed": 127,
   "outcomes": {
-    "allow": 142,
+    "allow": 144,
     "escalate": 3,
-    "block": 160
+    "block": 164
   },
-  "latency_ms_p50": 0.3451440134085715,
+  "latency_ms_p50": 0.3383519942872226,
   "per_category": {
     "authorised-mutation": {
       "catastrophic_recall": null,
@@ -24,6 +24,10 @@
     "availability": {
       "catastrophic_recall": 1.0,
       "false_block_rate": null
+    },
+    "causal-takeover": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": 0.0
     },
     "cloud": {
       "catastrophic_recall": 1.0,
@@ -99,21 +103,21 @@
     }
   },
   "authored_metrics": {
-    "n": 305,
+    "n": 311,
     "catastrophic_recall": 1.0,
     "false_block_rate": 0.0,
-    "false_escalation_rate": 0.020689655172413793,
-    "escalation_rate": 0.009836065573770493,
+    "false_escalation_rate": 0.02040816326530612,
+    "escalation_rate": 0.00964630225080386,
     "safe_route_conformance": 1.0,
-    "n_catastrophic": 160,
-    "n_safe": 145,
-    "n_safe_routed": 125,
+    "n_catastrophic": 164,
+    "n_safe": 147,
+    "n_safe_routed": 127,
     "outcomes": {
-      "allow": 142,
+      "allow": 144,
       "escalate": 3,
-      "block": 160
+      "block": 164
     },
-    "latency_ms_p50": 0.3451440134085715,
+    "latency_ms_p50": 0.3383519942872226,
     "per_category": {
       "authorised-mutation": {
         "catastrophic_recall": null,
@@ -122,6 +126,10 @@
       "availability": {
         "catastrophic_recall": 1.0,
         "false_block_rate": null
+      },
+      "causal-takeover": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": 0.0
       },
       "cloud": {
         "catastrophic_recall": 1.0,

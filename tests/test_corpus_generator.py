@@ -38,6 +38,14 @@ def test_catalogue_has_both_classes_and_attribution() -> None:
     assert aligned and all("copied" not in c["source"] for c in aligned)
 
 
+def test_catalogue_has_causal_takeover_timelines() -> None:
+    cases = [c for c in build_catalogue() if c["category"] == "causal-takeover"]
+
+    assert {c["label"] for c in cases} == {"catastrophic", "safe"}
+    assert all(c.get("metadata", {}).get("causal_timeline") for c in cases)
+    assert any(c.get("provenance") in {"retrieved", "tool_output"} for c in cases)
+
+
 def _row(cid: str, label: str = "safe") -> dict:
     return {
         "id": cid,

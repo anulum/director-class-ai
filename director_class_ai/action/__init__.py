@@ -9,6 +9,11 @@
 """Action-plane detectors: govern what an autonomous system *does*, not just says."""
 
 from .blast_radius import BlastRadiusDetector
+from .causal_takeover import (
+    CAUSAL_TIMELINE_KEY,
+    ActionTimeline,
+    CausalTakeoverDetector,
+)
 from .destructive_command import DestructiveCommandDetector
 from .intent_consistency import IntentConsistencyDetector
 from .mcp_inspector import MCP_CALL_KEY, MCPCallInspector, MCPToolCall, serialise_call
@@ -18,6 +23,9 @@ from .reversibility import REVERSIBILITY_KEY, ReversibilityDetector
 
 __all__ = [
     "BlastRadiusDetector",
+    "CAUSAL_TIMELINE_KEY",
+    "ActionTimeline",
+    "CausalTakeoverDetector",
     "DestructiveCommandDetector",
     "IntentConsistencyDetector",
     "MCPCallInspector",

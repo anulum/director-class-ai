@@ -51,6 +51,7 @@ from benchmarks.external_action_surfaces import (  # noqa: E402
 from director_class_ai.action import (  # noqa: E402
     MCP_CALL_KEY,
     BlastRadiusDetector,
+    CausalTakeoverDetector,
     DestructiveCommandDetector,
     IntentConsistencyDetector,
     MCPCallInspector,
@@ -95,6 +96,7 @@ def _governor() -> Governor:
         [
             DestructiveCommandDetector(),
             BlastRadiusDetector(),
+            CausalTakeoverDetector(),
             OriginTaintDetector(),
             IntentConsistencyDetector(),
             MCPCallInspector(),
@@ -105,6 +107,7 @@ def _governor() -> Governor:
 
 def _request(case: dict) -> EvaluationRequest:
     """Build the evaluation request, with the structured MCP path when present."""
+    metadata = dict(case.get("metadata", {}))
     mcp = case.get("mcp_call")
     if mcp:
         call = MCPToolCall(
@@ -119,13 +122,14 @@ def _request(case: dict) -> EvaluationRequest:
             query=case.get("query", ""),
             context=case.get("context", ""),
             action_provenance=call.default_provenance,
-            metadata={MCP_CALL_KEY: call},
+            metadata={**metadata, MCP_CALL_KEY: call},
         )
     return EvaluationRequest(
         action=case["action"],
         query=case.get("query", ""),
         context=case.get("context", ""),
         action_provenance=case.get("provenance", ""),
+        metadata=metadata,
     )
 
 
