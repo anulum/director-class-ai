@@ -8,11 +8,26 @@
 
 """Deployable gateway contracts around Director-Class AI governance primitives."""
 
-from .mcp import MCPGateway, MCPGatewayDecision, MCPGatewayRequest, MCPGatewayRoute
+from .mcp import (
+    MCPDiscoveryDecision,
+    MCPDiscoveryRequest,
+    MCPGateway,
+    MCPGatewayDecision,
+    MCPGatewayRequest,
+    MCPGatewayRoute,
+    MCPResponseDecision,
+    MCPResponseRequest,
+    MCPToolDescriptor,
+)
 
 __all__ = [
+    "MCPDiscoveryDecision",
+    "MCPDiscoveryRequest",
     "MCPGateway",
     "MCPGatewayDecision",
     "MCPGatewayRequest",
     "MCPGatewayRoute",
+    "MCPResponseDecision",
+    "MCPResponseRequest",
+    "MCPToolDescriptor",
 ]
