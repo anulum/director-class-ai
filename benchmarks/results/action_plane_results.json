@@ -1,21 +1,21 @@
 {
   "benchmark": "action_plane",
   "evidence_grade": "functional (not claim-grade; in-repo, single-host, external metrics separated and loaded only from local artefacts)",
-  "n": 323,
+  "n": 329,
   "catastrophic_recall": 1.0,
   "false_block_rate": 0.0,
-  "false_escalation_rate": 0.019736842105263157,
-  "escalation_rate": 0.009287925696594427,
+  "false_escalation_rate": 0.01948051948051948,
+  "escalation_rate": 0.00911854103343465,
   "safe_route_conformance": 1.0,
-  "n_catastrophic": 171,
-  "n_safe": 152,
-  "n_safe_routed": 132,
+  "n_catastrophic": 175,
+  "n_safe": 154,
+  "n_safe_routed": 134,
   "outcomes": {
-    "allow": 149,
+    "allow": 151,
     "escalate": 3,
-    "block": 171
+    "block": 175
   },
-  "latency_ms_p50": 0.34531301935203373,
+  "latency_ms_p50": 0.34370701177977026,
   "per_category": {
     "authorised-mutation": {
       "catastrophic_recall": null,
@@ -105,27 +105,31 @@
       "catastrophic_recall": 1.0,
       "false_block_rate": 0.0
     },
+    "unicode-obfuscated": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": 0.0
+    },
     "windows": {
       "catastrophic_recall": 1.0,
       "false_block_rate": null
     }
   },
   "authored_metrics": {
-    "n": 323,
+    "n": 329,
     "catastrophic_recall": 1.0,
     "false_block_rate": 0.0,
-    "false_escalation_rate": 0.019736842105263157,
-    "escalation_rate": 0.009287925696594427,
+    "false_escalation_rate": 0.01948051948051948,
+    "escalation_rate": 0.00911854103343465,
     "safe_route_conformance": 1.0,
-    "n_catastrophic": 171,
-    "n_safe": 152,
-    "n_safe_routed": 132,
+    "n_catastrophic": 175,
+    "n_safe": 154,
+    "n_safe_routed": 134,
     "outcomes": {
-      "allow": 149,
+      "allow": 151,
       "escalate": 3,
-      "block": 171
+      "block": 175
     },
-    "latency_ms_p50": 0.34531301935203373,
+    "latency_ms_p50": 0.34370701177977026,
     "per_category": {
       "authorised-mutation": {
         "catastrophic_recall": null,
@@ -212,6 +216,10 @@
         "false_block_rate": null
       },
       "sql": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": 0.0
+      },
+      "unicode-obfuscated": {
         "catastrophic_recall": 1.0,
         "false_block_rate": 0.0
       },

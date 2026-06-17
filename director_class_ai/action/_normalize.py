@@ -29,6 +29,7 @@ import binascii
 import gzip
 import re
 import shlex
+import unicodedata
 import zlib
 
 __all__ = ["expand"]
@@ -45,6 +46,7 @@ _B64_CONTEXT = re.compile(r"\bbase64\b|\b(?:ba)?sh\b\s*$|\|\s*(?:ba)?sh\b", re.I
 _HEX_RUN = re.compile(r"(?:\\x[0-9a-fA-F]{2}){2,}")
 _OCTAL_RUN = re.compile(r"(?:\\[0-7]{1,3}){2,}")
 _IFS = re.compile(r"\$\{IFS\}|\$IFS\b")
+_ZERO_WIDTH = re.compile("[\u200b-\u200f\ufeff]")
 _ALIAS = re.compile(r"alias\s+\w+=['\"]([^'\"]+)['\"]", re.IGNORECASE)
 _CMD_SUB = re.compile(r"\$\(([^()]*)\)|`([^`]*)`")
 _ECHO_SUB = re.compile(r"\$\(\s*(?:echo|printf)\s+(?:-e\s+)?([^()]*?)\)", re.IGNORECASE)
@@ -60,6 +62,37 @@ _XARGS_TEMPLATE = re.compile(
     re.IGNORECASE,
 )
 _SIMPLE_COMMAND_WORD = re.compile(r"[A-Za-z0-9_./-]+")
+_HOMOGLYPHS = str.maketrans(
+    {
+        "а": "a",
+        "е": "e",
+        "к": "k",
+        "м": "m",
+        "о": "o",
+        "р": "p",
+        "с": "c",
+        "х": "x",
+        "у": "y",
+        "Α": "A",
+        "Β": "B",
+        "Ε": "E",
+        "Ζ": "Z",
+        "Η": "H",
+        "Ι": "I",
+        "Κ": "K",
+        "Μ": "M",
+        "Ν": "N",
+        "Ο": "O",
+        "Ρ": "P",
+        "Τ": "T",
+        "Χ": "X",
+        "α": "a",
+        "ο": "o",
+        "ρ": "p",
+        "τ": "t",
+        "χ": "x",
+    }
+)
 
 
 def _printable_text(raw: bytes) -> str | None:
@@ -221,6 +254,14 @@ def _command_substitutions(command: str) -> list[str]:
     return forms
 
 
+def _unicode_reveals(command: str) -> list[str]:
+    """Reveal fullwidth, zero-width, and common Cyrillic/Greek homoglyph forms."""
+    normalised = unicodedata.normalize("NFKC", command)
+    stripped = _ZERO_WIDTH.sub("", normalised)
+    translated = stripped.translate(_HOMOGLYPHS)
+    return [form for form in (normalised, stripped, translated) if form != command]
+
+
 def _strip_shell_quotes(value: str) -> str:
     """Strip one simple shell-quote layer from an assignment value."""
     if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
@@ -262,6 +303,7 @@ def _transform_once(command: str) -> list[str]:
     out.append(norm.replace("$'", "").replace("'", "").replace('"', ""))
     # ${IFS} is a space substitute attackers use to avoid literal whitespace.
     out.append(_WS.sub(" ", _IFS.sub(" ", norm)).strip())
+    out.extend(_unicode_reveals(norm))
     out.extend(_decode_base64_payloads(command))
     out.extend(_decode_hex_runs(command))
     out.extend(_decode_hex_inplace(command))

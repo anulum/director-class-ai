@@ -220,6 +220,18 @@ class TestRecursiveAndNewTransforms:
         forms = expand("X='" + chr(0) + "'; $X -rf /")
         assert "\x00 -rf /" not in forms
 
+    def test_zero_width_command_revealed(self) -> None:
+        assert caught("r\u200bm -rf /").severity is Severity.CRITICAL
+
+    def test_fullwidth_command_revealed(self) -> None:
+        assert caught("ｒｍ -rf /").severity is Severity.CRITICAL
+
+    def test_homoglyph_command_revealed(self) -> None:
+        assert caught("rм -rf /").severity is Severity.CRITICAL
+
+    def test_printed_homoglyph_lookalike_stays_clean(self) -> None:
+        assert caught("echo r\u200bm -rf /") is None
+
 
 class TestExpandBounds:
     def test_max_depth_zero_returns_only_original(self) -> None:

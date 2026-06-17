@@ -83,6 +83,7 @@ SAFE = [
     r"printf '\162\155' | xargs -I{} echo {} -rf /",
     r"printf '\162\155' | xargs -I{} {} -rf ./build",
     "X=rm; echo $X -rf /",
+    "echo rm -rf /",
 ]
 
 

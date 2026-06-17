@@ -293,6 +293,12 @@ _SEVERITY_SCORE = {
 # blocking ``rm -rf node_modules`` makes the guard unusable, missing ``rm -rf /``
 # makes it useless.
 _RM_SEGMENT = re.compile(r"\brm\b([^|;&\n]*)", re.IGNORECASE)
+_SHELL_SPLIT = re.compile(r"[|;&]")
+_PRINT_COMMAND = re.compile(
+    r"^(?:[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|\"[^\"]*\"|[^\s;&|]+)\s+)*"
+    r"(?:echo|printf)\b",
+    re.IGNORECASE,
+)
 _SCRATCH_ABS = re.compile(r"^/(?:tmp|var/tmp)(?:/|$)")
 _CRITICAL_TARGETS = frozenset(
     {"/", "/*", "~", "~/", "$HOME", ".", "./", "..", "*", "./*"}
@@ -329,14 +335,18 @@ def _target_severity(target: str) -> Severity | None:
 def _rm_severity(form: str) -> Severity | None:
     """Severity of a recursive ``rm`` in *form*, or None if absent / local / safe."""
     worst: Severity | None = None
-    for segment in _RM_SEGMENT.findall(form):
-        tokens = segment.split()
-        if not any(_is_recursive_flag(t) for t in tokens):
-            continue  # not a recursive delete — a single-file rm is not a mass wipe
-        for token in tokens:
-            severity = _target_severity(token)
-            if severity is not None and (worst is None or severity > worst):
-                worst = severity
+    for shell_segment in _SHELL_SPLIT.split(form):
+        shell_segment = shell_segment.strip()
+        if _PRINT_COMMAND.match(shell_segment):
+            continue
+        for segment in _RM_SEGMENT.findall(shell_segment):
+            tokens = segment.split()
+            if not any(_is_recursive_flag(t) for t in tokens):
+                continue  # not recursive — a single-file rm is not a mass wipe
+            for token in tokens:
+                severity = _target_severity(token)
+                if severity is not None and (worst is None or severity > worst):
+                    worst = severity
     return worst
 
 

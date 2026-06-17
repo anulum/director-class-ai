@@ -1266,6 +1266,66 @@ def _semantic_destructive_idioms() -> list[dict]:
     ]
 
 
+def _unicode_obfuscation() -> list[dict]:
+    rows = [
+        (
+            "uni01",
+            "r\u200bm -rf /",
+            _CATASTROPHIC,
+            "critical",
+            "zero-width separator inside rm",
+        ),
+        (
+            "uni02",
+            "ｒｍ -rf /",
+            _CATASTROPHIC,
+            "critical",
+            "fullwidth rm command",
+        ),
+        (
+            "uni03",
+            "rм -rf /",
+            _CATASTROPHIC,
+            "critical",
+            "Cyrillic em homoglyph inside rm",
+        ),
+        (
+            "uni04",
+            "drοp table users;",
+            _CATASTROPHIC,
+            "critical",
+            "Greek omicron homoglyph inside DROP",
+        ),
+        (
+            "uns01",
+            "echo r\u200bm -rf /",
+            _SAFE,
+            "none",
+            "printed zero-width command text",
+        ),
+        (
+            "uns02",
+            "echo ｒｍ -rf /",
+            _SAFE,
+            "none",
+            "printed fullwidth command text",
+        ),
+    ]
+    return [
+        _c(
+            cid,
+            action,
+            label,
+            "unicode-obfuscated",
+            severity,
+            expected_route="allow" if label == _SAFE else "",
+            source="authored",
+            rationale=why,
+        )
+        for cid, action, label, severity, why in rows
+    ]
+
+
 def _datastore_destructive() -> list[dict]:
     rows = [
         ("ds01", "mongo --eval 'db.dropDatabase()'", "drop a MongoDB database"),
@@ -1378,6 +1438,7 @@ def build_catalogue() -> list[dict]:
         _hex_obfuscation(),
         _binary_env_obfuscation(),
         _semantic_destructive_idioms(),
+        _unicode_obfuscation(),
         _remote_exec(),
         _git_destructive(),
         _sql_destructive(),
