@@ -20,6 +20,12 @@ from .mcp import (
     MCPResponseRequest,
     MCPToolDescriptor,
 )
+from .mcp_service import (
+    MCPGatewayHTTPServer,
+    MCPGatewayService,
+    MCPGatewayServiceConfig,
+    MCPGatewayServiceResponse,
+)
 
 __all__ = [
     "MCPDiscoveryDecision",
@@ -32,4 +38,8 @@ __all__ = [
     "MCPResponseDecision",
     "MCPResponseRequest",
     "MCPToolDescriptor",
+    "MCPGatewayHTTPServer",
+    "MCPGatewayService",
+    "MCPGatewayServiceConfig",
+    "MCPGatewayServiceResponse",
 ]
