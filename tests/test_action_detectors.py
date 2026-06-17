@@ -58,10 +58,7 @@ class TestBlastRadius:
         assert sig is not None and sig.severity >= Severity.HIGH
 
     def test_echoed_destructive_text_is_not_an_effector_action(self) -> None:
-        assert (
-            self.det.evaluate(EvaluationRequest(action="X=rm; echo $X -rf /"))
-            is None
-        )
+        assert self.det.evaluate(EvaluationRequest(action="X=rm; echo $X -rf /")) is None
 
 
 class TestOriginTaint:

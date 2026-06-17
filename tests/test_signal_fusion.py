@@ -124,8 +124,10 @@ class TestAuthorisedDestructiveRouting:
         assert "user-authorised" in v.rationale and "escalat" in v.rationale
 
     def test_critical_user_authorised_also_escalates(self) -> None:
-        v = fuse([self._destructive(sev=Severity.CRITICAL, stype="sql_drop")],
-                 provenance="user")
+        v = fuse(
+            [self._destructive(sev=Severity.CRITICAL, stype="sql_drop")],
+            provenance="user",
+        )
         assert v.allow is True
         assert v.requires_human is True
 
@@ -144,16 +146,28 @@ class TestAuthorisedDestructiveRouting:
         # MCP argument): the danger is injection, not an authorised op → hard block.
         objectors = [
             self._destructive(sev=Severity.CRITICAL, stype="sql_drop"),
-            sig(Plane.ACTION, 0.85, sev=Severity.HIGH, locus=Locus.ACTION,
-                stype="mcp_tool_call"),
+            sig(
+                Plane.ACTION,
+                0.85,
+                sev=Severity.HIGH,
+                locus=Locus.ACTION,
+                stype="mcp_tool_call",
+            ),
         ]
         v = fuse(objectors, provenance="user")
         assert v.allow is False
 
     def test_exfiltration_signal_never_authorised(self) -> None:
         v = fuse(
-            [sig(Plane.ACTION, 0.9, sev=Severity.HIGH, locus=Locus.ACTION,
-                 stype="exfiltration")],
+            [
+                sig(
+                    Plane.ACTION,
+                    0.9,
+                    sev=Severity.HIGH,
+                    locus=Locus.ACTION,
+                    stype="exfiltration",
+                )
+            ],
             provenance="user",
         )
         assert v.allow is False

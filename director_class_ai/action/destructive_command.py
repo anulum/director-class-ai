@@ -78,7 +78,9 @@ _RULES: tuple[_Rule, ...] = (
         "filesystem format (mkfs)",
     ),
     _Rule(
-        _rx(r"\bwipefs\b[^\n;&|]*(?:-a\b|--all\b)[^\n;&|]*/dev/(?:sd|nvme|hd|vd|mmcblk|disk)"),
+        _rx(
+            r"\bwipefs\b[^\n;&|]*(?:-a\b|--all\b)[^\n;&|]*/dev/(?:sd|nvme|hd|vd|mmcblk|disk)"
+        ),
         "filesystem_format",
         Severity.CRITICAL,
         "filesystem signature wipe on a block device",
@@ -96,7 +98,9 @@ _RULES: tuple[_Rule, ...] = (
         "discard of an entire block device",
     ),
     _Rule(
-        _rx(r"\bcryptsetup\b[^\n;&|]*\bluksFormat\b[^\n;&|]*/dev/(?:sd|nvme|hd|vd|mmcblk|disk)"),
+        _rx(
+            r"\bcryptsetup\b[^\n;&|]*\bluksFormat\b[^\n;&|]*/dev/(?:sd|nvme|hd|vd|mmcblk|disk)"
+        ),
         "filesystem_format",
         Severity.CRITICAL,
         "LUKS format of a block device",
@@ -176,13 +180,17 @@ _RULES: tuple[_Rule, ...] = (
         "recursive world-writable permissions",
     ),
     _Rule(
-        _rx(r"\bchmod\s+-R\s+0{3,4}\b[^\n;&|]*(?:/(?:etc|var|usr|boot|root|home)\b|/\s*$|/\*|\bprod(?:uction)?\b)"),
+        _rx(
+            r"\bchmod\s+-R\s+0{3,4}\b[^\n;&|]*(?:/(?:etc|var|usr|boot|root|home)\b|/\s*$|/\*|\bprod(?:uction)?\b)"
+        ),
         "permission_wipe",
         Severity.HIGH,
         "recursive permission denial on a sensitive / production target",
     ),
     _Rule(
-        _rx(r"\bchown\s+-R\s+\S+\s+[^\n;&|]*(?:/(?:etc|var|usr|boot|root|home)\b|/\s*$|/\*|\bprod(?:uction)?\b)"),
+        _rx(
+            r"\bchown\s+-R\s+\S+\s+[^\n;&|]*(?:/(?:etc|var|usr|boot|root|home)\b|/\s*$|/\*|\bprod(?:uction)?\b)"
+        ),
         "permission_wipe",
         Severity.HIGH,
         "recursive ownership rewrite of a sensitive / production target",

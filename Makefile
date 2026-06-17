@@ -34,5 +34,8 @@ build: ## Build sdist + wheel
 bench: ## Run the action-plane benchmark
 	$(PY) -m benchmarks.action_plane
 
+redteam: ## Run the adversarial red-team benchmark
+	$(PY) -m benchmarks.adversarial_red_team
+
 preflight: spdx lint types test ## Full local gate before commit
 	@echo "preflight OK"
