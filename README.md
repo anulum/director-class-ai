@@ -102,6 +102,29 @@ director-class-siem-export runtime/audit.jsonl -o runtime/siem.jsonl
 director-class-siem-export runtime/audit.jsonl
 ```
 
+## Operator approvals
+
+The approval transport package exposes the existing digest-scoped queue through
+an operator-console adapter, signed webhook events, and a loopback JSON service.
+Responses contain ticket digests, status, timestamps, expiry, and approver
+digests only; raw actions and command output are not returned.
+
+```python
+from director_class_ai.approvals import (
+    ApprovalQueue,
+    ApprovalService,
+    ApprovalServiceConfig,
+    OperatorApprovalConsole,
+)
+
+queue = ApprovalQueue("runtime/approvals.json")
+console = OperatorApprovalConsole(queue)
+service = ApprovalService(
+    console,
+    config=ApprovalServiceConfig(operator_key="operator-key"),
+)
+```
+
 ## Local verification
 
 ```bash

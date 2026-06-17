@@ -10,5 +10,29 @@
 
 from .policy import ApprovalPolicy
 from .queue import ApprovalQueue, ApprovalTicket
+from .transport import (
+    APPROVAL_AUTH_HEADER,
+    APPROVAL_SIGNATURE_HEADER,
+    ApprovalService,
+    ApprovalServiceConfig,
+    ApprovalServiceResponse,
+    ApprovalWebhookEvent,
+    ApprovalWebhookSink,
+    OperatorApprovalConsole,
+    OperatorApprovalHTTPServer,
+)
 
-__all__ = ["ApprovalPolicy", "ApprovalQueue", "ApprovalTicket"]
+__all__ = [
+    "APPROVAL_AUTH_HEADER",
+    "APPROVAL_SIGNATURE_HEADER",
+    "ApprovalPolicy",
+    "ApprovalQueue",
+    "ApprovalService",
+    "ApprovalServiceConfig",
+    "ApprovalServiceResponse",
+    "ApprovalTicket",
+    "ApprovalWebhookEvent",
+    "ApprovalWebhookSink",
+    "OperatorApprovalConsole",
+    "OperatorApprovalHTTPServer",
+]
