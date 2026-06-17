@@ -20,6 +20,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+from .capability_profiles import load_capability_profile
 from .profile import Profile
 
 __all__ = ["load_profile", "load_profile_file"]
@@ -41,6 +42,7 @@ def load_profile(data: dict[str, Any]) -> Profile:
         raise ValueError(
             f"profile {profile.name!r} must set require_audit and require_approval"
         )
+    load_capability_profile(profile.capability_profile)
     return profile
 
 

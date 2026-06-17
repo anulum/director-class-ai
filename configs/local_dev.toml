@@ -6,3 +6,4 @@ action_block_threshold = 0.3
 uncertainty_margin = 0.15
 require_audit = false
 require_approval = false
+capability_profile = "local_operator_actions"

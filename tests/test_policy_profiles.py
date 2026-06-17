@@ -12,7 +12,16 @@ from pathlib import Path
 
 import pytest
 
-from director_class_ai.policy import Profile, load_profile, load_profile_file
+from director_class_ai.policy import (
+    ACTION_SURFACES,
+    BUILTIN_CAPABILITY_PROFILES,
+    BlastRadius,
+    CapabilityContext,
+    CapabilityGrant,
+    Profile,
+    load_profile,
+    load_profile_file,
+)
 
 _CONFIGS = Path(__file__).resolve().parent.parent / "configs"
 _BUILTINS = ["local_dev", "ci", "pilot", "high_risk"]
@@ -23,6 +32,7 @@ def test_builtin_profiles_load_and_default_to_dry_run(name: str) -> None:
     profile = load_profile_file(_CONFIGS / f"{name}.toml")
     assert profile.name == name
     assert profile.default_dry_run is True  # no profile executes by default
+    assert profile.capability_profile in BUILTIN_CAPABILITY_PROFILES
 
 
 @pytest.mark.parametrize("name", ["pilot", "high_risk"])
@@ -51,11 +61,61 @@ def test_strict_profile_without_requirements_fails_fast() -> None:
         load_profile({"name": "pilot", "require_audit": False})
 
 
+def test_unknown_capability_profile_fails_fast() -> None:
+    with pytest.raises(ValueError, match="unknown capability profile"):
+        load_profile({"name": "x", "capability_profile": "missing"})
+
+
 def test_to_fusion_policy_maps_thresholds() -> None:
     profile = load_profile_file(_CONFIGS / "high_risk.toml")
     policy = profile.to_fusion_policy()
     assert policy.action_block_threshold == profile.action_block_threshold
     assert policy.content_threshold == profile.content_threshold
+
+
+def test_capability_profiles_cover_required_action_surfaces() -> None:
+    expected = {
+        "shell",
+        "filesystem",
+        "database",
+        "cloud",
+        "kubernetes",
+        "email",
+        "browser",
+        "mcp",
+        "external_http",
+    }
+
+    assert {surface.value for surface in ACTION_SURFACES} == expected
+    for profile in BUILTIN_CAPABILITY_PROFILES.values():
+        assert set(profile.surface_names()) == expected
+
+
+def test_deny_all_capability_profile_rejects_even_matching_grants() -> None:
+    policy = load_profile_file(_CONFIGS / "ci.toml").to_capability_policy(
+        (_grant(action="execute"),)
+    )
+
+    decision = policy.evaluate(_context(action="execute"))
+
+    assert decision.permitted is False
+    assert decision.findings == ("origin_not_allowed",)
+
+
+def test_local_operator_profile_requires_grant_then_origin_match() -> None:
+    profile = load_profile_file(_CONFIGS / "local_dev.toml")
+
+    without_grant = profile.to_capability_policy().evaluate(_context(action="execute"))
+    with_grant = profile.to_capability_policy((_grant(action="execute"),)).evaluate(
+        _context(action="execute")
+    )
+    wrong_origin = profile.to_capability_policy(
+        (_grant(action="execute", source_origin="retrieved"),)
+    ).evaluate(_context(action="execute", source_origin="retrieved"))
+
+    assert without_grant.findings == ("capability_missing",)
+    assert with_grant.permitted is True
+    assert wrong_origin.findings == ("origin_not_allowed",)
 
 
 class TestRequireRuntime:
@@ -79,4 +139,42 @@ class TestRequireRuntime:
 
 
 def test_field_names_includes_thresholds() -> None:
-    assert {"name", "default_dry_run", "action_block_threshold"} <= Profile.field_names()
+    assert {
+        "name",
+        "default_dry_run",
+        "action_block_threshold",
+        "capability_profile",
+    } <= Profile.field_names()
+
+
+def _context(**overrides: object) -> CapabilityContext:
+    base: dict[str, object] = {
+        "subject": "agent-a",
+        "tenant": "tenant-a",
+        "session": "session-a",
+        "source_origin": "user",
+        "tool": "shell/run",
+        "resource": "workspace",
+        "action": "execute",
+        "blast_radius": "high",
+        "now": 10,
+    }
+    base.update(overrides)
+    return CapabilityContext.from_mapping(base)
+
+
+def _grant(**overrides: object) -> CapabilityGrant:
+    base: dict[str, object] = {
+        "grant_id": "grant-action",
+        "subject": "agent-a",
+        "tenant": "tenant-a",
+        "session": "session-a",
+        "source_origin": "user",
+        "tool": "shell/run",
+        "resource": "workspace",
+        "action": "execute",
+        "max_blast_radius": BlastRadius.HIGH,
+        "expires_at": 20,
+    }
+    base.update(overrides)
+    return CapabilityGrant(**base)

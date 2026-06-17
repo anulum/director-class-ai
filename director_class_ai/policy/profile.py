@@ -20,6 +20,8 @@ from __future__ import annotations
 from dataclasses import dataclass, fields
 
 from ..core.fusion import FusionPolicy
+from .capability import CapabilityGrant, CapabilityPolicy
+from .capability_profiles import load_capability_profile
 
 __all__ = ["Profile"]
 
@@ -36,6 +38,7 @@ class Profile:
     uncertainty_margin: float = 0.15
     require_audit: bool = False
     require_approval: bool = False
+    capability_profile: str = "deny_all_actions"
 
     def __post_init__(self) -> None:
         for attr in (
@@ -56,6 +59,13 @@ class Profile:
             action_block_threshold=self.action_block_threshold,
             uncertainty_margin=self.uncertainty_margin,
         )
+
+    def to_capability_policy(
+        self,
+        grants: tuple[CapabilityGrant, ...] = (),
+    ) -> CapabilityPolicy:
+        """Compile the profile's capability envelope with runtime grants."""
+        return load_capability_profile(self.capability_profile).compile(grants)
 
     def require_runtime(
         self, *, audit_sink: object | None, approval: object | None

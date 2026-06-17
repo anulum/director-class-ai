@@ -18,19 +18,31 @@ from .capability import (
     CapabilityPolicyDetector,
     OriginRule,
 )
+from .capability_profiles import (
+    ACTION_SURFACES,
+    BUILTIN_CAPABILITY_PROFILES,
+    ActionSurface,
+    CapabilitySurfaceProfile,
+    load_capability_profile,
+)
 from .loader import load_profile, load_profile_file
 from .profile import Profile
 
 __all__ = [
+    "ACTION_SURFACES",
+    "BUILTIN_CAPABILITY_PROFILES",
     "CAPABILITY_CONTEXT_KEY",
+    "ActionSurface",
     "BlastRadius",
     "CapabilityContext",
     "CapabilityGrant",
     "CapabilityPolicy",
     "CapabilityPolicyDecision",
     "CapabilityPolicyDetector",
+    "CapabilitySurfaceProfile",
     "OriginRule",
     "Profile",
+    "load_capability_profile",
     "load_profile",
     "load_profile_file",
 ]
