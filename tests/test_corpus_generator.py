@@ -51,6 +51,8 @@ def test_catalogue_has_binary_env_obfuscation_cases() -> None:
 
     assert {c["label"] for c in cases} == {"catastrophic", "safe"}
     assert any("gunzip" in c["action"] for c in cases)
+    assert any("bunzip2" in c["action"] for c in cases)
+    assert any("xz -d" in c["action"] for c in cases)
     assert any("$X" in c["action"] for c in cases)
 
 

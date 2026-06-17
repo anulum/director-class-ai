@@ -20,7 +20,9 @@ command substitution).
 from __future__ import annotations
 
 import base64
+import bz2
 import gzip
+import lzma
 import zlib
 
 _CATASTROPHIC = "catastrophic"
@@ -1147,6 +1149,8 @@ def _hex_obfuscation() -> list[dict]:
 def _binary_env_obfuscation() -> list[dict]:
     gzip_rm = base64.b64encode(gzip.compress(b"rm -rf /", mtime=0)).decode()
     zlib_drop = base64.b64encode(zlib.compress(b"DROP TABLE users;")).decode()
+    bzip2_rm = base64.b64encode(bz2.compress(b"rm -rf /")).decode()
+    lzma_drop = base64.b64encode(lzma.compress(b"DROP TABLE users;")).decode()
     rows = [
         (
             "bin01",
@@ -1161,6 +1165,20 @@ def _binary_env_obfuscation() -> list[dict]:
             _CATASTROPHIC,
             "critical",
             "zlib-compressed SQL drop piped to shell",
+        ),
+        (
+            "bin03",
+            f"echo {bzip2_rm} | base64 -d | bunzip2 | bash",
+            _CATASTROPHIC,
+            "critical",
+            "bzip2-compressed root delete piped to shell",
+        ),
+        (
+            "bin04",
+            f"echo {lzma_drop} | base64 -d | xz -d | sh",
+            _CATASTROPHIC,
+            "critical",
+            "lzma-compressed SQL drop piped to shell",
         ),
         (
             "env01",
@@ -1182,6 +1200,20 @@ def _binary_env_obfuscation() -> list[dict]:
             _SAFE,
             "none",
             "compressed data without shell execution context",
+        ),
+        (
+            "ben03",
+            f"archive={bzip2_rm}",
+            _SAFE,
+            "none",
+            "bzip2-compressed data without shell execution context",
+        ),
+        (
+            "ben04",
+            f"archive={lzma_drop}",
+            _SAFE,
+            "none",
+            "lzma-compressed data without shell execution context",
         ),
         (
             "ben02",

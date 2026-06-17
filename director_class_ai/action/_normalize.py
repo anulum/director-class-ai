@@ -26,7 +26,9 @@ from __future__ import annotations
 
 import base64
 import binascii
+import bz2
 import gzip
+import lzma
 import re
 import shlex
 import unicodedata
@@ -128,15 +130,15 @@ def _decode_base64_payloads(command: str) -> list[str]:
 
 
 def _decode_binary_payloads(raw: bytes) -> list[str]:
-    """Decode plain, gzip, and zlib payloads into printable text forms only."""
+    """Decode plain and common compressed payloads into printable text only."""
     out: list[str] = []
     direct = _printable_text(raw)
     if direct is not None:
         out.append(direct)
-    for decoder in (gzip.decompress, zlib.decompress):
+    for decoder in (gzip.decompress, zlib.decompress, bz2.decompress, lzma.decompress):
         try:
             text = _printable_text(decoder(raw))
-        except (OSError, EOFError, zlib.error):
+        except (OSError, EOFError, zlib.error, lzma.LZMAError):
             continue
         if text is not None:
             out.append(text)

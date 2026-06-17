@@ -192,12 +192,40 @@ class TestRecursiveAndNewTransforms:
         payload = base64.b64encode(zlib.compress(b"DROP TABLE users;")).decode()
         assert caught(f"echo {payload} | base64 -d | zlib-flate -uncompress | sh")
 
+    def test_bzip2_base64_payload_decoded_with_shell_context(self) -> None:
+        import base64
+        import bz2
+
+        payload = base64.b64encode(bz2.compress(b"rm -rf /")).decode()
+        assert caught(f"echo {payload} | base64 -d | bunzip2 | bash") is not None
+
+    def test_lzma_base64_payload_decoded_with_shell_context(self) -> None:
+        import base64
+        import lzma
+
+        payload = base64.b64encode(lzma.compress(b"DROP TABLE users;")).decode()
+        assert caught(f"echo {payload} | base64 -d | xz -d | sh") is not None
+
     def test_binary_payload_without_shell_context_stays_opaque(self) -> None:
         import base64
         import gzip
 
         payload = base64.b64encode(gzip.compress(b"rm -rf /")).decode()
         assert not any("rm -rf /" in f for f in expand(f"archive={payload}"))
+
+    def test_bzip2_payload_without_shell_context_stays_opaque(self) -> None:
+        import base64
+        import bz2
+
+        payload = base64.b64encode(bz2.compress(b"rm -rf /")).decode()
+        assert not any("rm -rf /" in f for f in expand(f"archive={payload}"))
+
+    def test_lzma_payload_without_shell_context_stays_opaque(self) -> None:
+        import base64
+        import lzma
+
+        payload = base64.b64encode(lzma.compress(b"DROP TABLE users;")).decode()
+        assert not any("DROP TABLE users;" in f for f in expand(f"archive={payload}"))
 
     def test_compressed_non_printable_payload_skipped(self) -> None:
         import base64
