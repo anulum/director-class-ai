@@ -78,10 +78,46 @@ _RULES: tuple[_Rule, ...] = (
         "filesystem format (mkfs)",
     ),
     _Rule(
+        _rx(r"\bwipefs\b[^\n;&|]*(?:-a\b|--all\b)[^\n;&|]*/dev/(?:sd|nvme|hd|vd|mmcblk|disk)"),
+        "filesystem_format",
+        Severity.CRITICAL,
+        "filesystem signature wipe on a block device",
+    ),
+    _Rule(
+        _rx(r"\bsgdisk\b[^\n;&|]*--zap-all\b[^\n;&|]*/dev/(?:sd|nvme|hd|vd|mmcblk|disk)"),
+        "filesystem_format",
+        Severity.CRITICAL,
+        "partition table wipe on a block device",
+    ),
+    _Rule(
+        _rx(r"\bblkdiscard\b[^\n;&|]*/dev/(?:sd|nvme|hd|vd|mmcblk|disk)"),
+        "disk_overwrite",
+        Severity.CRITICAL,
+        "discard of an entire block device",
+    ),
+    _Rule(
+        _rx(r"\bcryptsetup\b[^\n;&|]*\bluksFormat\b[^\n;&|]*/dev/(?:sd|nvme|hd|vd|mmcblk|disk)"),
+        "filesystem_format",
+        Severity.CRITICAL,
+        "LUKS format of a block device",
+    ),
+    _Rule(
+        _rx(r"\bparted\b[^\n;&|]*/dev/(?:sd|nvme|hd|vd|mmcblk|disk)[^\n;&|]*\bmklabel\b"),
+        "filesystem_format",
+        Severity.CRITICAL,
+        "partition label rewrite on a block device",
+    ),
+    _Rule(
         _rx(r"\bfind\b.*\s-delete\b|\bfind\b.*-exec\s+rm\b"),
         "destructive_command",
         Severity.HIGH,
         "find -delete / -exec rm mass deletion",
+    ),
+    _Rule(
+        _rx(r"\bfind\b[^\n;&|]*(?:/\s|/\s*$)[^\n;&|]*-exec\s+shred\b"),
+        "destructive_command",
+        Severity.HIGH,
+        "find -exec shred over a root tree",
     ),
     _Rule(
         _rx(
@@ -107,6 +143,25 @@ _RULES: tuple[_Rule, ...] = (
         Severity.CRITICAL,
         "redirect over a raw block device",
     ),
+    _Rule(
+        _rx(
+            r"\brsync\b[^\n;&|]*--delete\b[^\n;&|]*"
+            r"(?:/dev/null/?|(?:^|\s)(?:\.?/)?empty/)[^\n;&|]*"
+            r"\s/(?:etc|var|srv|home|root|opt|usr|boot)\b"
+        ),
+        "destructive_command",
+        Severity.HIGH,
+        "rsync --delete mirror wipe of a sensitive target",
+    ),
+    _Rule(
+        _rx(
+            r"\btruncate\b[^\n;&|]*(?:-s\s*0|--size(?:=|\s)0)[^\n;&|]*"
+            r"(?:/(?:etc|var|usr|boot|root|home)\b|/\s*$|/\*|\bprod(?:uction)?\b)"
+        ),
+        "destructive_command",
+        Severity.HIGH,
+        "truncate-to-zero of a sensitive / production target",
+    ),
     # ── shell: availability / privilege / remote exec ──────────────────────────
     _Rule(
         _rx(r"\b(?:shutdown|reboot|halt|poweroff)\b|\binit\s+0\b"),
@@ -119,6 +174,18 @@ _RULES: tuple[_Rule, ...] = (
         "permission_wipe",
         Severity.HIGH,
         "recursive world-writable permissions",
+    ),
+    _Rule(
+        _rx(r"\bchmod\s+-R\s+0{3,4}\b[^\n;&|]*(?:/(?:etc|var|usr|boot|root|home)\b|/\s*$|/\*|\bprod(?:uction)?\b)"),
+        "permission_wipe",
+        Severity.HIGH,
+        "recursive permission denial on a sensitive / production target",
+    ),
+    _Rule(
+        _rx(r"\bchown\s+-R\s+\S+\s+[^\n;&|]*(?:/(?:etc|var|usr|boot|root|home)\b|/\s*$|/\*|\bprod(?:uction)?\b)"),
+        "permission_wipe",
+        Severity.HIGH,
+        "recursive ownership rewrite of a sensitive / production target",
     ),
     _Rule(
         _rx(r"\b(?:kill(?:all)?\s+-9|kill\s+-9\s+-1)\b|\bkillall\b"),

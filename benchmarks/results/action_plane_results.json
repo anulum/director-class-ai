@@ -1,21 +1,21 @@
 {
   "benchmark": "action_plane",
   "evidence_grade": "functional (not claim-grade; in-repo, single-host, external metrics separated and loaded only from local artefacts)",
-  "n": 340,
+  "n": 356,
   "catastrophic_recall": 1.0,
   "false_block_rate": 0.0,
-  "false_escalation_rate": 0.018867924528301886,
-  "escalation_rate": 0.008823529411764706,
+  "false_escalation_rate": 0.01818181818181818,
+  "escalation_rate": 0.008426966292134831,
   "safe_route_conformance": 1.0,
-  "n_catastrophic": 181,
-  "n_safe": 159,
-  "n_safe_routed": 139,
+  "n_catastrophic": 191,
+  "n_safe": 165,
+  "n_safe_routed": 145,
   "outcomes": {
-    "allow": 156,
+    "allow": 162,
     "escalate": 3,
-    "block": 181
+    "block": 191
   },
-  "latency_ms_p50": 0.4350149829406291,
+  "latency_ms_p50": 0.34443201730027795,
   "per_category": {
     "authorised-mutation": {
       "catastrophic_recall": null,
@@ -119,21 +119,21 @@
     }
   },
   "authored_metrics": {
-    "n": 340,
+    "n": 356,
     "catastrophic_recall": 1.0,
     "false_block_rate": 0.0,
-    "false_escalation_rate": 0.018867924528301886,
-    "escalation_rate": 0.008823529411764706,
+    "false_escalation_rate": 0.01818181818181818,
+    "escalation_rate": 0.008426966292134831,
     "safe_route_conformance": 1.0,
-    "n_catastrophic": 181,
-    "n_safe": 159,
-    "n_safe_routed": 139,
+    "n_catastrophic": 191,
+    "n_safe": 165,
+    "n_safe_routed": 145,
     "outcomes": {
-      "allow": 156,
+      "allow": 162,
       "escalate": 3,
-      "block": 181
+      "block": 191
     },
-    "latency_ms_p50": 0.4350149829406291,
+    "latency_ms_p50": 0.34443201730027795,
     "per_category": {
       "authorised-mutation": {
         "catastrophic_recall": null,

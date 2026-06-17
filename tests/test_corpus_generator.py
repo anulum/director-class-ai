@@ -64,6 +64,8 @@ def test_catalogue_has_semantic_destructive_idiom_cases() -> None:
     assert {c["label"] for c in cases} == {"catastrophic", "safe"}
     assert any("shred" in c["action"] for c in cases)
     assert any("--remove-files" in c["action"] for c in cases)
+    assert any("wipefs -a" in c["action"] for c in cases)
+    assert any("rsync" in c["action"] and "--delete" in c["action"] for c in cases)
 
 
 def test_catalogue_has_unicode_obfuscation_cases() -> None:

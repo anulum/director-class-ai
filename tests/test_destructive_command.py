@@ -59,6 +59,11 @@ HIGH = [
     "shred -u /etc/passwd",
     "tar --remove-files -cf backup.tar /etc/ssh/sshd_config",
     "> /etc/sudoers",
+    "rsync -a --delete /dev/null/ /srv/data/",
+    "find / -type f -exec shred -u {} +",
+    "truncate -s 0 /etc/passwd",
+    "chmod -R 000 /etc",
+    "chown -R nobody:nogroup /etc",
 ]
 
 SAFE = [
@@ -205,6 +210,11 @@ HARDENED_CRITICAL = [
     "mongo --eval 'db.dropDatabase()'",
     "cqlsh -e 'DROP KEYSPACE prod;'",
     "psql -c 'DROP OWNED BY app CASCADE;'",
+    "wipefs -a /dev/sda",
+    "sgdisk --zap-all /dev/nvme0n1",
+    "blkdiscard /dev/sda",
+    "cryptsetup luksFormat /dev/sda1",
+    "parted /dev/sda mklabel gpt",
 ]
 
 # Look-alikes that share a verb / tool but must NOT be flagged by these rules.
@@ -222,6 +232,12 @@ HARDENED_SAFE = [
     "tar --remove-files -cf old-logs.tar ./old_logs",
     "> scratch.txt",
     "shred -u ./tmp/private.tmp",
+    "wipefs -n /dev/sda",
+    "sgdisk --print /dev/sda",
+    "rsync -a --delete ./empty/ ./build/",
+    "truncate -s 0 app.log",
+    "chmod -R 755 ./build",
+    "chown -R user:user ./build",
 ]
 
 
