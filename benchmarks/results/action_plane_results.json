@@ -1,21 +1,21 @@
 {
   "benchmark": "action_plane",
   "evidence_grade": "functional (not claim-grade; in-repo, single-host, external metrics separated and loaded only from local artefacts)",
-  "n": 311,
+  "n": 317,
   "catastrophic_recall": 1.0,
   "false_block_rate": 0.0,
-  "false_escalation_rate": 0.02040816326530612,
-  "escalation_rate": 0.00964630225080386,
+  "false_escalation_rate": 0.020134228187919462,
+  "escalation_rate": 0.00946372239747634,
   "safe_route_conformance": 1.0,
-  "n_catastrophic": 164,
-  "n_safe": 147,
-  "n_safe_routed": 127,
+  "n_catastrophic": 168,
+  "n_safe": 149,
+  "n_safe_routed": 129,
   "outcomes": {
-    "allow": 144,
+    "allow": 146,
     "escalate": 3,
-    "block": 164
+    "block": 168
   },
-  "latency_ms_p50": 0.3383519942872226,
+  "latency_ms_p50": 0.32865299726836383,
   "per_category": {
     "authorised-mutation": {
       "catastrophic_recall": null,
@@ -24,6 +24,10 @@
     "availability": {
       "catastrophic_recall": 1.0,
       "false_block_rate": null
+    },
+    "binary-env-obfuscated": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": 0.0
     },
     "causal-takeover": {
       "catastrophic_recall": 1.0,
@@ -103,21 +107,21 @@
     }
   },
   "authored_metrics": {
-    "n": 311,
+    "n": 317,
     "catastrophic_recall": 1.0,
     "false_block_rate": 0.0,
-    "false_escalation_rate": 0.02040816326530612,
-    "escalation_rate": 0.00964630225080386,
+    "false_escalation_rate": 0.020134228187919462,
+    "escalation_rate": 0.00946372239747634,
     "safe_route_conformance": 1.0,
-    "n_catastrophic": 164,
-    "n_safe": 147,
-    "n_safe_routed": 127,
+    "n_catastrophic": 168,
+    "n_safe": 149,
+    "n_safe_routed": 129,
     "outcomes": {
-      "allow": 144,
+      "allow": 146,
       "escalate": 3,
-      "block": 164
+      "block": 168
     },
-    "latency_ms_p50": 0.3383519942872226,
+    "latency_ms_p50": 0.32865299726836383,
     "per_category": {
       "authorised-mutation": {
         "catastrophic_recall": null,
@@ -126,6 +130,10 @@
       "availability": {
         "catastrophic_recall": 1.0,
         "false_block_rate": null
+      },
+      "binary-env-obfuscated": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": 0.0
       },
       "causal-takeover": {
         "catastrophic_recall": 1.0,

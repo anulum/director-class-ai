@@ -178,6 +178,48 @@ class TestRecursiveAndNewTransforms:
     def test_xargs_project_local_cleanup_stays_clean(self) -> None:
         assert caught(r"printf '\162\155' | xargs -I{} {} -rf ./build") is None
 
+    def test_gzip_base64_payload_decoded_with_shell_context(self) -> None:
+        import base64
+        import gzip
+
+        payload = base64.b64encode(gzip.compress(b"rm -rf /")).decode()
+        assert caught(f"echo {payload} | base64 -d | gunzip | bash") is not None
+
+    def test_zlib_base64_payload_decoded_with_shell_context(self) -> None:
+        import base64
+        import zlib
+
+        payload = base64.b64encode(zlib.compress(b"DROP TABLE users;")).decode()
+        assert caught(f"echo {payload} | base64 -d | zlib-flate -uncompress | sh")
+
+    def test_binary_payload_without_shell_context_stays_opaque(self) -> None:
+        import base64
+        import gzip
+
+        payload = base64.b64encode(gzip.compress(b"rm -rf /")).decode()
+        assert not any("rm -rf /" in f for f in expand(f"archive={payload}"))
+
+    def test_compressed_non_printable_payload_skipped(self) -> None:
+        import base64
+        import zlib
+
+        payload = base64.b64encode(zlib.compress(b"\x00\x00")).decode()
+        forms = expand(f"echo {payload} | base64 -d | zlib-flate -uncompress | sh")
+        assert not any("\x00" in f for f in forms)
+
+    def test_env_var_command_indirection_revealed(self) -> None:
+        assert caught("X=rm; $X -rf /").severity is Severity.CRITICAL
+
+    def test_env_var_full_payload_revealed(self) -> None:
+        assert caught("CMD='DROP TABLE users;'; $CMD").severity is Severity.CRITICAL
+
+    def test_env_var_echo_lookalike_stays_clean(self) -> None:
+        assert caught("X=rm; echo $X -rf /") is None
+
+    def test_env_var_non_printable_value_skipped(self) -> None:
+        forms = expand("X='" + chr(0) + "'; $X -rf /")
+        assert "\x00 -rf /" not in forms
+
 
 class TestExpandBounds:
     def test_max_depth_zero_returns_only_original(self) -> None:

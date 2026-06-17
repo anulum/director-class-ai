@@ -40,6 +40,8 @@ CATASTROPHIC_CRITICAL = [
     "TRUNCATE TABLE orders;",
     "terraform destroy -auto-approve",
     r"printf '\162\155' | xargs -I{} {} -rf /",
+    "X=rm; $X -rf /",
+    "CMD='DROP TABLE users;'; $CMD",
 ]
 
 HIGH = [
@@ -77,6 +79,7 @@ SAFE = [
     r"printf '\154\163'",
     r"printf '\162\155' | xargs -I{} echo {} -rf /",
     r"printf '\162\155' | xargs -I{} {} -rf ./build",
+    "X=rm; echo $X -rf /",
 ]
 
 

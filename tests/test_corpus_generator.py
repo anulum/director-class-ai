@@ -46,6 +46,14 @@ def test_catalogue_has_causal_takeover_timelines() -> None:
     assert any(c.get("provenance") in {"retrieved", "tool_output"} for c in cases)
 
 
+def test_catalogue_has_binary_env_obfuscation_cases() -> None:
+    cases = [c for c in build_catalogue() if c["category"] == "binary-env-obfuscated"]
+
+    assert {c["label"] for c in cases} == {"catastrophic", "safe"}
+    assert any("gunzip" in c["action"] for c in cases)
+    assert any("$X" in c["action"] for c in cases)
+
+
 def _row(cid: str, label: str = "safe") -> dict:
     return {
         "id": cid,

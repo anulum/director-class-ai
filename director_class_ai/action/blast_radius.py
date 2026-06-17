@@ -45,6 +45,12 @@ _WEIGHTS: tuple[tuple[re.Pattern[str], float, str], ...] = (
     (PRODUCTION, 0.20, "production scope"),
     (BREADTH, 0.15, "recursive / wildcard / force breadth"),
 )
+_PRINT_SEGMENT = re.compile(
+    r"(?:^|[;&|]\s*)"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|\"[^\"]*\"|[^\s;&|]+)\s+)*"
+    r"(?:echo|printf)\b[^;&|]*",
+    re.IGNORECASE,
+)
 
 
 def _severity(risk: float) -> Severity:
@@ -64,7 +70,7 @@ class BlastRadiusDetector:
     floor: float = 0.4
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
-        command = (request.action or "").strip()
+        command = _PRINT_SEGMENT.sub(" ", (request.action or "")).strip()
         if not command:
             return None
         risk = 0.0

@@ -26,8 +26,10 @@ from __future__ import annotations
 
 import base64
 import binascii
+import gzip
 import re
 import shlex
+import zlib
 
 __all__ = ["expand"]
 
@@ -47,6 +49,10 @@ _ALIAS = re.compile(r"alias\s+\w+=['\"]([^'\"]+)['\"]", re.IGNORECASE)
 _CMD_SUB = re.compile(r"\$\(([^()]*)\)|`([^`]*)`")
 _ECHO_SUB = re.compile(r"\$\(\s*(?:echo|printf)\s+(?:-e\s+)?([^()]*?)\)", re.IGNORECASE)
 _ECHO_PREFIX = re.compile(r"^\s*(?:echo|printf)\s+(?:-e\s+)?", re.IGNORECASE)
+_ENV_ASSIGN = re.compile(
+    r"(?:^|[;&]\s*)(?P<name>[A-Za-z_][A-Za-z0-9_]*)="
+    r"(?P<value>'[^']*'|\"[^\"]*\"|[^\s;&|]+)"
+)
 _XARGS_TEMPLATE = re.compile(
     r"^\s*(?:printf|echo)\s+(?:-e\s+)?(?P<payload>.+?)"
     r"\s*\|\s*xargs\s+-I\s*(?P<placeholder>\S+)"
@@ -54,6 +60,15 @@ _XARGS_TEMPLATE = re.compile(
     re.IGNORECASE,
 )
 _SIMPLE_COMMAND_WORD = re.compile(r"[A-Za-z0-9_./-]+")
+
+
+def _printable_text(raw: bytes) -> str | None:
+    """Decode printable bytes to one whitespace-normalised command string."""
+    try:
+        text = _WS.sub(" ", raw.decode("utf-8")).strip()
+    except UnicodeDecodeError:
+        return None
+    return text if text and text.isprintable() else None
 
 
 def _merge_split_flags(text: str) -> str:
@@ -73,12 +88,26 @@ def _decode_base64_payloads(command: str) -> list[str]:
     for token in _B64_TOKEN.findall(command):
         try:
             raw = base64.b64decode(token, validate=True)
-            text = _WS.sub(" ", raw.decode("utf-8")).strip()
-        except (binascii.Error, ValueError, UnicodeDecodeError):
+        except (binascii.Error, ValueError):
             continue
-        if text and text.isprintable():
-            decoded.append(text)
+        decoded.extend(_decode_binary_payloads(raw))
     return decoded
+
+
+def _decode_binary_payloads(raw: bytes) -> list[str]:
+    """Decode plain, gzip, and zlib payloads into printable text forms only."""
+    out: list[str] = []
+    direct = _printable_text(raw)
+    if direct is not None:
+        out.append(direct)
+    for decoder in (gzip.decompress, zlib.decompress):
+        try:
+            text = _printable_text(decoder(raw))
+        except (OSError, EOFError, zlib.error):
+            continue
+        if text is not None:
+            out.append(text)
+    return out
 
 
 def _decode_hex_runs(command: str) -> list[str]:
@@ -192,6 +221,33 @@ def _command_substitutions(command: str) -> list[str]:
     return forms
 
 
+def _strip_shell_quotes(value: str) -> str:
+    """Strip one simple shell-quote layer from an assignment value."""
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def _env_var_reconstructions(command: str) -> list[str]:
+    """Reveal ``X=rm; $X -rf /`` only when ``$X`` is the command word."""
+    assignments = {
+        match.group("name"): _strip_shell_quotes(match.group("value"))
+        for match in _ENV_ASSIGN.finditer(command)
+    }
+    forms: list[str] = []
+    for name, value in assignments.items():
+        if not value or not value.isprintable() or len(value) > 256:
+            continue
+        command_var = re.compile(
+            rf"(?:^|[;&]\s*)\$(?:{re.escape(name)}|\{{{re.escape(name)}\}})"
+            rf"(?P<args>(?:\s+[^;&|]+)*)"
+        )
+        for match in command_var.finditer(command):
+            args = match.group("args").strip()
+            forms.append(f"{value} {args}".strip())
+    return forms
+
+
 def _transform_once(command: str) -> list[str]:
     """One layer of de-obfuscation: all direct transforms of *command*."""
     out: list[str] = []
@@ -213,6 +269,7 @@ def _transform_once(command: str) -> list[str]:
     out.extend(_decode_octal_inplace(command))
     out.extend(_xargs_reconstructions(command))
     out.extend(_command_substitutions(command))
+    out.extend(_env_var_reconstructions(command))
     out.extend(_ALIAS.findall(command))
     return out
 
