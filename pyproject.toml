@@ -30,6 +30,9 @@ classifiers = [
 ]
 dependencies = []
 
+[project.scripts]
+director-class-mcp-gateway = "director_class_ai.gateway.mcp_cli:main"
+
 [project.optional-dependencies]
 # Content/integrity detectors reuse the director-ai model primitives during
 # development; pinned as an explicit dependency on extraction.

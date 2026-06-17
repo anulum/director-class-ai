@@ -56,6 +56,15 @@ decision = middleware.run(
 assert decision.route == "allow"
 ```
 
+## MCP gateway service
+
+The package also exposes a local loopback MCP review service. It reviews
+discovery, tool calls, and tool responses, but it never dispatches tools.
+
+```bash
+director-class-mcp-gateway --host 127.0.0.1 --port 8765
+```
+
 ## Design
 
 The ensemble runs detectors concurrently and cheap-first (tiered cascade), so the
