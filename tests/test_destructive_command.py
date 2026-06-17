@@ -56,6 +56,9 @@ HIGH = [
     "UPDATE accounts SET balance = 0;",
     "kubectl delete namespace prod",
     "aws s3 rm s3://bucket --recursive",
+    "shred -u /etc/passwd",
+    "tar --remove-files -cf backup.tar /etc/ssh/sshd_config",
+    "> /etc/sudoers",
 ]
 
 SAFE = [
@@ -215,6 +218,9 @@ HARDENED_SAFE = [
     "pip install -r requirements.txt",
     "npm install -g typescript",
     "usermod -c 'Full Name' alice",
+    "tar --remove-files -cf old-logs.tar ./old_logs",
+    "> scratch.txt",
+    "shred -u ./tmp/private.tmp",
 ]
 
 

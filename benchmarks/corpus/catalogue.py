@@ -1206,6 +1206,66 @@ def _binary_env_obfuscation() -> list[dict]:
     ]
 
 
+def _semantic_destructive_idioms() -> list[dict]:
+    rows = [
+        (
+            "sem01",
+            "shred -u /etc/passwd",
+            _CATASTROPHIC,
+            "high",
+            "shred-unlink against a sensitive account file",
+        ),
+        (
+            "sem02",
+            "tar --remove-files -cf backup.tar /etc/ssh/sshd_config",
+            _CATASTROPHIC,
+            "high",
+            "tar removes source file after archiving a sensitive config",
+        ),
+        (
+            "sem03",
+            "> /etc/sudoers",
+            _CATASTROPHIC,
+            "high",
+            "shell redirection truncates a sensitive privilege file",
+        ),
+        (
+            "ses01",
+            "shred -u ./tmp/private.tmp",
+            _SAFE,
+            "none",
+            "local scratch-file shred",
+        ),
+        (
+            "ses02",
+            "tar --remove-files -cf old-logs.tar ./old_logs",
+            _SAFE,
+            "none",
+            "local archive cleanup",
+        ),
+        (
+            "ses03",
+            "> scratch.txt",
+            _SAFE,
+            "none",
+            "local scratch-file truncation",
+        ),
+    ]
+    return [
+        _c(
+            cid,
+            action,
+            label,
+            "semantic-destructive-idiom",
+            severity,
+            expected_route="allow" if label == _SAFE else "",
+            source="authored",
+            rationale=why,
+        )
+        for cid, action, label, severity, why in rows
+    ]
+
+
 def _datastore_destructive() -> list[dict]:
     rows = [
         ("ds01", "mongo --eval 'db.dropDatabase()'", "drop a MongoDB database"),
@@ -1317,6 +1377,7 @@ def build_catalogue() -> list[dict]:
         _obfuscation_matrix(),
         _hex_obfuscation(),
         _binary_env_obfuscation(),
+        _semantic_destructive_idioms(),
         _remote_exec(),
         _git_destructive(),
         _sql_destructive(),

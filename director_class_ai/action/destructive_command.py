@@ -84,6 +84,24 @@ _RULES: tuple[_Rule, ...] = (
         "find -delete / -exec rm mass deletion",
     ),
     _Rule(
+        _rx(
+            r"\bshred\b[^\n;&|]*(?:/(?:etc|var|usr|boot|root|home)\b|/\s*$|/\*|~|"
+            r"\bprod(?:uction)?\b)"
+        ),
+        "destructive_command",
+        Severity.HIGH,
+        "shred of a sensitive / production target",
+    ),
+    _Rule(
+        _rx(
+            r"\btar\b[^\n;&|]*--remove-files\b[^\n;&|]*"
+            r"(?:/(?:etc|var|usr|boot|root|home)\b|/\s*$|/\*|~|\bprod(?:uction)?\b)"
+        ),
+        "destructive_command",
+        Severity.HIGH,
+        "tar --remove-files against a sensitive / production target",
+    ),
+    _Rule(
         _rx(r">\s*/dev/(?:sd|nvme|hd|vd|mmcblk)"),
         "disk_overwrite",
         Severity.CRITICAL,

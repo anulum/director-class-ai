@@ -54,6 +54,16 @@ def test_catalogue_has_binary_env_obfuscation_cases() -> None:
     assert any("$X" in c["action"] for c in cases)
 
 
+def test_catalogue_has_semantic_destructive_idiom_cases() -> None:
+    cases = [
+        c for c in build_catalogue() if c["category"] == "semantic-destructive-idiom"
+    ]
+
+    assert {c["label"] for c in cases} == {"catastrophic", "safe"}
+    assert any("shred" in c["action"] for c in cases)
+    assert any("--remove-files" in c["action"] for c in cases)
+
+
 def _row(cid: str, label: str = "safe") -> dict:
     return {
         "id": cid,
