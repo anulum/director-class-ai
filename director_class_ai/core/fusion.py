@@ -78,6 +78,8 @@ class FusionPolicy:
             {"origin_taint", "mcp_tool_call", "exfiltration"}
             | {"causal_takeover"}
             | {"mcp_remote_auth"}
+            | {"capability_context_missing", "capability_missing"}
+            | {"capability_origin_denied"}
         )
     )
     plane_mode: dict[Plane, FusionMode] = field(

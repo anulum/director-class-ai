@@ -35,6 +35,7 @@ from typing import Literal
 
 from ..action import MCPToolCall, MCPToolRegistration
 from ..core.governor import ApprovalHook, AuditSink
+from ..policy import CapabilityPolicy
 from .mcp import (
     MCPDiscoveryRequest,
     MCPGateway,
@@ -95,11 +96,13 @@ class MCPGatewayService:
         registrations: Sequence[MCPToolRegistration] = (),
         *,
         config: MCPGatewayServiceConfig | None = None,
+        capability_policy: CapabilityPolicy | None = None,
         approval: ApprovalHook | None = None,
         audit_sink: AuditSink | None = None,
     ) -> None:
         self._config = config or MCPGatewayServiceConfig()
         self._registrations = tuple(registrations)
+        self._capability_policy = capability_policy
         self._approval = approval
         self._audit_sink = audit_sink
         self._gateway = self._build_gateway()
@@ -139,6 +142,7 @@ class MCPGatewayService:
             self._registrations,
             allow_dynamic_discovery=self._config.allow_dynamic_discovery,
             require_signed_registrations=self._config.require_signed_registrations,
+            capability_policy=self._capability_policy,
             approval=self._approval,
             audit_sink=self._audit_sink,
         )
@@ -182,6 +186,7 @@ class MCPGatewayService:
             context=_string(payload.get("context")),
             tenant_id=_string(payload.get("tenant_id")),
             dry_run=_bool(payload.get("dry_run"), default=True),
+            capability_context=_mapping(payload.get("capability_context")),
         )
         decision = self._gateway.review(request)
         return MCPGatewayServiceResponse(

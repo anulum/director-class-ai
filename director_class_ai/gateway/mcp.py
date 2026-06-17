@@ -35,9 +35,11 @@ from ..action import (
     OriginTaintDetector,
     serialise_call,
 )
-from ..core import Decision, EvaluationRequest, Governor, ParallelEnsembleScorer
+from ..core import Decision, Detector, EvaluationRequest, Governor, ParallelEnsembleScorer
 from ..core.governor import ApprovalHook, AuditSink
 from ..core.signal import DetectorSignal, Locus, Plane, Severity
+from ..policy import CAPABILITY_CONTEXT_KEY, CapabilityContext, CapabilityPolicy
+from ..policy.capability import CapabilityPolicyDetector
 
 __all__ = [
     "MCPDiscoveryDecision",
@@ -399,6 +401,10 @@ def _call_digest(call: MCPToolCall) -> str:
     )
 
 
+def _context_digest(value: Mapping[str, object]) -> str:
+    return _digest(value)
+
+
 def _route(*, permitted: bool, escalated: bool) -> MCPGatewayRoute:
     if escalated:
         return "human"
@@ -460,6 +466,36 @@ def _remote_auth_metadata(
     if isinstance(value, MCPRemoteAuthContext):
         return value.as_metadata()
     return dict(value)
+
+
+def _capability_context_metadata(
+    value: Mapping[str, object] | CapabilityContext | None,
+) -> Mapping[str, object]:
+    if value is None:
+        return {}
+    if isinstance(value, CapabilityContext):
+        return {
+            "subject": value.subject,
+            "tenant": value.tenant,
+            "session": value.session,
+            "source_origin": value.source_origin,
+            "tool": value.tool,
+            "resource": value.resource,
+            "action": value.action,
+            "blast_radius": value.blast_radius.name.lower(),
+            "now": value.now,
+        }
+    return dict(value)
+
+
+def _capability_audit_projection(value: Mapping[str, object]) -> Mapping[str, object]:
+    if not value:
+        return {}
+    context = CapabilityContext.from_mapping(value)
+    return {
+        "context_digest": _context_digest(value),
+        "summary": context.redacted_summary(),
+    }
 
 
 def _discovery_text(descriptor: MCPToolDescriptor) -> str:
@@ -670,6 +706,7 @@ class MCPGatewayRequest:
     context: str = ""
     tenant_id: str = ""
     dry_run: bool = True
+    capability_context: Mapping[str, object] = field(default_factory=dict)
 
     @classmethod
     def from_parts(
@@ -684,6 +721,7 @@ class MCPGatewayRequest:
         tool_schema: Mapping[str, object] | None = None,
         argument_schema: Mapping[str, object] | None = None,
         remote_auth: Mapping[str, object] | MCPRemoteAuthContext | None = None,
+        capability_context: Mapping[str, object] | CapabilityContext | None = None,
         provenance: str = "",
         query: str = "",
         context: str = "",
@@ -709,6 +747,7 @@ class MCPGatewayRequest:
             context=context,
             tenant_id=tenant_id,
             dry_run=dry_run,
+            capability_context=_capability_context_metadata(capability_context),
         )
 
     def to_evaluation(self) -> EvaluationRequest:
@@ -720,7 +759,11 @@ class MCPGatewayRequest:
             action=serialise_call(self.call),
             action_provenance=self.provenance,
             tenant_id=self.tenant_id,
-            metadata={MCP_CALL_KEY: self.call, "dry_run": self.dry_run},
+            metadata={
+                MCP_CALL_KEY: self.call,
+                "dry_run": self.dry_run,
+                CAPABILITY_CONTEXT_KEY: self.capability_context,
+            },
         )
 
 
@@ -739,6 +782,7 @@ class MCPGatewayDecision:
     requires_human: bool
     firing: tuple[str, ...]
     request_digest: str
+    policy_projection: Mapping[str, object]
 
     @classmethod
     def from_governor(cls, call: MCPToolCall, decision: Decision) -> MCPGatewayDecision:
@@ -757,6 +801,30 @@ class MCPGatewayDecision:
             requires_human=decision.verdict.requires_human,
             firing=decision.record.firing,
             request_digest=decision.record.request_digest,
+            policy_projection={},
+        )
+
+    @classmethod
+    def from_request_and_governor(
+        cls,
+        request: MCPGatewayRequest,
+        decision: Decision,
+    ) -> MCPGatewayDecision:
+        """Build a gateway decision and attach redacted policy context evidence."""
+        base = cls.from_governor(request.call, decision)
+        return cls(
+            decision=base.decision,
+            call=base.call,
+            call_digest=base.call_digest,
+            schema_digest=base.schema_digest,
+            route=base.route,
+            permitted=base.permitted,
+            escalated=base.escalated,
+            risk=base.risk,
+            requires_human=base.requires_human,
+            firing=base.firing,
+            request_digest=base.request_digest,
+            policy_projection=_capability_audit_projection(request.capability_context),
         )
 
     def to_audit_event(self) -> dict[str, object]:
@@ -780,6 +848,10 @@ class MCPGatewayDecision:
             "tainted_argument_keys": tuple(
                 sorted(key for key in self.call.arguments if self.call.is_tainted(key))
             ),
+            "policy": {
+                **self.policy_projection,
+                "rationale": self.decision.record.rationale,
+            },
         }
 
 
@@ -806,6 +878,7 @@ class MCPGateway:
         *,
         allow_dynamic_discovery: bool = False,
         require_signed_registrations: bool = False,
+        capability_policy: CapabilityPolicy | None = None,
         approval: ApprovalHook | None = None,
         audit_sink: AuditSink | None = None,
     ) -> MCPGateway:
@@ -816,15 +889,16 @@ class MCPGateway:
             allow_dynamic_discovery=allow_dynamic_discovery,
             require_signed_registrations=require_signed_registrations,
         )
-        ensemble = ParallelEnsembleScorer(
-            [
-                MCPCallInspector(registry=registry),
-                _MCPRemoteAuthDetector(),
-                DestructiveCommandDetector(),
-                BlastRadiusDetector(),
-                OriginTaintDetector(),
-            ]
-        )
+        detectors: list[Detector] = [
+            MCPCallInspector(registry=registry),
+            _MCPRemoteAuthDetector(),
+            DestructiveCommandDetector(),
+            BlastRadiusDetector(),
+            OriginTaintDetector(),
+        ]
+        if capability_policy is not None:
+            detectors.append(CapabilityPolicyDetector(capability_policy))
+        ensemble = ParallelEnsembleScorer(detectors)
         call_governor = Governor(
             ensemble=ensemble,
             approval=approval,
@@ -867,4 +941,4 @@ class MCPGateway:
         """Review a typed MCP request without executing the tool."""
 
         decision = self._governor.review(request.to_evaluation())
-        return MCPGatewayDecision.from_governor(request.call, decision)
+        return MCPGatewayDecision.from_request_and_governor(request, decision)

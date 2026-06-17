@@ -19,6 +19,13 @@ from director_class_ai.gateway import (
     MCPToolDescriptor,
 )
 from director_class_ai.gateway.mcp import _MCPRemoteAuthDetector
+from director_class_ai.policy import (
+    BlastRadius,
+    CapabilityContext,
+    CapabilityGrant,
+    CapabilityPolicy,
+    OriginRule,
+)
 
 
 def _registration() -> MCPToolRegistration:
@@ -43,6 +50,47 @@ def _safe_request() -> MCPGatewayRequest:
     )
 
 
+def _capability_context(**overrides: object) -> dict[str, object]:
+    context: dict[str, object] = {
+        "subject": "agent-a",
+        "tenant": "tenant-a",
+        "session": "session-a",
+        "source_origin": "user",
+        "tool": "fs/read_file",
+        "resource": "workspace:README.md",
+        "action": "read",
+        "blast_radius": "low",
+        "now": 10,
+    }
+    context.update(overrides)
+    return context
+
+
+def _capability_policy(
+    *,
+    approval_required: bool = False,
+    origin: str = "user",
+) -> CapabilityPolicy:
+    return CapabilityPolicy(
+        grants=(
+            CapabilityGrant(
+                grant_id="grant-read",
+                subject="agent-a",
+                tenant="tenant-a",
+                session="session-a",
+                source_origin=origin,
+                tool="fs/read_file",
+                resource="workspace:README.md",
+                action="read",
+                max_blast_radius=BlastRadius.LOW,
+                expires_at=20,
+                approval_required=approval_required,
+            ),
+        ),
+        origin_rules=(OriginRule("user", tool="fs/read_file", action="read"),),
+    )
+
+
 def test_request_preserves_structured_and_serialized_review_paths() -> None:
     request = _safe_request()
     evaluation = request.to_evaluation()
@@ -62,6 +110,113 @@ def test_registered_safe_read_is_allowed() -> None:
     event = decision.to_audit_event()
     assert event["argument_keys"] == ("path",)
     assert event["tainted_argument_keys"] == ()
+
+
+def test_capability_policy_allows_signed_call_with_redacted_audit() -> None:
+    request = MCPGatewayRequest.from_parts(
+        "fs",
+        "read_file",
+        {"path": "README.md"},
+        server_identity={"name": "fs", "transport": "stdio"},
+        tool_schema={"description": "Read one workspace file", "mode": "read"},
+        argument_schema={"properties": {"path": {"type": "string"}}},
+        capability_context=_capability_context(),
+        provenance="user",
+    )
+    gateway = MCPGateway.from_registry(
+        [_registration()],
+        capability_policy=_capability_policy(),
+    )
+
+    decision = gateway.review(request)
+    event = decision.to_audit_event()
+
+    assert decision.route == "allow"
+    assert decision.permitted is True
+    assert event["policy"]["summary"]["resource_present"] is True
+    assert event["policy"]["summary"]["source_origin"] == "user"
+    assert event["policy"]["context_digest"]
+    assert "workspace:README.md" not in repr(event)
+
+
+def test_capability_policy_accepts_typed_context_object() -> None:
+    context = CapabilityContext.from_mapping(_capability_context())
+    request = MCPGatewayRequest.from_parts(
+        "fs",
+        "read_file",
+        {"path": "README.md"},
+        server_identity={"name": "fs", "transport": "stdio"},
+        tool_schema={"description": "Read one workspace file", "mode": "read"},
+        argument_schema={"properties": {"path": {"type": "string"}}},
+        capability_context=context,
+        provenance="user",
+    )
+    gateway = MCPGateway.from_registry(
+        [_registration()],
+        capability_policy=_capability_policy(),
+    )
+
+    decision = gateway.review(request)
+
+    assert decision.route == "allow"
+    assert request.capability_context["blast_radius"] == "low"
+
+
+def test_capability_policy_blocks_missing_context_at_gateway() -> None:
+    decision = MCPGateway.from_registry(
+        [_registration()],
+        capability_policy=_capability_policy(),
+    ).review(_safe_request())
+
+    assert decision.route == "block"
+    assert decision.permitted is False
+    assert decision.firing == ("capability_context_missing",)
+
+
+def test_capability_policy_blocks_disallowed_origin_without_approval_downgrade() -> None:
+    request = MCPGatewayRequest.from_parts(
+        "fs",
+        "read_file",
+        {"path": "README.md"},
+        server_identity={"name": "fs", "transport": "stdio"},
+        tool_schema={"description": "Read one workspace file", "mode": "read"},
+        argument_schema={"properties": {"path": {"type": "string"}}},
+        capability_context=_capability_context(source_origin="retrieved"),
+        provenance="user",
+    )
+    gateway = MCPGateway.from_registry(
+        [_registration()],
+        capability_policy=_capability_policy(origin="retrieved"),
+    )
+
+    decision = gateway.review(request)
+
+    assert decision.route == "block"
+    assert decision.permitted is False
+    assert decision.firing == ("capability_origin_denied",)
+
+
+def test_capability_policy_routes_approval_grant_to_human() -> None:
+    request = MCPGatewayRequest.from_parts(
+        "fs",
+        "read_file",
+        {"path": "README.md"},
+        server_identity={"name": "fs", "transport": "stdio"},
+        tool_schema={"description": "Read one workspace file", "mode": "read"},
+        argument_schema={"properties": {"path": {"type": "string"}}},
+        capability_context=_capability_context(),
+        provenance="user",
+    )
+    gateway = MCPGateway.from_registry(
+        [_registration()],
+        capability_policy=_capability_policy(approval_required=True),
+    )
+
+    decision = gateway.review(request)
+
+    assert decision.route == "human"
+    assert decision.permitted is False
+    assert decision.firing == ("capability_approval_required",)
 
 
 def test_unknown_tool_fails_closed_by_default() -> None:

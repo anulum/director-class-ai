@@ -21,6 +21,12 @@ from director_class_ai.gateway import (
     MCPGatewayServiceConfig,
 )
 from director_class_ai.gateway.mcp_service import _content_length
+from director_class_ai.policy import (
+    BlastRadius,
+    CapabilityGrant,
+    CapabilityPolicy,
+    OriginRule,
+)
 
 
 def _remote_auth(audience: str = "mcp://fs") -> dict[str, object]:
@@ -70,6 +76,42 @@ def _discover(service: MCPGatewayService) -> Mapping[str, object]:
         "/v1/mcp/discovery",
         {"server": "fs", "descriptors": [_remote_descriptor()]},
     ).body
+
+
+def _capability_context(**overrides: object) -> dict[str, object]:
+    context: dict[str, object] = {
+        "subject": "agent-a",
+        "tenant": "tenant-a",
+        "session": "session-a",
+        "source_origin": "user",
+        "tool": "fs/read_file",
+        "resource": "workspace:README.md",
+        "action": "read",
+        "blast_radius": "low",
+        "now": 10,
+    }
+    context.update(overrides)
+    return context
+
+
+def _capability_policy() -> CapabilityPolicy:
+    return CapabilityPolicy(
+        grants=(
+            CapabilityGrant(
+                grant_id="grant-read",
+                subject="agent-a",
+                tenant="tenant-a",
+                session="session-a",
+                source_origin="user",
+                tool="fs/read_file",
+                resource="workspace:README.md",
+                action="read",
+                max_blast_radius=BlastRadius.LOW,
+                expires_at=20,
+            ),
+        ),
+        origin_rules=(OriginRule("user", tool="fs/read_file", action="read"),),
+    )
 
 
 def test_service_health_reports_registry_count() -> None:
@@ -176,6 +218,60 @@ def test_service_discovery_updates_signed_registry_for_safe_remote_read() -> Non
     assert review.body["route"] == "allow"
     assert review.body["argument_keys"] == ("path",)
     assert "README.md" not in repr(review.body)
+
+
+def test_service_review_accepts_capability_context_and_redacts_policy() -> None:
+    service = MCPGatewayService(capability_policy=_capability_policy())
+    descriptor = _remote_descriptor()
+
+    discovery = _discover(service)
+    review = service.handle(
+        "POST",
+        "/v1/mcp/review",
+        {
+            "server": "fs",
+            "tool": "read_file",
+            "arguments": {"path": "README.md"},
+            "server_identity": descriptor["server_identity"],
+            "tool_schema": _tool_schema(descriptor),
+            "argument_schema": descriptor["argument_schema"],
+            "remote_auth": _remote_auth(),
+            "capability_context": _capability_context(),
+            "provenance": "user",
+        },
+    )
+
+    assert discovery["permitted"] is True
+    assert review.status == 200
+    assert review.body["route"] == "allow"
+    assert review.body["policy"]["summary"]["resource_present"] is True
+    assert review.body["policy"]["context_digest"]
+    assert "workspace:README.md" not in repr(review.body)
+
+
+def test_service_review_blocks_when_capability_context_is_missing() -> None:
+    service = MCPGatewayService(capability_policy=_capability_policy())
+    descriptor = _remote_descriptor()
+    _discover(service)
+
+    review = service.handle(
+        "POST",
+        "/v1/mcp/review",
+        {
+            "server": "fs",
+            "tool": "read_file",
+            "arguments": {"path": "README.md"},
+            "server_identity": descriptor["server_identity"],
+            "tool_schema": _tool_schema(descriptor),
+            "argument_schema": descriptor["argument_schema"],
+            "remote_auth": _remote_auth(),
+            "provenance": "user",
+        },
+    )
+
+    assert review.status == 403
+    assert review.body["route"] == "block"
+    assert review.body["firing"] == ("capability_context_missing",)
 
 
 def test_service_blocks_remote_discovery_without_auth_context() -> None:

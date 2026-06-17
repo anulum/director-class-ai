@@ -8,7 +8,29 @@
 
 """Named, validated deployment profiles."""
 
+from .capability import (
+    CAPABILITY_CONTEXT_KEY,
+    BlastRadius,
+    CapabilityContext,
+    CapabilityGrant,
+    CapabilityPolicy,
+    CapabilityPolicyDecision,
+    CapabilityPolicyDetector,
+    OriginRule,
+)
 from .loader import load_profile, load_profile_file
 from .profile import Profile
 
-__all__ = ["Profile", "load_profile", "load_profile_file"]
+__all__ = [
+    "CAPABILITY_CONTEXT_KEY",
+    "BlastRadius",
+    "CapabilityContext",
+    "CapabilityGrant",
+    "CapabilityPolicy",
+    "CapabilityPolicyDecision",
+    "CapabilityPolicyDetector",
+    "OriginRule",
+    "Profile",
+    "load_profile",
+    "load_profile_file",
+]
