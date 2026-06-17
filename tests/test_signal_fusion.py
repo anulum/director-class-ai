@@ -172,6 +172,22 @@ class TestAuthorisedDestructiveRouting:
         )
         assert v.allow is False
 
+    def test_remote_mcp_auth_signal_never_authorised(self) -> None:
+        v = fuse(
+            [
+                sig(
+                    Plane.ACTION,
+                    0.9,
+                    sev=Severity.HIGH,
+                    locus=Locus.ACTION,
+                    stype="mcp_remote_auth",
+                )
+            ],
+            provenance="user",
+        )
+        assert v.allow is False
+        assert v.requires_human is False
+
     def test_content_block_is_not_resurrected_by_action_escalation(self) -> None:
         # A content objection that already blocked must win — softening the action
         # verdict to escalation does not allow the request through.

@@ -37,6 +37,7 @@ from ..action import (
 )
 from ..core import Decision, EvaluationRequest, Governor, ParallelEnsembleScorer
 from ..core.governor import ApprovalHook, AuditSink
+from ..core.signal import DetectorSignal, Locus, Plane, Severity
 
 __all__ = [
     "MCPDiscoveryDecision",
@@ -45,6 +46,7 @@ __all__ = [
     "MCPGatewayDecision",
     "MCPGatewayRequest",
     "MCPGatewayRoute",
+    "MCPRemoteAuthContext",
     "MCPResponseDecision",
     "MCPResponseRequest",
     "MCPToolDescriptor",
@@ -53,6 +55,10 @@ __all__ = [
 MCPGatewayRoute = Literal["allow", "block", "human"]
 
 _TRANSPORTS = frozenset({"stdio", "http", "https", "sse", "websocket"})
+_REMOTE_TRANSPORTS = frozenset({"http", "https", "sse", "websocket"})
+_TRUSTED_TRANSPORT_PROVENANCE = frozenset(
+    {"tls_verified", "pinned_certificate", "mtls", "loopback"}
+)
 _DISCOVERY_POISONING = re.compile(
     r"\b("
     r"ignore\s+(?:all\s+)?previous\s+instructions|"
@@ -150,6 +156,7 @@ class MCPToolDescriptor:
     server_identity: Mapping[str, object] = field(default_factory=dict)
     transport: str = "stdio"
     hidden_metadata: Mapping[str, object] = field(default_factory=dict)
+    remote_auth: Mapping[str, object] = field(default_factory=dict)
 
     @property
     def digest(self) -> str:
@@ -165,6 +172,7 @@ class MCPToolDescriptor:
                 "server_identity": self.server_identity,
                 "transport": self.transport,
                 "hidden_metadata": self.hidden_metadata,
+                "remote_auth": self.remote_auth,
             }
         )
 
@@ -186,6 +194,27 @@ class MCPToolDescriptor:
             argument_schema=self.argument_schema,
             allowed_transports=(self.transport,),
         ).signed()
+
+
+@dataclass(frozen=True)
+class MCPRemoteAuthContext:
+    """Remote MCP transport and audience-binding evidence."""
+
+    presented_audience: str
+    expected_audience: str
+    server_identity: Mapping[str, object]
+    transport_provenance: str
+    authenticated: bool = True
+
+    def as_metadata(self) -> Mapping[str, object]:
+        """Return the mapping stored on descriptors and calls."""
+        return {
+            "presented_audience": self.presented_audience,
+            "expected_audience": self.expected_audience,
+            "server_identity": dict(self.server_identity),
+            "transport_provenance": self.transport_provenance,
+            "authenticated": self.authenticated,
+        }
 
 
 @dataclass(frozen=True)
@@ -350,6 +379,7 @@ def _schema_digest(call: MCPToolCall) -> str:
             "server_identity": call.server_identity,
             "tool_schema": call.tool_schema,
             "argument_schema": call.argument_schema,
+            "remote_auth": call.remote_auth,
         }
     )
 
@@ -381,6 +411,57 @@ def _normalise_name(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", value.lower())
 
 
+def _transport(metadata: Mapping[str, object], fallback: str = "") -> str:
+    value = metadata.get("transport")
+    if isinstance(value, str) and value.strip():
+        return value.strip().lower()
+    return fallback.strip().lower()
+
+
+def _remote_auth_findings(
+    *,
+    transport: str,
+    server_identity: Mapping[str, object],
+    remote_auth: Mapping[str, object],
+) -> tuple[str, ...]:
+    if transport not in _REMOTE_TRANSPORTS:
+        return ()
+
+    findings: list[str] = []
+    if not remote_auth:
+        return ("remote_auth_missing",)
+
+    presented = str(remote_auth.get("presented_audience", "")).strip()
+    expected = str(remote_auth.get("expected_audience", "")).strip()
+    if not presented or not expected or presented != expected:
+        findings.append("remote_audience_mismatch")
+
+    auth_identity = remote_auth.get("server_identity")
+    if not isinstance(auth_identity, Mapping) or not auth_identity:
+        findings.append("remote_identity_missing")
+    elif dict(auth_identity) != dict(server_identity):
+        findings.append("remote_identity_mismatch")
+
+    provenance = str(remote_auth.get("transport_provenance", "")).strip().lower()
+    if provenance not in _TRUSTED_TRANSPORT_PROVENANCE:
+        findings.append("remote_transport_unverified")
+
+    if remote_auth.get("authenticated") is not True:
+        findings.append("remote_auth_not_authenticated")
+
+    return tuple(dict.fromkeys(findings))
+
+
+def _remote_auth_metadata(
+    value: Mapping[str, object] | MCPRemoteAuthContext | None,
+) -> Mapping[str, object]:
+    if value is None:
+        return {}
+    if isinstance(value, MCPRemoteAuthContext):
+        return value.as_metadata()
+    return dict(value)
+
+
 def _discovery_text(descriptor: MCPToolDescriptor) -> str:
     return "\n".join(
         (
@@ -389,6 +470,7 @@ def _discovery_text(descriptor: MCPToolDescriptor) -> str:
             _canonical(descriptor.output_schema),
             _canonical(descriptor.argument_schema),
             _canonical(descriptor.hidden_metadata),
+            _canonical(descriptor.remote_auth),
         )
     )
 
@@ -478,6 +560,16 @@ def _descriptor_poisoning_findings(descriptor: MCPToolDescriptor) -> tuple[str, 
     return tuple(dict.fromkeys(findings))
 
 
+def _descriptor_remote_auth_findings(
+    descriptor: MCPToolDescriptor,
+) -> tuple[str, ...]:
+    return _remote_auth_findings(
+        transport=descriptor.transport.strip().lower(),
+        server_identity=descriptor.server_identity,
+        remote_auth=descriptor.remote_auth,
+    )
+
+
 def _out_of_scope_parameters(
     descriptor: MCPToolDescriptor,
     parameter_names: tuple[str, ...],
@@ -522,8 +614,45 @@ def _review_discovery(request: MCPDiscoveryRequest) -> tuple[str, ...]:
         seen_normalised[normalised] = descriptor.tool
 
         findings.extend(_descriptor_poisoning_findings(descriptor))
+        findings.extend(_descriptor_remote_auth_findings(descriptor))
 
     return tuple(dict.fromkeys(findings))
+
+
+class _MCPRemoteAuthDetector:
+    """Fail closed when remote MCP calls lack audience-bound provenance."""
+
+    name = "mcp_remote_auth"
+    plane = Plane.ACTION
+    tier = 0
+
+    def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
+        """Return a signal for remote MCP auth/provenance mismatches."""
+        call = request.metadata.get(MCP_CALL_KEY)
+        if not isinstance(call, MCPToolCall):
+            return None
+
+        transport = _transport(
+            call.tool_schema,
+            fallback=_transport(call.server_identity),
+        )
+        findings = _remote_auth_findings(
+            transport=transport,
+            server_identity=call.server_identity,
+            remote_auth=call.remote_auth,
+        )
+        if not findings:
+            return None
+        return DetectorSignal(
+            detector=self.name,
+            plane=Plane.ACTION,
+            score=0.9,
+            locus=Locus.ACTION,
+            signal_type="mcp_remote_auth",
+            severity=Severity.HIGH,
+            rationale="remote MCP call failed audience or provenance binding: "
+            + ", ".join(findings),
+        )
 
 
 @dataclass(frozen=True)
@@ -554,6 +683,7 @@ class MCPGatewayRequest:
         server_identity: Mapping[str, object] | None = None,
         tool_schema: Mapping[str, object] | None = None,
         argument_schema: Mapping[str, object] | None = None,
+        remote_auth: Mapping[str, object] | MCPRemoteAuthContext | None = None,
         provenance: str = "",
         query: str = "",
         context: str = "",
@@ -570,6 +700,7 @@ class MCPGatewayRequest:
             server_identity=dict(server_identity or {}),
             tool_schema=dict(tool_schema or {}),
             argument_schema=dict(argument_schema or {}),
+            remote_auth=_remote_auth_metadata(remote_auth),
         )
         return cls(
             call=call,
@@ -688,6 +819,7 @@ class MCPGateway:
         ensemble = ParallelEnsembleScorer(
             [
                 MCPCallInspector(registry=registry),
+                _MCPRemoteAuthDetector(),
                 DestructiveCommandDetector(),
                 BlastRadiusDetector(),
                 OriginTaintDetector(),

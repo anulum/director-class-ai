@@ -146,6 +146,7 @@ class MCPToolCall:
     server_identity: Mapping[str, object] = field(default_factory=dict)
     tool_schema: Mapping[str, object] = field(default_factory=dict)
     argument_schema: Mapping[str, object] = field(default_factory=dict)
+    remote_auth: Mapping[str, object] = field(default_factory=dict)
 
     def provenance_of(self, key: str) -> str:
         """Return the normalised provenance for one argument key."""

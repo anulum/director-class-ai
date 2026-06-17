@@ -9,13 +9,16 @@
 from __future__ import annotations
 
 from director_class_ai.action import MCP_CALL_KEY, MCPToolCall, MCPToolRegistration
+from director_class_ai.core import EvaluationRequest
 from director_class_ai.gateway import (
     MCPDiscoveryRequest,
     MCPGateway,
     MCPGatewayRequest,
+    MCPRemoteAuthContext,
     MCPResponseRequest,
     MCPToolDescriptor,
 )
+from director_class_ai.gateway.mcp import _MCPRemoteAuthDetector
 
 
 def _registration() -> MCPToolRegistration:
@@ -155,6 +158,29 @@ def _descriptor(tool: str = "read_file") -> MCPToolDescriptor:
     )
 
 
+def _remote_auth(audience: str = "mcp://fs") -> MCPRemoteAuthContext:
+    return MCPRemoteAuthContext(
+        presented_audience=audience,
+        expected_audience="mcp://fs",
+        server_identity={"name": "fs", "transport": "https", "audience": "mcp://fs"},
+        transport_provenance="tls_verified",
+    )
+
+
+def _remote_descriptor() -> MCPToolDescriptor:
+    return MCPToolDescriptor(
+        server="fs",
+        tool="read_file",
+        description="Read one workspace file.",
+        input_schema={"type": "object"},
+        output_schema={"type": "object"},
+        argument_schema={"properties": {"path": {"type": "string"}}},
+        server_identity={"name": "fs", "transport": "https", "audience": "mcp://fs"},
+        transport="https",
+        remote_auth=_remote_auth().as_metadata(),
+    )
+
+
 def test_discovery_allows_clean_descriptors_and_yields_registrations() -> None:
     request = MCPDiscoveryRequest.from_descriptors("fs", [_descriptor()])
     decision = MCPGateway.from_registry([]).review_discovery(request)
@@ -168,6 +194,164 @@ def test_discovery_allows_clean_descriptors_and_yields_registrations() -> None:
     assert registrations[0].key == ("fs", "read_file")
     assert registrations[0].registry_signature == registrations[0].fingerprint
     assert decision.to_audit_event()["descriptor_digests"]
+
+
+def test_remote_discovery_fails_closed_without_auth_context() -> None:
+    descriptor = MCPToolDescriptor(
+        server="fs",
+        tool="read_file",
+        description="Read one workspace file.",
+        server_identity={"name": "fs", "transport": "https", "audience": "mcp://fs"},
+        transport="https",
+    )
+
+    decision = MCPGateway.from_registry([]).review_discovery(
+        MCPDiscoveryRequest.from_descriptors("fs", [descriptor])
+    )
+
+    assert decision.route == "block"
+    assert decision.permitted is False
+    assert "remote_auth_missing" in decision.findings
+
+
+def test_remote_discovery_fails_closed_for_audience_mismatch() -> None:
+    descriptor = MCPToolDescriptor(
+        server="fs",
+        tool="read_file",
+        description="Read one workspace file.",
+        server_identity={"name": "fs", "transport": "https", "audience": "mcp://fs"},
+        transport="https",
+        remote_auth=_remote_auth("mcp://other").as_metadata(),
+    )
+
+    decision = MCPGateway.from_registry([]).review_discovery(
+        MCPDiscoveryRequest.from_descriptors("fs", [descriptor])
+    )
+
+    assert decision.route == "block"
+    assert "remote_audience_mismatch" in decision.findings
+
+
+def test_remote_discovery_fails_closed_for_unverified_transport() -> None:
+    descriptor = MCPToolDescriptor(
+        server="fs",
+        tool="read_file",
+        description="Read one workspace file.",
+        server_identity={"name": "fs", "transport": "https", "audience": "mcp://fs"},
+        transport="https",
+        remote_auth={
+            **dict(_remote_auth().as_metadata()),
+            "transport_provenance": "unverified_redirect",
+        },
+    )
+
+    decision = MCPGateway.from_registry([]).review_discovery(
+        MCPDiscoveryRequest.from_descriptors("fs", [descriptor])
+    )
+
+    assert decision.route == "block"
+    assert "remote_transport_unverified" in decision.findings
+
+
+def test_remote_discovery_registration_backs_safe_remote_read() -> None:
+    descriptor = _remote_descriptor()
+    discovery = MCPGateway.from_registry([]).review_discovery(
+        MCPDiscoveryRequest.from_descriptors("fs", [descriptor])
+    )
+    gateway = MCPGateway.from_registry(
+        discovery.registrations(),
+        require_signed_registrations=True,
+    )
+    request = MCPGatewayRequest.from_parts(
+        "fs",
+        "read_file",
+        {"path": "README.md"},
+        server_identity=descriptor.server_identity,
+        tool_schema={
+            "description": descriptor.description,
+            "input_schema": descriptor.input_schema,
+            "output_schema": descriptor.output_schema,
+            "transport": descriptor.transport,
+        },
+        argument_schema=descriptor.argument_schema,
+        remote_auth=dict(_remote_auth().as_metadata()),
+        provenance="user",
+    )
+
+    decision = gateway.review(request)
+
+    assert discovery.route == "allow"
+    assert decision.route == "allow"
+    assert decision.permitted is True
+
+
+def test_remote_auth_detector_ignores_non_mcp_requests() -> None:
+    detector = _MCPRemoteAuthDetector()
+
+    signal = detector.evaluate(EvaluationRequest(action="echo ok"))
+
+    assert signal is None
+
+
+def test_remote_call_fails_closed_for_missing_auth_context() -> None:
+    descriptor = _remote_descriptor()
+    discovery = MCPGateway.from_registry([]).review_discovery(
+        MCPDiscoveryRequest.from_descriptors("fs", [descriptor])
+    )
+    gateway = MCPGateway.from_registry(
+        discovery.registrations(),
+        require_signed_registrations=True,
+    )
+    request = MCPGatewayRequest.from_parts(
+        "fs",
+        "read_file",
+        {"path": "README.md"},
+        server_identity=descriptor.server_identity,
+        tool_schema={
+            "description": descriptor.description,
+            "input_schema": descriptor.input_schema,
+            "output_schema": descriptor.output_schema,
+            "transport": descriptor.transport,
+        },
+        argument_schema=descriptor.argument_schema,
+        provenance="user",
+    )
+
+    decision = gateway.review(request)
+
+    assert decision.route == "block"
+    assert "mcp_remote_auth" in decision.firing
+
+
+def test_remote_call_fails_closed_for_audience_mismatch() -> None:
+    descriptor = _remote_descriptor()
+    discovery = MCPGateway.from_registry([]).review_discovery(
+        MCPDiscoveryRequest.from_descriptors("fs", [descriptor])
+    )
+    gateway = MCPGateway.from_registry(
+        discovery.registrations(),
+        require_signed_registrations=True,
+    )
+    request = MCPGatewayRequest.from_parts(
+        "fs",
+        "read_file",
+        {"path": "README.md"},
+        server_identity=descriptor.server_identity,
+        tool_schema={
+            "description": descriptor.description,
+            "input_schema": descriptor.input_schema,
+            "output_schema": descriptor.output_schema,
+            "transport": descriptor.transport,
+        },
+        argument_schema=descriptor.argument_schema,
+        remote_auth=_remote_auth("mcp://other"),
+        provenance="user",
+    )
+
+    decision = gateway.review(request)
+
+    assert decision.route == "block"
+    assert "mcp_remote_auth" in decision.firing
 
 
 def test_discovery_registration_can_back_signed_call_review() -> None:
