@@ -246,6 +246,10 @@ def test_service_review_accepts_capability_context_and_redacts_policy() -> None:
     assert review.body["route"] == "allow"
     assert review.body["policy"]["summary"]["resource_present"] is True
     assert review.body["policy"]["context_digest"]
+    assert review.body["policy"]["decision"]["matched_grant_ids"] == ("grant-read",)
+    assert review.body["policy"]["decision"]["rationale"] == (
+        "capability and origin policy matched"
+    )
     assert "workspace:README.md" not in repr(review.body)
 
 

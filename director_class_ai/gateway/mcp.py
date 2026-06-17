@@ -488,13 +488,21 @@ def _capability_context_metadata(
     return dict(value)
 
 
-def _capability_audit_projection(value: Mapping[str, object]) -> Mapping[str, object]:
+def _capability_audit_projection(
+    value: Mapping[str, object],
+    policy: CapabilityPolicy | None,
+) -> Mapping[str, object]:
     if not value:
         return {}
     context = CapabilityContext.from_mapping(value)
-    return {
+    projection: dict[str, object] = {
         "context_digest": _context_digest(value),
         "summary": context.redacted_summary(),
+    }
+    if policy is not None:
+        projection["decision"] = policy.evaluate(context).audit_projection()
+    return {
+        **projection,
     }
 
 
@@ -809,6 +817,7 @@ class MCPGatewayDecision:
         cls,
         request: MCPGatewayRequest,
         decision: Decision,
+        capability_policy: CapabilityPolicy | None,
     ) -> MCPGatewayDecision:
         """Build a gateway decision and attach redacted policy context evidence."""
         base = cls.from_governor(request.call, decision)
@@ -824,7 +833,10 @@ class MCPGatewayDecision:
             requires_human=base.requires_human,
             firing=base.firing,
             request_digest=base.request_digest,
-            policy_projection=_capability_audit_projection(request.capability_context),
+            policy_projection=_capability_audit_projection(
+                request.capability_context,
+                capability_policy,
+            ),
         )
 
     def to_audit_event(self) -> dict[str, object]:
@@ -862,9 +874,11 @@ class MCPGateway:
         self,
         governor: Governor,
         *,
+        capability_policy: CapabilityPolicy | None = None,
         response_governor: Governor | None = None,
     ) -> None:
         self._governor = governor
+        self._capability_policy = capability_policy
         self._response_governor = response_governor or Governor(
             ensemble=ParallelEnsembleScorer(
                 [DestructiveCommandDetector(), BlastRadiusDetector()]
@@ -913,6 +927,7 @@ class MCPGateway:
         )
         return cls(
             call_governor,
+            capability_policy=capability_policy,
             response_governor=response_governor,
         )
 
@@ -941,4 +956,8 @@ class MCPGateway:
         """Review a typed MCP request without executing the tool."""
 
         decision = self._governor.review(request.to_evaluation())
-        return MCPGatewayDecision.from_request_and_governor(request, decision)
+        return MCPGatewayDecision.from_request_and_governor(
+            request,
+            decision,
+            self._capability_policy,
+        )

@@ -136,6 +136,10 @@ def test_capability_policy_allows_signed_call_with_redacted_audit() -> None:
     assert event["policy"]["summary"]["resource_present"] is True
     assert event["policy"]["summary"]["source_origin"] == "user"
     assert event["policy"]["context_digest"]
+    assert event["policy"]["decision"]["matched_grant_ids"] == ("grant-read",)
+    assert event["policy"]["decision"]["rationale"] == (
+        "capability and origin policy matched"
+    )
     assert "workspace:README.md" not in repr(event)
 
 
@@ -160,6 +164,27 @@ def test_capability_policy_accepts_typed_context_object() -> None:
 
     assert decision.route == "allow"
     assert request.capability_context["blast_radius"] == "low"
+
+
+def test_capability_context_audit_without_policy_has_no_policy_decision() -> None:
+    request = MCPGatewayRequest.from_parts(
+        "fs",
+        "read_file",
+        {"path": "README.md"},
+        server_identity={"name": "fs", "transport": "stdio"},
+        tool_schema={"description": "Read one workspace file", "mode": "read"},
+        argument_schema={"properties": {"path": {"type": "string"}}},
+        capability_context=_capability_context(),
+        provenance="user",
+    )
+
+    decision = MCPGateway.from_registry([_registration()]).review(request)
+    policy = decision.to_audit_event()["policy"]
+
+    assert decision.route == "allow"
+    assert policy["context_digest"]
+    assert policy["summary"]["resource_present"] is True
+    assert "decision" not in policy
 
 
 def test_capability_policy_blocks_missing_context_at_gateway() -> None:
