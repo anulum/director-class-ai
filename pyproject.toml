@@ -33,6 +33,7 @@ dependencies = []
 [project.scripts]
 director-class-guard = "director_class_ai.cli.guard:main"
 director-class-mcp-gateway = "director_class_ai.gateway.mcp_cli:main"
+director-class-siem-export = "director_class_ai.audit.export_cli:main"
 
 [project.optional-dependencies]
 # Content/integrity detectors reuse the director-ai model primitives during

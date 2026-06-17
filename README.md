@@ -89,6 +89,19 @@ resolves them into one `Verdict`. Architecture and roadmap: `docs/internal/`.
 Proprietary commercial — see `LICENSE`. Source visibility is **not** a grant of
 rights; production use requires a commercial agreement (protoscience@anulum.li).
 
+## SIEM/SOC export
+
+`director-class-siem-export` verifies the tamper-evident audit chain before it
+writes SIEM/SOC JSONL. Exported events contain decision ids, detector ids, policy
+profile, approval state, request digest, verdict booleans, risk, and chain
+metadata. Raw prompts, actions, context, responses, and command output are not in
+the export schema.
+
+```bash
+director-class-siem-export runtime/audit.jsonl -o runtime/siem.jsonl
+director-class-siem-export runtime/audit.jsonl
+```
+
 ## Local verification
 
 ```bash
