@@ -260,6 +260,81 @@ class TestRecursiveAndNewTransforms:
     def test_printed_homoglyph_lookalike_stays_clean(self) -> None:
         assert caught("echo r\u200bm -rf /") is None
 
+    def test_brace_list_command_revealed(self) -> None:
+        assert caught("{rm,-rf,/}").severity is Severity.CRITICAL
+
+    def test_brace_embedded_command_revealed(self) -> None:
+        assert caught("r{m,} -rf /").severity is Severity.CRITICAL
+
+    def test_brace_split_flags_revealed(self) -> None:
+        assert caught("rm -{r,f} /").severity is Severity.CRITICAL
+
+    def test_printed_brace_lookalike_stays_clean(self) -> None:
+        assert caught("echo {rm,-rf,/}") is None
+
+    def test_safe_brace_glob_stays_clean(self) -> None:
+        assert caught("touch file{1,2}.txt") is None
+
+    def test_arithmetic_printf_xargs_reconstructs_command(self) -> None:
+        command = (
+            r"printf \"$(printf '\\%03o' $((0x72)))"
+            r"$(printf '\\%03o' $((0x6d)))\" | xargs -I{} {} -rf /"
+        )
+        assert caught(command).severity is Severity.CRITICAL
+
+    def test_arithmetic_printf_xargs_echo_stays_clean(self) -> None:
+        command = (
+            r"printf \"$(printf '\\%03o' $((0x72)))"
+            r"$(printf '\\%03o' $((0x6d)))\" | xargs -I{} echo {} -rf /"
+        )
+        assert caught(command) is None
+
+    def test_arithmetic_printf_xargs_local_cleanup_stays_clean(self) -> None:
+        command = (
+            r"printf \"$(printf '\\%03o' $((0x72)))"
+            r"$(printf '\\%03o' $((0x6d)))\" | xargs -I{} {} -rf ./build"
+        )
+        assert caught(command) is None
+
+    def test_arithmetic_expansion_reveals_supported_integer_ops(self) -> None:
+        command = (
+            "echo $((+1)) $((-2)) $((~0)) $((2+3)) $((5-2)) $((3*4)) "
+            "$((5%2)) $((1<<3)) $((8>>1)) $((1|2)) $((3&1)) $((1^3))"
+        )
+        assert "echo 1 -2 -1 5 3 12 1 8 4 3 1 2" in expand(command)
+
+    def test_invalid_arithmetic_expansions_stay_opaque(self) -> None:
+        for command in (
+            "echo $((1+))",
+            "echo $((name))",
+            "echo $((+name))",
+            "echo $((name+1))",
+            "echo $((5%0))",
+        ):
+            forms = expand(command)
+            assert forms == [command]
+
+    def test_out_of_bounds_arithmetic_expansion_stays_opaque(self) -> None:
+        command = "echo $((1<<30))"
+        assert expand(command) == [command]
+
+    def test_malformed_brace_lists_stay_opaque(self) -> None:
+        commands = (
+            "{,}",
+            "{1,2,3,4,5,6,7,8,9}",
+            "{aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,b}",
+        )
+        for command in commands:
+            assert expand(command) == [command]
+
+    def test_arithmetic_printf_xargs_out_of_byte_range_stays_clean(self) -> None:
+        command = r"printf \"$(printf '\\%03o' $((0x100)))\" | xargs -I{} {} -rf /"
+        assert caught(command) is None
+
+    def test_arithmetic_printf_xargs_non_command_word_stays_clean(self) -> None:
+        command = r"printf \"$(printf '\\%03o' $((0x20)))\" | xargs -I{} {} -rf /"
+        assert caught(command) is None
+
 
 class TestExpandBounds:
     def test_max_depth_zero_returns_only_original(self) -> None:

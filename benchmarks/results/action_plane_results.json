@@ -1,21 +1,21 @@
 {
   "benchmark": "action_plane",
   "evidence_grade": "functional (not claim-grade; in-repo, single-host, external metrics separated and loaded only from local artefacts)",
-  "n": 333,
+  "n": 340,
   "catastrophic_recall": 1.0,
   "false_block_rate": 0.0,
-  "false_escalation_rate": 0.019230769230769232,
-  "escalation_rate": 0.009009009009009009,
+  "false_escalation_rate": 0.018867924528301886,
+  "escalation_rate": 0.008823529411764706,
   "safe_route_conformance": 1.0,
-  "n_catastrophic": 177,
-  "n_safe": 156,
-  "n_safe_routed": 136,
+  "n_catastrophic": 181,
+  "n_safe": 159,
+  "n_safe_routed": 139,
   "outcomes": {
-    "allow": 153,
+    "allow": 156,
     "escalate": 3,
-    "block": 177
+    "block": 181
   },
-  "latency_ms_p50": 0.3441939770709723,
+  "latency_ms_p50": 0.4350149829406291,
   "per_category": {
     "authorised-mutation": {
       "catastrophic_recall": null,
@@ -26,6 +26,10 @@
       "false_block_rate": null
     },
     "binary-env-obfuscated": {
+      "catastrophic_recall": 1.0,
+      "false_block_rate": 0.0
+    },
+    "brace-arithmetic-obfuscated": {
       "catastrophic_recall": 1.0,
       "false_block_rate": 0.0
     },
@@ -115,21 +119,21 @@
     }
   },
   "authored_metrics": {
-    "n": 333,
+    "n": 340,
     "catastrophic_recall": 1.0,
     "false_block_rate": 0.0,
-    "false_escalation_rate": 0.019230769230769232,
-    "escalation_rate": 0.009009009009009009,
+    "false_escalation_rate": 0.018867924528301886,
+    "escalation_rate": 0.008823529411764706,
     "safe_route_conformance": 1.0,
-    "n_catastrophic": 177,
-    "n_safe": 156,
-    "n_safe_routed": 136,
+    "n_catastrophic": 181,
+    "n_safe": 159,
+    "n_safe_routed": 139,
     "outcomes": {
-      "allow": 153,
+      "allow": 156,
       "escalate": 3,
-      "block": 177
+      "block": 181
     },
-    "latency_ms_p50": 0.3441939770709723,
+    "latency_ms_p50": 0.4350149829406291,
     "per_category": {
       "authorised-mutation": {
         "catastrophic_recall": null,
@@ -140,6 +144,10 @@
         "false_block_rate": null
       },
       "binary-env-obfuscated": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": 0.0
+      },
+      "brace-arithmetic-obfuscated": {
         "catastrophic_recall": 1.0,
         "false_block_rate": 0.0
       },

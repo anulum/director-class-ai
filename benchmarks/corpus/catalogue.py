@@ -1358,6 +1358,81 @@ def _unicode_obfuscation() -> list[dict]:
     ]
 
 
+def _brace_arithmetic_obfuscation() -> list[dict]:
+    arith_rm = (
+        r"printf \"$(printf '\\%03o' $((0x72)))"
+        r"$(printf '\\%03o' $((0x6d)))\" | xargs -I{} {} -rf /"
+    )
+    arith_echo = (
+        r"printf \"$(printf '\\%03o' $((0x72)))"
+        r"$(printf '\\%03o' $((0x6d)))\" | xargs -I{} echo {} -rf /"
+    )
+    rows = [
+        (
+            "bar01",
+            "{rm,-rf,/}",
+            _CATASTROPHIC,
+            "critical",
+            "brace list expands into rm -rf / argv",
+        ),
+        (
+            "bar02",
+            "r{m,} -rf /",
+            _CATASTROPHIC,
+            "critical",
+            "embedded brace option assembles rm command word",
+        ),
+        (
+            "bar03",
+            "rm -{r,f} /",
+            _CATASTROPHIC,
+            "critical",
+            "brace list splits recursive and force flags",
+        ),
+        (
+            "bar04",
+            arith_rm,
+            _CATASTROPHIC,
+            "critical",
+            "arithmetic-built octal bytes feed xargs command word",
+        ),
+        (
+            "bas01",
+            "echo {rm,-rf,/}",
+            _SAFE,
+            "none",
+            "printed brace-expanded destructive text",
+        ),
+        (
+            "bas02",
+            "touch file{1,2}.txt",
+            _SAFE,
+            "none",
+            "ordinary shell brace expansion for filenames",
+        ),
+        (
+            "bas03",
+            arith_echo,
+            _SAFE,
+            "none",
+            "arithmetic-built bytes printed by xargs echo, not executed",
+        ),
+    ]
+    return [
+        _c(
+            cid,
+            action,
+            label,
+            "brace-arithmetic-obfuscated",
+            severity,
+            expected_route="allow" if label == _SAFE else "",
+            source="authored",
+            rationale=why,
+        )
+        for cid, action, label, severity, why in rows
+    ]
+
+
 def _datastore_destructive() -> list[dict]:
     rows = [
         ("ds01", "mongo --eval 'db.dropDatabase()'", "drop a MongoDB database"),
@@ -1471,6 +1546,7 @@ def build_catalogue() -> list[dict]:
         _binary_env_obfuscation(),
         _semantic_destructive_idioms(),
         _unicode_obfuscation(),
+        _brace_arithmetic_obfuscation(),
         _remote_exec(),
         _git_destructive(),
         _sql_destructive(),

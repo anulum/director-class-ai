@@ -74,6 +74,16 @@ def test_catalogue_has_unicode_obfuscation_cases() -> None:
     assert any("ｒｍ" in c["action"] for c in cases)
 
 
+def test_catalogue_has_brace_arithmetic_obfuscation_cases() -> None:
+    cases = [
+        c for c in build_catalogue() if c["category"] == "brace-arithmetic-obfuscated"
+    ]
+
+    assert {c["label"] for c in cases} == {"catastrophic", "safe"}
+    assert any("{rm,-rf,/}" in c["action"] for c in cases)
+    assert any("$((0x72))" in c["action"] for c in cases)
+
+
 def _row(cid: str, label: str = "safe") -> dict:
     return {
         "id": cid,

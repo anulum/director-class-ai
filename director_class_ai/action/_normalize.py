@@ -24,6 +24,7 @@ a hostile input cannot blow up the work.
 
 from __future__ import annotations
 
+import ast
 import base64
 import binascii
 import bz2
@@ -56,6 +57,12 @@ _ECHO_PREFIX = re.compile(r"^\s*(?:echo|printf)\s+(?:-e\s+)?", re.IGNORECASE)
 _ENV_ASSIGN = re.compile(
     r"(?:^|[;&]\s*)(?P<name>[A-Za-z_][A-Za-z0-9_]*)="
     r"(?P<value>'[^']*'|\"[^\"]*\"|[^\s;&|]+)"
+)
+_BRACE_LIST = re.compile(r"\{([^{}\s]{1,96})\}")
+_ARITH = re.compile(r"\$\(\((?P<expr>[^()]{1,64})\)\)")
+_PRINTF_ARITH_OCTAL = re.compile(
+    r"printf\s+['\"]\\\\%0?3?o['\"]\s+\$\(\((?P<expr>[^()]{1,64})\)\)",
+    re.IGNORECASE,
 )
 _XARGS_TEMPLATE = re.compile(
     r"^\s*(?:printf|echo)\s+(?:-e\s+)?(?P<payload>.+?)"
@@ -113,6 +120,110 @@ def _merge_split_flags(text: str) -> str:
         prev = text
         text = _SPLIT_FLAGS.sub(r"\1\2", text)
     return text
+
+
+def _safe_shell_arithmetic(expr: str) -> int | None:
+    """Evaluate a bounded shell-arithmetic subset used in obfuscated bytes."""
+    allowed_binops = (
+        ast.Add,
+        ast.Sub,
+        ast.Mult,
+        ast.Mod,
+        ast.LShift,
+        ast.RShift,
+        ast.BitOr,
+        ast.BitAnd,
+        ast.BitXor,
+    )
+    allowed_unary = (ast.UAdd, ast.USub, ast.Invert)
+
+    def walk(node: ast.AST) -> int | None:
+        if isinstance(node, ast.Expression):
+            return walk(node.body)
+        if isinstance(node, ast.Constant) and type(node.value) is int:
+            return node.value
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, allowed_unary):
+            value = walk(node.operand)
+            if value is None:
+                return None
+            if isinstance(node.op, ast.UAdd):
+                return value
+            if isinstance(node.op, ast.USub):
+                return -value
+            return ~value
+        if isinstance(node, ast.BinOp) and isinstance(node.op, allowed_binops):
+            left = walk(node.left)
+            right = walk(node.right)
+            if left is None or right is None:
+                return None
+            if isinstance(node.op, ast.Add):
+                return left + right
+            if isinstance(node.op, ast.Sub):
+                return left - right
+            if isinstance(node.op, ast.Mult):
+                return left * right
+            if isinstance(node.op, ast.Mod) and right != 0:
+                return left % right
+            if isinstance(node.op, ast.LShift) and 0 <= right <= 16:
+                return left << right
+            if isinstance(node.op, ast.RShift) and 0 <= right <= 16:
+                return left >> right
+            if isinstance(node.op, ast.BitOr):
+                return left | right
+            if isinstance(node.op, ast.BitAnd):
+                return left & right
+            if isinstance(node.op, ast.BitXor):
+                return left ^ right
+        return None
+
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError:
+        return None
+    value = walk(tree)
+    if value is None or not -(1 << 20) <= value <= (1 << 20):
+        return None
+    return value
+
+
+def _arithmetic_expansions(command: str) -> list[str]:
+    """Reveal bounded ``$((...))`` expansions as decimal shell output."""
+
+    changed = False
+
+    def repl(match: re.Match[str]) -> str:
+        nonlocal changed
+        value = _safe_shell_arithmetic(match.group("expr"))
+        if value is None:
+            return match.group(0)
+        changed = True
+        return str(value)
+
+    substituted = _ARITH.sub(repl, command)
+    return [substituted] if changed and substituted != command else []
+
+
+def _brace_expansions(command: str) -> list[str]:
+    """Reveal small shell brace lists used to assemble command words or argv."""
+    forms: list[str] = []
+    for match in _BRACE_LIST.finditer(command):
+        parts = match.group(1).split(",")
+        if len(parts) < 2:
+            continue
+        if all(part == "" for part in parts):
+            continue
+        if len(parts) > 8 or not all(len(part) <= 32 for part in parts):
+            continue
+
+        start, end = match.span()
+        prev = command[start - 1] if start > 0 else " "
+        nxt = command[end] if end < len(command) else " "
+        whole_word = prev.isspace() and (nxt.isspace() or nxt in "|;&")
+        if whole_word:
+            forms.append(f"{command[:start]}{' '.join(parts)}{command[end:]}")
+        for part in parts:
+            forms.append(f"{command[:start]}{part}{command[end:]}")
+    return forms
 
 
 def _decode_base64_payloads(command: str) -> list[str]:
@@ -238,6 +349,34 @@ def _xargs_reconstructions(command: str) -> list[str]:
     return [f"{verb} {args}".strip()]
 
 
+def _xargs_arithmetic_printf_reconstructions(command: str) -> list[str]:
+    """Reveal arithmetic-built octal bytes piped into an ``xargs`` command word."""
+    match = _XARGS_TEMPLATE.match(command)
+    if match is None:
+        return []
+
+    placeholder = match.group("placeholder")
+    template = match.group("template")
+    if template != placeholder:
+        return []
+
+    octets: list[int] = []
+    for expr_match in _PRINTF_ARITH_OCTAL.finditer(match.group("payload")):
+        value = _safe_shell_arithmetic(expr_match.group("expr"))
+        if value is None or not 0 <= value <= 255:
+            return []
+        octets.append(value)
+    if not octets or len(octets) > 64:
+        return []
+
+    text = _printable_text(bytes(octets))
+    if text is None or not _SIMPLE_COMMAND_WORD.fullmatch(text):
+        return []
+
+    args = match.group("args").strip()
+    return [f"{text} {args}".strip()]
+
+
 def _command_substitutions(command: str) -> list[str]:
     """Reveal ``$(...)`` / backtick substitutions and inline ``$(echo ...)``."""
     forms: list[str] = []
@@ -311,7 +450,10 @@ def _transform_once(command: str) -> list[str]:
     out.extend(_decode_hex_inplace(command))
     out.extend(_decode_octal_runs(command))
     out.extend(_decode_octal_inplace(command))
+    out.extend(_brace_expansions(command))
+    out.extend(_arithmetic_expansions(command))
     out.extend(_xargs_reconstructions(command))
+    out.extend(_xargs_arithmetic_printf_reconstructions(command))
     out.extend(_command_substitutions(command))
     out.extend(_env_var_reconstructions(command))
     out.extend(_ALIAS.findall(command))
