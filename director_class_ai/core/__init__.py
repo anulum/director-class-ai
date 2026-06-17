@@ -6,12 +6,18 @@
 # Contact: www.anulum.li | protoscience@anulum.li
 # Director-Class AI — ensemble core
 
-"""Plane-agnostic detector signal, fusion, and (forthcoming) ensemble runner."""
+"""Plane-agnostic detector signal, fusion, ensemble, and calibration APIs."""
 
 from .calibration import CalibrationRegistry, PlattCalibrator, fit_platt
 from .ensemble import ParallelEnsembleScorer
 from .fusion import FusionPolicy, Verdict, fuse
 from .governor import AuditRecord, Decision, Governor
+from .meta_classifier import (
+    MetaClassifierFusionPolicy,
+    SignalMetaClassifier,
+    extract_signal_features,
+    fit_signal_meta_classifier,
+)
 from .signal import (
     Detector,
     DetectorSignal,
@@ -35,11 +41,15 @@ __all__ = [
     "EvaluationRequest",
     "FusionMode",
     "FusionPolicy",
+    "MetaClassifierFusionPolicy",
     "Locus",
     "ParallelEnsembleScorer",
     "Plane",
     "Severity",
+    "SignalMetaClassifier",
     "Span",
     "Verdict",
+    "extract_signal_features",
+    "fit_signal_meta_classifier",
     "fuse",
 ]
