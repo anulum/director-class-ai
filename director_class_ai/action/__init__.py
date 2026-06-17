@@ -26,6 +26,13 @@ from .destructive_command import DestructiveCommandDetector
 from .intent_consistency import IntentConsistencyDetector
 from .mcp_inspector import MCP_CALL_KEY, MCPCallInspector, MCPToolCall, serialise_call
 from .mcp_registry import MCPToolRegistration, MCPTrustRegistry
+from .memory import (
+    MEMORY_CONTEXT_KEY,
+    MemoryActionContext,
+    MemoryPlanDelta,
+    MemoryThreatDetector,
+    MemoryWriteContract,
+)
 from .origin_taint import OriginTaintDetector
 from .reversibility import REVERSIBILITY_KEY, ReversibilityDetector
 
@@ -47,6 +54,11 @@ __all__ = [
     "MCP_CALL_KEY",
     "MCPToolRegistration",
     "MCPTrustRegistry",
+    "MEMORY_CONTEXT_KEY",
+    "MemoryActionContext",
+    "MemoryPlanDelta",
+    "MemoryThreatDetector",
+    "MemoryWriteContract",
     "OriginTaintDetector",
     "REVERSIBILITY_KEY",
     "ReversibilityDetector",

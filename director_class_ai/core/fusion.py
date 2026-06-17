@@ -88,6 +88,13 @@ class FusionPolicy:
                 "browser_unsafe_download",
                 "browser_cross_site_task_drift",
             }
+            | {
+                "memory_poisoning",
+                "stale_tool_schema",
+                "persistent_instruction_injection",
+                "delayed_malicious_objective",
+                "task_plan_drift",
+            }
         )
     )
     plane_mode: dict[Plane, FusionMode] = field(

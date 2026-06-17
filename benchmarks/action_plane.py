@@ -57,6 +57,7 @@ from director_class_ai.action import (  # noqa: E402
     IntentConsistencyDetector,
     MCPCallInspector,
     MCPToolCall,
+    MemoryThreatDetector,
     OriginTaintDetector,
     serialise_call,
 )
@@ -102,6 +103,7 @@ def _governor() -> Governor:
             IntentConsistencyDetector(),
             MCPCallInspector(),
             BrowserActionDetector(),
+            MemoryThreatDetector(),
         ]
     )
     return Governor(ensemble=ensemble)  # no approver: escalation => not permitted
