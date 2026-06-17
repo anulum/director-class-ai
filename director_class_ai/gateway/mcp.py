@@ -102,6 +102,9 @@ class MCPToolDescriptor:
         return MCPToolRegistration(
             server=self.server,
             tool=self.tool,
+            description=self.description,
+            input_schema=self.input_schema,
+            output_schema=self.output_schema,
             server_identity=self.server_identity,
             tool_schema={
                 "description": self.description,
@@ -110,7 +113,8 @@ class MCPToolDescriptor:
                 "transport": self.transport,
             },
             argument_schema=self.argument_schema,
-        )
+            allowed_transports=(self.transport,),
+        ).signed()
 
 
 @dataclass(frozen=True)
@@ -491,6 +495,7 @@ class MCPGateway:
         registrations: Sequence[MCPToolRegistration],
         *,
         allow_dynamic_discovery: bool = False,
+        require_signed_registrations: bool = False,
         approval: ApprovalHook | None = None,
         audit_sink: AuditSink | None = None,
     ) -> MCPGateway:
@@ -499,6 +504,7 @@ class MCPGateway:
         registry = MCPTrustRegistry(
             registrations,
             allow_dynamic_discovery=allow_dynamic_discovery,
+            require_signed_registrations=require_signed_registrations,
         )
         ensemble = ParallelEnsembleScorer(
             [

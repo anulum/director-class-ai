@@ -166,7 +166,38 @@ def test_discovery_allows_clean_descriptors_and_yields_registrations() -> None:
     assert decision.findings == ()
     assert len(registrations) == 1
     assert registrations[0].key == ("fs", "read_file")
+    assert registrations[0].registry_signature == registrations[0].fingerprint
     assert decision.to_audit_event()["descriptor_digests"]
+
+
+def test_discovery_registration_can_back_signed_call_review() -> None:
+    descriptor = _descriptor()
+    discovery = MCPGateway.from_registry([]).review_discovery(
+        MCPDiscoveryRequest.from_descriptors("fs", [descriptor])
+    )
+    gateway = MCPGateway.from_registry(
+        discovery.registrations(),
+        require_signed_registrations=True,
+    )
+    request = MCPGatewayRequest.from_parts(
+        "fs",
+        "read_file",
+        {"path": "README.md"},
+        server_identity=descriptor.server_identity,
+        tool_schema={
+            "description": descriptor.description,
+            "input_schema": descriptor.input_schema,
+            "output_schema": descriptor.output_schema,
+            "transport": descriptor.transport,
+        },
+        argument_schema=descriptor.argument_schema,
+        provenance="user",
+    )
+
+    decision = gateway.review(request)
+
+    assert decision.route == "allow"
+    assert decision.permitted is True
 
 
 def test_discovery_fails_closed_for_poisoned_descriptor_text() -> None:

@@ -57,8 +57,95 @@ def test_registration_fingerprint_is_stable_across_mapping_order() -> None:
     assert first.fingerprint == second.fingerprint
 
 
+def test_registration_signature_binds_manifest() -> None:
+    signed = _registration().signed()
+    tampered = MCPToolRegistration(
+        server=signed.server,
+        tool=signed.tool,
+        server_identity=signed.server_identity,
+        tool_schema={"description": "read a different file", "mode": "read"},
+        argument_schema=signed.argument_schema,
+        registry_signature=signed.registry_signature,
+    )
+
+    assert signed.signature_valid is True
+    assert tampered.signature_valid is False
+
+
 def test_registered_tool_with_matching_schema_is_accepted() -> None:
     registry = MCPTrustRegistry([_registration()])
+    assert registry.evaluate(EvaluationRequest(metadata={MCP_CALL_KEY: _call()})) is None
+
+
+def test_signed_registration_is_accepted_when_signature_required() -> None:
+    registry = MCPTrustRegistry(
+        [_registration().signed()],
+        require_signed_registrations=True,
+    )
+    assert registry.evaluate(EvaluationRequest(metadata={MCP_CALL_KEY: _call()})) is None
+
+
+def test_unsigned_registration_is_denied_when_signature_required() -> None:
+    registry = MCPTrustRegistry(
+        [_registration()],
+        require_signed_registrations=True,
+    )
+    sig = registry.evaluate(EvaluationRequest(metadata={MCP_CALL_KEY: _call()}))
+
+    assert sig is not None
+    assert sig.signal_type == "mcp_unsigned_registration"
+    assert sig.severity is Severity.HIGH
+
+
+def test_registration_signature_mismatch_is_denied() -> None:
+    registration = MCPToolRegistration(
+        server="fs",
+        tool="read_file",
+        server_identity={"name": "local-fs", "transport": "stdio"},
+        tool_schema={"description": "read a project file", "mode": "read"},
+        argument_schema={
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+        },
+        registry_signature="not-the-current-manifest-digest",
+    )
+    registry = MCPTrustRegistry([registration])
+    sig = registry.evaluate(EvaluationRequest(metadata={MCP_CALL_KEY: _call()}))
+
+    assert sig is not None
+    assert sig.signal_type == "mcp_registration_signature_mismatch"
+
+
+def test_transport_mismatch_is_denied() -> None:
+    registry = MCPTrustRegistry([_registration().signed()])
+    sig = registry.evaluate(
+        EvaluationRequest(
+            metadata={
+                MCP_CALL_KEY: _call(
+                    server_identity={"name": "local-fs", "transport": "http"}
+                )
+            }
+        )
+    )
+
+    assert sig is not None
+    assert sig.signal_type == "mcp_transport_mismatch"
+
+
+def test_empty_transport_allow_list_skips_transport_gate() -> None:
+    registration = MCPToolRegistration(
+        server="fs",
+        tool="read_file",
+        server_identity={"name": "local-fs", "transport": "stdio"},
+        tool_schema={"description": "read a project file", "mode": "read"},
+        argument_schema={
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+        },
+        allowed_transports=(),
+    ).signed()
+    registry = MCPTrustRegistry([registration])
+
     assert registry.evaluate(EvaluationRequest(metadata={MCP_CALL_KEY: _call()})) is None
 
 

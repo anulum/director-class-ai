@@ -11,10 +11,11 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from ..core import DetectorSignal, EvaluationRequest, Locus, Plane, Severity
 from .mcp_inspector import MCP_CALL_KEY, MCPToolCall
@@ -22,11 +23,11 @@ from .mcp_inspector import MCP_CALL_KEY, MCPToolCall
 __all__ = ["MCPToolRegistration", "MCPTrustRegistry"]
 
 
-def _canonical(value: Mapping[str, object]) -> str:
+def _canonical(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
 
 
-def _fingerprint(*parts: Mapping[str, object]) -> str:
+def _fingerprint(*parts: object) -> str:
     payload = "\x1f".join(_canonical(part) for part in parts)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
@@ -35,30 +36,95 @@ def _normalise_name(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", value.lower())
 
 
+def _normalise_transports(values: Sequence[str]) -> tuple[str, ...]:
+    return tuple(sorted({value.strip().lower() for value in values if value.strip()}))
+
+
+def _mapping_value(mapping: Mapping[str, object], key: str) -> Mapping[str, object]:
+    value = mapping.get(key)
+    return value if isinstance(value, Mapping) else {}
+
+
 @dataclass(frozen=True)
 class MCPToolRegistration:
     """Known-good identity and schema fingerprint for one MCP tool."""
 
     server: str
     tool: str
+    description: str = ""
+    input_schema: Mapping[str, object] = field(default_factory=dict)
+    output_schema: Mapping[str, object] = field(default_factory=dict)
     server_identity: Mapping[str, object] = field(default_factory=dict)
     tool_schema: Mapping[str, object] = field(default_factory=dict)
     argument_schema: Mapping[str, object] = field(default_factory=dict)
+    allowed_transports: tuple[str, ...] = ("stdio",)
+    registry_signature: str = ""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "allowed_transports",
+            _normalise_transports(self.allowed_transports),
+        )
+
+    @property
+    def manifest(self) -> Mapping[str, object]:
+        return {
+            "server": self.server,
+            "tool": self.tool,
+            "description": self.description
+            or str(self.tool_schema.get("description", "")),
+            "input_schema": self.input_schema
+            or _mapping_value(self.tool_schema, "input_schema"),
+            "output_schema": self.output_schema
+            or _mapping_value(self.tool_schema, "output_schema"),
+            "server_identity": self.server_identity,
+            "tool_schema": self.tool_schema,
+            "argument_schema": self.argument_schema,
+            "allowed_transports": self.allowed_transports,
+        }
 
     @property
     def fingerprint(self) -> str:
-        return _fingerprint(
-            self.server_identity,
-            self.tool_schema,
-            self.argument_schema,
-        )
+        return _fingerprint(self.manifest)
+
+    @property
+    def signature_valid(self) -> bool:
+        if not self.registry_signature:
+            return True
+        return hmac.compare_digest(self.registry_signature, self.fingerprint)
 
     @property
     def key(self) -> tuple[str, str]:
         return (self.server, self.tool)
 
+    def signed(self) -> MCPToolRegistration:
+        return replace(self, registry_signature=self.fingerprint)
+
     def fingerprint_for(self, call: MCPToolCall) -> str:
-        return _fingerprint(call.server_identity, call.tool_schema, call.argument_schema)
+        return _fingerprint(
+            {
+                "server": call.server,
+                "tool": call.tool,
+                "description": self.description
+                or str(call.tool_schema.get("description", "")),
+                "input_schema": self.input_schema
+                or _mapping_value(call.tool_schema, "input_schema"),
+                "output_schema": self.output_schema
+                or _mapping_value(call.tool_schema, "output_schema"),
+                "server_identity": call.server_identity,
+                "tool_schema": call.tool_schema,
+                "argument_schema": call.argument_schema,
+                "allowed_transports": self.allowed_transports,
+            }
+        )
+
+    def call_transport(self, call: MCPToolCall) -> str:
+        for metadata in (call.tool_schema, call.server_identity):
+            value = metadata.get("transport")
+            if isinstance(value, str) and value.strip():
+                return value.strip().lower()
+        return ""
 
 
 class MCPTrustRegistry:
@@ -73,6 +139,7 @@ class MCPTrustRegistry:
         registrations: Sequence[MCPToolRegistration],
         *,
         allow_dynamic_discovery: bool = False,
+        require_signed_registrations: bool = False,
     ) -> None:
         self._registrations = {
             registration.key: registration for registration in registrations
@@ -81,6 +148,7 @@ class MCPTrustRegistry:
         for registration in registrations:
             self._by_server.setdefault(registration.server, []).append(registration)
         self._allow_dynamic_discovery = allow_dynamic_discovery
+        self._require_signed_registrations = require_signed_registrations
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
         call = request.metadata.get(MCP_CALL_KEY)
@@ -104,6 +172,27 @@ class MCPTrustRegistry:
                 Severity.HIGH,
                 f"MCP tool {call.server}/{call.tool} is not in the trust registry",
             )
+
+        if self._require_signed_registrations and not registration.registry_signature:
+            return _signal(
+                "mcp_unsigned_registration",
+                Severity.HIGH,
+                f"MCP tool {call.server}/{call.tool} registration is not signed",
+            )
+        if not registration.signature_valid:
+            return _signal(
+                "mcp_registration_signature_mismatch",
+                Severity.HIGH,
+                f"MCP tool {call.server}/{call.tool} registry signature mismatch",
+            )
+        if registration.allowed_transports:
+            transport = registration.call_transport(call)
+            if transport and transport not in registration.allowed_transports:
+                return _signal(
+                    "mcp_transport_mismatch",
+                    Severity.HIGH,
+                    f"MCP tool {call.server}/{call.tool} transport is not allowed",
+                )
 
         if registration.fingerprint_for(call) != registration.fingerprint:
             return _signal(
