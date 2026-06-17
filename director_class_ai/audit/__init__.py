@@ -9,5 +9,21 @@
 """Tamper-evident, durable audit of governance decisions."""
 
 from .chain import AuditChainSink, ChainVerification, verify_chain
+from .sinks import (
+    AUDIT_EVENT_NAME,
+    AuditExportEvent,
+    audit_record_to_event,
+    chain_entry_to_event,
+    export_chain_to_siem_jsonl,
+)
 
-__all__ = ["AuditChainSink", "ChainVerification", "verify_chain"]
+__all__ = [
+    "AUDIT_EVENT_NAME",
+    "AuditChainSink",
+    "AuditExportEvent",
+    "ChainVerification",
+    "audit_record_to_event",
+    "chain_entry_to_event",
+    "export_chain_to_siem_jsonl",
+    "verify_chain",
+]
