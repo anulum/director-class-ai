@@ -44,6 +44,10 @@ from pathlib import Path
 
 sys.path.insert(0, ".")
 
+from benchmarks.external_action_surfaces import (  # noqa: E402
+    load_external_cases,
+    source_inventory,
+)
 from director_class_ai.action import (  # noqa: E402
     MCP_CALL_KEY,
     BlastRadiusDetector,
@@ -62,6 +66,7 @@ from director_class_ai.core import (  # noqa: E402
 )
 
 _CORPUS = Path(__file__).parent / "data" / "action_corpus.jsonl"
+_EXTERNAL_MANIFEST = Path(__file__).parent / "external_sources" / "MANIFEST.md"
 _RESULTS = Path(__file__).parent / "results" / "action_plane_results.json"
 
 # An expected_route in the corpus maps to the operational outcome it should yield.
@@ -124,7 +129,7 @@ def _request(case: dict) -> EvaluationRequest:
     )
 
 
-def evaluate(corpus: list[dict]) -> dict:
+def _evaluate_cases(corpus: list[dict]) -> dict:
     gov = _governor()
     by_cat: dict[str, dict[str, int]] = defaultdict(
         lambda: {"catastrophic": 0, "caught": 0, "safe": 0, "false_block": 0}
@@ -166,10 +171,6 @@ def evaluate(corpus: list[dict]) -> dict:
 
     latencies.sort()
     return {
-        "benchmark": "action_plane",
-        "evidence_grade": (
-            "functional (not claim-grade; in-repo, single-host, no external cross-check)"
-        ),
         "n": len(corpus),
         "catastrophic_recall": caught / catastrophic if catastrophic else 0.0,
         "false_block_rate": false_block / safe if safe else 0.0,
@@ -195,6 +196,21 @@ def evaluate(corpus: list[dict]) -> dict:
     }
 
 
+def evaluate(corpus: list[dict], *, external_corpus: list[dict] | None = None) -> dict:
+    authored_metrics = _evaluate_cases(corpus)
+    external_metrics = _evaluate_cases(external_corpus or [])
+    return {
+        "benchmark": "action_plane",
+        "evidence_grade": (
+            "functional (not claim-grade; in-repo, single-host, external metrics "
+            "separated and loaded only from local artefacts)"
+        ),
+        **authored_metrics,
+        "authored_metrics": authored_metrics,
+        "external_metrics": external_metrics,
+    }
+
+
 def _markdown(r: dict) -> str:
     conformance = r["safe_route_conformance"]
     conformance_s = "n/a" if conformance is None else f"{conformance:.3f}"
@@ -215,7 +231,9 @@ def _markdown(r: dict) -> str:
 
 def main() -> None:
     corpus = _load(_CORPUS)
-    result = evaluate(corpus)
+    external = load_external_cases(_EXTERNAL_MANIFEST)
+    result = evaluate(corpus, external_corpus=external)
+    result["external_sources"] = source_inventory(_EXTERNAL_MANIFEST)
     _RESULTS.parent.mkdir(parents=True, exist_ok=True)
     _RESULTS.write_text(json.dumps(result, indent=2))
     print(_markdown(result))

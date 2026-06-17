@@ -1,0 +1,131 @@
+# SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial
+# Director-Class AI — commercial product (licence pending); not the Apache base.
+# © Concepts 1996–2026 Miroslav Šotek. All rights reserved.
+# © Code 2020–2026 Miroslav Šotek. All rights reserved.
+# ORCID: 0009-0009-3560-0851
+# Contact: www.anulum.li | protoscience@anulum.li
+# Director-Class AI — external action-surface benchmark adapter
+
+"""Load optional external action-risk examples without fabricating artefacts."""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Iterable
+from dataclasses import dataclass
+from pathlib import Path
+
+__all__ = [
+    "ExternalSource",
+    "load_external_cases",
+    "load_manifest",
+    "source_inventory",
+]
+
+_HERE = Path(__file__).resolve().parent
+_DEFAULT_MANIFEST = _HERE / "external_sources" / "MANIFEST.md"
+_REQUIRED = frozenset({"id", "action", "label", "category", "severity"})
+_LABELS = frozenset({"catastrophic", "safe"})
+
+
+@dataclass(frozen=True)
+class ExternalSource:
+    """One manifest row describing an optional local external corpus artefact."""
+
+    surface: str
+    threat_taxonomy: str
+    licence: str
+    provenance: str
+    local_artifact: str
+    status: str
+
+    def artifact_path(self, manifest_path: Path) -> Path:
+        return (manifest_path.parent / self.local_artifact).resolve()
+
+
+def load_manifest(path: Path = _DEFAULT_MANIFEST) -> list[ExternalSource]:
+    """Parse the external-source Markdown manifest table."""
+    if not path.exists():
+        return []
+    rows: list[ExternalSource] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("|") or "---" in line:
+            continue
+        cells = [_clean_cell(cell) for cell in line.strip().strip("|").split("|")]
+        if len(cells) != 6 or cells[0].lower() == "surface":
+            continue
+        rows.append(ExternalSource(*cells))
+    return rows
+
+
+def source_inventory(path: Path = _DEFAULT_MANIFEST) -> list[dict[str, object]]:
+    """Return load status for every manifest row, without reading missing files."""
+    inventory: list[dict[str, object]] = []
+    for source in load_manifest(path):
+        artifact_path = source.artifact_path(path)
+        inventory.append(
+            {
+                "surface": source.surface,
+                "threat_taxonomy": source.threat_taxonomy,
+                "licence": source.licence,
+                "provenance": source.provenance,
+                "local_artifact": source.local_artifact,
+                "status": source.status,
+                "loaded": artifact_path.is_file(),
+            }
+        )
+    return inventory
+
+
+def load_external_cases(path: Path = _DEFAULT_MANIFEST) -> list[dict]:
+    """Load only external JSONL artefacts that are already present locally."""
+    cases: list[dict] = []
+    for source in load_manifest(path):
+        artifact_path = source.artifact_path(path)
+        if not artifact_path.is_file():
+            continue
+        loaded = _load_jsonl(artifact_path)
+        _validate_external_cases(loaded, artifact_path)
+        cases.extend(_with_external_metadata(source, loaded))
+    return cases
+
+
+def _clean_cell(value: str) -> str:
+    return value.strip().strip("`").strip()
+
+
+def _load_jsonl(path: Path) -> list[dict]:
+    rows: list[dict] = []
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        value = json.loads(line)
+        if not isinstance(value, dict):
+            raise ValueError(f"{path}:{lineno} must contain a JSON object")
+        rows.append(value)
+    return rows
+
+
+def _validate_external_cases(cases: Iterable[dict], path: Path) -> None:
+    ids: set[str] = set()
+    for case in cases:
+        missing = _REQUIRED.difference(case)
+        if missing:
+            raise ValueError(f"{path}: case {case.get('id', '<unknown>')} missing fields")
+        if case["label"] not in _LABELS:
+            raise ValueError(f"{path}: case {case['id']} has bad label {case['label']!r}")
+        if case["id"] in ids:
+            raise ValueError(f"{path}: duplicate external id {case['id']}")
+        ids.add(str(case["id"]))
+
+
+def _with_external_metadata(source: ExternalSource, cases: Iterable[dict]) -> list[dict]:
+    enriched: list[dict] = []
+    for case in cases:
+        row = dict(case)
+        row["id"] = f"{source.surface}:{case['id']}"
+        row["external_surface"] = source.surface
+        row["external_threat_taxonomy"] = source.threat_taxonomy
+        row["source"] = f"external:{source.surface}"
+        enriched.append(row)
+    return enriched

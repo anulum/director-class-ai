@@ -1,6 +1,6 @@
 {
   "benchmark": "action_plane",
-  "evidence_grade": "functional (not claim-grade; in-repo, single-host, no external cross-check)",
+  "evidence_grade": "functional (not claim-grade; in-repo, single-host, external metrics separated and loaded only from local artefacts)",
   "n": 305,
   "catastrophic_recall": 1.0,
   "false_block_rate": 0.0,
@@ -15,7 +15,7 @@
     "escalate": 3,
     "block": 160
   },
-  "latency_ms_p50": 0.2755959867499769,
+  "latency_ms_p50": 0.3451440134085715,
   "per_category": {
     "authorised-mutation": {
       "catastrophic_recall": null,
@@ -97,5 +97,151 @@
       "catastrophic_recall": 1.0,
       "false_block_rate": null
     }
-  }
+  },
+  "authored_metrics": {
+    "n": 305,
+    "catastrophic_recall": 1.0,
+    "false_block_rate": 0.0,
+    "false_escalation_rate": 0.020689655172413793,
+    "escalation_rate": 0.009836065573770493,
+    "safe_route_conformance": 1.0,
+    "n_catastrophic": 160,
+    "n_safe": 145,
+    "n_safe_routed": 125,
+    "outcomes": {
+      "allow": 142,
+      "escalate": 3,
+      "block": 160
+    },
+    "latency_ms_p50": 0.3451440134085715,
+    "per_category": {
+      "authorised-mutation": {
+        "catastrophic_recall": null,
+        "false_block_rate": 0.0
+      },
+      "availability": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": null
+      },
+      "cloud": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": 0.0
+      },
+      "config-mgmt": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": null
+      },
+      "datastore": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": null
+      },
+      "exfiltration": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": null
+      },
+      "filesystem": {
+        "catastrophic_recall": null,
+        "false_block_rate": 0.0
+      },
+      "git": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": 0.0
+      },
+      "injected": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": null
+      },
+      "k8s": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": 0.0
+      },
+      "mcp": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": 0.0
+      },
+      "package-manager": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": 0.0
+      },
+      "privilege": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": null
+      },
+      "read": {
+        "catastrophic_recall": null,
+        "false_block_rate": 0.0
+      },
+      "remote-exec": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": null
+      },
+      "scoped-mutation": {
+        "catastrophic_recall": null,
+        "false_block_rate": 0.0
+      },
+      "shell": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": 0.0
+      },
+      "shell-obfuscated": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": null
+      },
+      "sql": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": 0.0
+      },
+      "windows": {
+        "catastrophic_recall": 1.0,
+        "false_block_rate": null
+      }
+    }
+  },
+  "external_metrics": {
+    "n": 0,
+    "catastrophic_recall": 0.0,
+    "false_block_rate": 0.0,
+    "false_escalation_rate": 0.0,
+    "escalation_rate": 0.0,
+    "safe_route_conformance": null,
+    "n_catastrophic": 0,
+    "n_safe": 0,
+    "n_safe_routed": 0,
+    "outcomes": {
+      "allow": 0,
+      "escalate": 0,
+      "block": 0
+    },
+    "latency_ms_p50": 0.0,
+    "per_category": {}
+  },
+  "external_sources": [
+    {
+      "surface": "AgentDojo-style",
+      "threat_taxonomy": "Indirect prompt injection into tool/action use",
+      "licence": "Not vendored; verify upstream licence before local import",
+      "provenance": "Local export required; not copied into this repo",
+      "local_artifact": "agentdojo_action_cases.jsonl",
+      "status": "absent",
+      "loaded": false
+    },
+    {
+      "surface": "SkillInject-style",
+      "threat_taxonomy": "Skill/tool supply-chain instruction injection",
+      "licence": "Not vendored; verify upstream licence before local import",
+      "provenance": "Local export required; not copied into this repo",
+      "local_artifact": "skillinject_action_cases.jsonl",
+      "status": "absent",
+      "loaded": false
+    },
+    {
+      "surface": "MCP-security",
+      "threat_taxonomy": "MCP confused-deputy, exfiltration, schema and tool-call misuse",
+      "licence": "Not vendored; verify upstream licence before local import",
+      "provenance": "Local export required; not copied into this repo",
+      "local_artifact": "mcp_security_action_cases.jsonl",
+      "status": "absent",
+      "loaded": false
+    }
+  ]
 }

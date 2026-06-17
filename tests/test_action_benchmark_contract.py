@@ -38,6 +38,8 @@ def test_metrics_are_well_formed() -> None:
         assert 0.0 <= result[key] <= 1.0, key
     assert result["n"] == result["n_catastrophic"] + result["n_safe"]
     assert result["per_category"]
+    assert result["authored_metrics"]["n"] == result["n"]
+    assert result["external_metrics"]["n"] == 0
 
 
 def test_measured_recall_and_false_block_hold() -> None:
