@@ -26,6 +26,36 @@ verdict = guard.evaluate(EvaluationRequest(action="rm -rf /"))
 assert verdict.allow is False and verdict.requires_human is True
 ```
 
+## Python middleware
+
+Applications that dispatch tools directly can put the SDK middleware in front of
+their executor. Dry-run is the default; real execution requires both a permitting
+Governor decision and `dry_run=False`.
+
+```python
+from director_class_ai.sdk import (
+    ToolExecutionResult,
+    ToolReviewMiddleware,
+    ToolReviewRequest,
+)
+
+
+def executor(request: ToolReviewRequest) -> ToolExecutionResult:
+    return ToolExecutionResult({"status": "ok"}, exit_code=0)
+
+
+middleware = ToolReviewMiddleware.default(executor=executor)
+decision = middleware.run(
+    ToolReviewRequest(
+        "fs.read",
+        {"path": "README.md"},
+        provenance="user",
+        dry_run=False,
+    )
+)
+assert decision.route == "allow"
+```
+
 ## Design
 
 The ensemble runs detectors concurrently and cheap-first (tiered cascade), so the
