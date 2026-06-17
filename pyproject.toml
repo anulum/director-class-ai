@@ -31,6 +31,7 @@ classifiers = [
 dependencies = []
 
 [project.scripts]
+director-class-guard = "director_class_ai.cli.guard:main"
 director-class-mcp-gateway = "director_class_ai.gateway.mcp_cli:main"
 
 [project.optional-dependencies]

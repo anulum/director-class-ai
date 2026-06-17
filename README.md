@@ -65,6 +65,17 @@ discovery, tool calls, and tool responses, but it never dispatches tools.
 director-class-mcp-gateway --host 127.0.0.1 --port 8765
 ```
 
+## Command guard
+
+For command-line workflows, `director-class-guard` reviews shell, database,
+cloud, Kubernetes, HTTP, and custom commands before optional execution. It is
+dry-run by default.
+
+```bash
+director-class-guard --surface kubernetes -- kubectl get pods
+director-class-guard --surface shell --execute -- printf guard-ok
+```
+
 ## Design
 
 The ensemble runs detectors concurrently and cheap-first (tiered cascade), so the
