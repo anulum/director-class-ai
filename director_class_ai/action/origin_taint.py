@@ -41,6 +41,7 @@ class OriginTaintDetector:
     tier = 0
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
+        """Flag actions whose provenance is an untrusted content channel."""
         command = (request.action or "").strip()
         if not command:
             return None

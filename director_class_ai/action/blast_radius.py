@@ -70,6 +70,7 @@ class BlastRadiusDetector:
     floor: float = 0.4
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
+        """Emit a blast-radius signal when an irreversible action reaches scope."""
         command = _PRINT_SEGMENT.sub(" ", (request.action or "")).strip()
         if not command:
             return None

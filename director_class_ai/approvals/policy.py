@@ -39,6 +39,7 @@ class ApprovalPolicy:
     default_route: str = "auto"
 
     def route(self, verdict: Verdict) -> str:
+        """Return the approval route for the verdict's highest firing severity."""
         if not verdict.firing:
             return self.default_route
         peak = max(s.severity for s in verdict.firing)

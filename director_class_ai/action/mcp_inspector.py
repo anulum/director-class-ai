@@ -148,9 +148,11 @@ class MCPToolCall:
     argument_schema: Mapping[str, object] = field(default_factory=dict)
 
     def provenance_of(self, key: str) -> str:
+        """Return the normalised provenance for one argument key."""
         return (self.arg_provenance.get(key) or self.default_provenance).strip().lower()
 
     def is_tainted(self, key: str) -> bool:
+        """Return true when an argument value came from an untrusted origin."""
         return self.provenance_of(key) in UNTRUSTED_ORIGINS
 
 
@@ -283,6 +285,7 @@ class MCPCallInspector:
         self._registry = registry
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
+        """Inspect structured MCP metadata before serialised-action detectors run."""
         call = request.metadata.get(MCP_CALL_KEY)
         if not isinstance(call, MCPToolCall):
             return None

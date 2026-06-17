@@ -106,9 +106,11 @@ class ApprovalQueue:
 
     # ── human actions ─────────────────────────────────────────────────────────
     def approve(self, digest: str, approver: str) -> ApprovalTicket:
+        """Approve one pending ticket and set its expiry."""
         return self._decide(digest, _APPROVED, approver)
 
     def deny(self, digest: str, approver: str) -> ApprovalTicket:
+        """Deny one pending ticket without making it executable."""
         return self._decide(digest, _DENIED, approver)
 
     def _decide(self, digest: str, status: str, approver: str) -> ApprovalTicket:
@@ -128,7 +130,9 @@ class ApprovalQueue:
             return ticket
 
     def get(self, digest: str) -> ApprovalTicket | None:
+        """Return one ticket by digest, or None when it is absent."""
         return self._load().get(digest)
 
     def pending(self) -> list[ApprovalTicket]:
+        """Return all tickets still awaiting a human decision."""
         return [t for t in self._load().values() if t.status == _PENDING]

@@ -56,6 +56,7 @@ class SubprocessGuard:
         query: str = "",
         dry_run: bool = True,
     ) -> EffectorResult:
+        """Review one shell command and execute only when explicitly permitted."""
         return self._adapter.run_command(
             command, provenance=provenance, query=query, dry_run=dry_run
         )

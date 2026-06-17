@@ -433,6 +433,7 @@ class DestructiveCommandDetector:
     tier = 0
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
+        """Match destructive command patterns across de-obfuscated action forms."""
         command = (request.action or "").strip()
         if not command:
             return None

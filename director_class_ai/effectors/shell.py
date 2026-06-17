@@ -41,6 +41,7 @@ class ShellEffectorAdapter(GovernedEffector):
         dry_run: bool = True,
         reversibility: ReversibilityMetadata | None = None,
     ) -> EffectorResult:
+        """Govern a shell command with optional reversibility evidence."""
         return self.run(
             EffectorRequest(
                 action=command,

@@ -41,11 +41,13 @@ class ContradictionContentDetector:
     ) -> (
         ContradictionContentDetector
     ):  # pragma: no cover - needs [detectors] extra + model
+        """Load the optional director-ai contradiction scorer."""
         from director_ai.core.scoring.contradiction import ContradictionScorer
 
         return cls(ContradictionScorer.from_pretrained(**kwargs), threshold=threshold)
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
+        """Emit a contradiction signal when response and context conflict."""
         if not request.response.strip() or not request.context.strip():
             return None
         score = float(self._scorer.contradiction(request.context, request.response))

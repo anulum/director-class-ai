@@ -123,6 +123,7 @@ class CausalTakeoverDetector:
     tier = 0
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
+        """Detect untrusted context that causally drives a mutating action."""
         timeline = _timeline_from_request(request)
         action = (timeline.proposed_action or request.action).strip()
         if not action or not MUTATING.search(action):

@@ -123,6 +123,7 @@ class LLMJudgeDetector:
         self._locus = locus
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
+        """Sample the judge and emit a calibrated risk-raising signal."""
         results = [self._judge_fn(request) for _ in range(self._samples)]
         scores = [r.score for r in results]
         mean = sum(scores) / len(scores)
@@ -169,6 +170,7 @@ class JudgePanel:
     tier: int = 2
 
     def detectors(self) -> list[LLMJudgeDetector]:
+        """Build detector instances for every configured judge spec."""
         return [
             LLMJudgeDetector(
                 spec.judge_fn,

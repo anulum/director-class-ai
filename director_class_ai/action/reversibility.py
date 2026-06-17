@@ -53,6 +53,7 @@ class ReversibilityDetector:
     tier = 0
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
+        """Require digest-only rollback evidence for irreversible mutations."""
         action = request.action.strip()
         if not action:
             return None

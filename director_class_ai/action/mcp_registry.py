@@ -69,6 +69,7 @@ class MCPToolRegistration:
 
     @property
     def manifest(self) -> Mapping[str, object]:
+        """Return the signed registry manifest for this tool registration."""
         return {
             "server": self.server,
             "tool": self.tool,
@@ -86,22 +87,27 @@ class MCPToolRegistration:
 
     @property
     def fingerprint(self) -> str:
+        """Return the stable digest for the registry manifest."""
         return _fingerprint(self.manifest)
 
     @property
     def signature_valid(self) -> bool:
+        """Return whether the stored signature matches the current manifest."""
         if not self.registry_signature:
             return True
         return hmac.compare_digest(self.registry_signature, self.fingerprint)
 
     @property
     def key(self) -> tuple[str, str]:
+        """Return the lookup key used by the trust registry."""
         return (self.server, self.tool)
 
     def signed(self) -> MCPToolRegistration:
+        """Return a copy whose signature is bound to the current manifest."""
         return replace(self, registry_signature=self.fingerprint)
 
     def fingerprint_for(self, call: MCPToolCall) -> str:
+        """Return the manifest digest that a runtime call must match."""
         return _fingerprint(
             {
                 "server": call.server,
@@ -120,6 +126,7 @@ class MCPToolRegistration:
         )
 
     def call_transport(self, call: MCPToolCall) -> str:
+        """Extract the declared transport from a runtime call, if present."""
         for metadata in (call.tool_schema, call.server_identity):
             value = metadata.get("transport")
             if isinstance(value, str) and value.strip():
@@ -151,6 +158,7 @@ class MCPTrustRegistry:
         self._require_signed_registrations = require_signed_registrations
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
+        """Fail closed on unknown tools, manifest drift, and policy violations."""
         call = request.metadata.get(MCP_CALL_KEY)
         if not isinstance(call, MCPToolCall):
             return None

@@ -40,6 +40,7 @@ class IntentConsistencyDetector:
     tier = 0
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
+        """Flag mutating actions proposed under clearly read-only user tasks."""
         command = (request.action or "").strip()
         task = (request.query or "").strip()
         if not command or not task:

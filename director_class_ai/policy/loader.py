@@ -45,5 +45,6 @@ def load_profile(data: dict[str, Any]) -> Profile:
 
 
 def load_profile_file(path: str | Path) -> Profile:
+    """Load and validate one TOML profile file."""
     with Path(path).open("rb") as fh:
         return load_profile(tomllib.load(fh))

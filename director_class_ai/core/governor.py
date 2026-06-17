@@ -87,6 +87,7 @@ class Governor:
     _trail: list[AuditRecord] = field(default_factory=list, init=False, repr=False)
 
     def review(self, request: EvaluationRequest) -> Decision:
+        """Resolve one request into a fail-closed decision and audit record."""
         verdict = self.ensemble.evaluate(request)
         escalated = False
         if not verdict.allow:

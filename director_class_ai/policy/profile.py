@@ -49,6 +49,7 @@ class Profile:
                 raise ValueError(f"{attr} must be in [0, 1], got {value}")
 
     def to_fusion_policy(self) -> FusionPolicy:
+        """Convert this deployment profile into a fusion policy."""
         return FusionPolicy(
             content_threshold=self.content_threshold,
             integrity_threshold=self.integrity_threshold,
@@ -71,4 +72,5 @@ class Profile:
 
     @classmethod
     def field_names(cls) -> set[str]:
+        """Return valid TOML keys for profile loading."""
         return {f.name for f in fields(cls)}

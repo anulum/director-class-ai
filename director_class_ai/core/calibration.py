@@ -48,6 +48,7 @@ class PlattCalibrator:
     b: float
 
     def calibrate(self, raw: float) -> float:
+        """Map one raw detector score onto the calibrated probability scale."""
         return _sigmoid(self.a * raw + self.b)
 
 
@@ -94,9 +95,11 @@ class CalibrationRegistry:
         self._by_detector: dict[str, PlattCalibrator] = {}
 
     def set(self, detector: str, calibrator: PlattCalibrator) -> None:
+        """Install or replace the calibrator for one detector name."""
         self._by_detector[detector] = calibrator
 
     def has(self, detector: str) -> bool:
+        """Return whether a detector has a fitted calibrator."""
         return detector in self._by_detector
 
     def apply(self, signal: DetectorSignal) -> DetectorSignal:

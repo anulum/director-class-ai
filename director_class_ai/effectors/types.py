@@ -57,6 +57,7 @@ class ReversibilityMetadata:
     diff_digest: str = ""
 
     def to_metadata(self) -> dict[str, str]:
+        """Return digest-only reversibility metadata for detector review."""
         return {
             "snapshot_id": self.snapshot_id,
             "rollback_command": self.rollback_command,
@@ -81,6 +82,7 @@ class EffectorRequest:
     reversibility: ReversibilityMetadata = field(default_factory=ReversibilityMetadata)
 
     def to_evaluation(self) -> EvaluationRequest:
+        """Convert the effector request into the shared detector input shape."""
         metadata = dict(self.metadata)
         reversibility = self.reversibility.to_metadata()
         if any(reversibility.values()):
@@ -107,6 +109,7 @@ class EffectorResult:
 
     @property
     def decision_id(self) -> str:
+        """Return the request digest that identifies the governance decision."""
         return self.decision.record.request_digest
 
 
@@ -129,6 +132,7 @@ class GovernedEffector:
         self._execute = execute
 
     def run(self, request: EffectorRequest) -> EffectorResult:
+        """Govern and optionally execute one effector request."""
         decision = self._governor.review(request.to_evaluation())
         # blocked, dry-run, or no executor wired -> never touch the effector
         if not decision.permitted or request.dry_run or self._execute is None:

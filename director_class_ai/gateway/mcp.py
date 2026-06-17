@@ -84,6 +84,7 @@ class MCPToolDescriptor:
 
     @property
     def digest(self) -> str:
+        """Return the descriptor digest used in discovery audit events."""
         return _digest(
             {
                 "server": self.server,
@@ -99,6 +100,7 @@ class MCPToolDescriptor:
         )
 
     def to_registration(self) -> MCPToolRegistration:
+        """Convert this clean descriptor into a signed trust registration."""
         return MCPToolRegistration(
             server=self.server,
             tool=self.tool,
@@ -135,6 +137,7 @@ class MCPDiscoveryRequest:
         provenance: str = "",
         tenant_id: str = "",
     ) -> MCPDiscoveryRequest:
+        """Build a discovery request from descriptor objects."""
         return cls(
             server=server,
             descriptors=tuple(descriptors),
@@ -154,6 +157,7 @@ class MCPDiscoveryDecision:
     descriptor_digests: tuple[str, ...]
 
     def registrations(self) -> tuple[MCPToolRegistration, ...]:
+        """Return signed registrations only when discovery was permitted."""
         if not self.permitted:
             return ()
         return tuple(
@@ -161,6 +165,7 @@ class MCPDiscoveryDecision:
         )
 
     def to_audit_event(self) -> dict[str, object]:
+        """Return a redacted discovery audit event."""
         return {
             "event_type": "mcp_discovery_decision",
             "server": self.request.server,
@@ -188,11 +193,13 @@ class MCPResponseRequest:
 
     @property
     def rendered_output(self) -> str:
+        """Return the response body as stable text for review and digesting."""
         if isinstance(self.output, str):
             return self.output
         return _canonical(self.output)
 
     def to_evaluation(self) -> EvaluationRequest:
+        """Build the response-review input without tainting benign output."""
         return EvaluationRequest(
             response=self.rendered_output,
             action=self.rendered_output,
@@ -224,6 +231,7 @@ class MCPResponseDecision:
         request: MCPResponseRequest,
         decision: Decision,
     ) -> MCPResponseDecision:
+        """Build a response decision from a Governor decision."""
         return cls(
             request=request,
             decision=decision,
@@ -239,6 +247,7 @@ class MCPResponseDecision:
         )
 
     def to_audit_event(self) -> dict[str, object]:
+        """Return a redacted response-review audit event."""
         return {
             "event_type": "mcp_response_decision",
             "server": self.request.call.server,
@@ -383,6 +392,7 @@ class MCPGatewayRequest:
         tenant_id: str = "",
         dry_run: bool = True,
     ) -> MCPGatewayRequest:
+        """Build a gateway tool-call request from primitive call parts."""
         call = MCPToolCall(
             server=server,
             tool=tool,
@@ -433,6 +443,7 @@ class MCPGatewayDecision:
 
     @classmethod
     def from_governor(cls, call: MCPToolCall, decision: Decision) -> MCPGatewayDecision:
+        """Build a gateway decision from a Governor decision."""
         permitted = decision.permitted
         escalated = decision.escalated
         return cls(

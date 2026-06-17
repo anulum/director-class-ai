@@ -48,7 +48,9 @@ __all__ = ["SemanticActionSupportDetector", "SupportScorer"]
 class SupportScorer(Protocol):
     """An entailment scorer: ``score(premise, hypothesis)`` divergence in [0, 1]."""
 
-    def score(self, premise: str, hypothesis: str) -> float: ...
+    def score(self, premise: str, hypothesis: str) -> float:
+        """Return task/action divergence in [0, 1]."""
+        ...
 
 
 class SemanticActionSupportDetector:
@@ -66,11 +68,13 @@ class SemanticActionSupportDetector:
     def from_pretrained(
         cls, *, threshold: float = 0.6, **kwargs: Any
     ) -> SemanticActionSupportDetector:  # pragma: no cover - needs [detectors] extra
+        """Load the optional director-ai NLI scorer for task/action support."""
         from director_ai.core.scoring.nli import NLIScorer
 
         return cls(NLIScorer(**kwargs), threshold=threshold)
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
+        """Emit a signal when a mutating action is unsupported by the task."""
         task = (request.query or "").strip()
         action = (request.action or "").strip()
         if not task or not action:

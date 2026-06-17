@@ -38,11 +38,13 @@ class TokenSpanContentDetector:
     def from_pretrained(
         cls, **kwargs: Any
     ) -> TokenSpanContentDetector:  # pragma: no cover - needs [detectors] extra + model
+        """Load the optional director-ai hallucinated-span detector."""
         from director_ai.core.scoring.span_detector import HallucinationSpanDetector
 
         return cls(HallucinationSpanDetector.from_pretrained(**kwargs))
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
+        """Emit unsupported-span signals for hallucinated response text."""
         if not request.response.strip():
             return None
         detection = self._detector.detect(request.context, request.response)

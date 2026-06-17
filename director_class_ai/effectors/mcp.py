@@ -64,6 +64,7 @@ class MCPEffectorAdapter(GovernedEffector):
         context: str = "",
         dry_run: bool = True,
     ) -> EffectorResult:
+        """Govern a structured MCP tool call and execute only when permitted."""
         call = MCPToolCall(
             server=server,
             tool=tool,
