@@ -80,6 +80,14 @@ class FusionPolicy:
             | {"mcp_remote_auth"}
             | {"capability_context_missing", "capability_missing"}
             | {"capability_origin_denied"}
+            | {
+                "browser_prompt_injection",
+                "browser_malicious_iframe",
+                "browser_popup_hijack",
+                "browser_clipboard_exfiltration",
+                "browser_unsafe_download",
+                "browser_cross_site_task_drift",
+            }
         )
     )
     plane_mode: dict[Plane, FusionMode] = field(

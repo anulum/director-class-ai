@@ -51,6 +51,7 @@ from benchmarks.external_action_surfaces import (  # noqa: E402
 from director_class_ai.action import (  # noqa: E402
     MCP_CALL_KEY,
     BlastRadiusDetector,
+    BrowserActionDetector,
     CausalTakeoverDetector,
     DestructiveCommandDetector,
     IntentConsistencyDetector,
@@ -100,6 +101,7 @@ def _governor() -> Governor:
             OriginTaintDetector(),
             IntentConsistencyDetector(),
             MCPCallInspector(),
+            BrowserActionDetector(),
         ]
     )
     return Governor(ensemble=ensemble)  # no approver: escalation => not permitted

@@ -9,6 +9,14 @@
 """Action-plane detectors: govern what an autonomous system *does*, not just says."""
 
 from .blast_radius import BlastRadiusDetector
+from .browser import (
+    BROWSER_ACTION_KEY,
+    BrowserAction,
+    BrowserActionDetector,
+    BrowserWorkLog,
+    BrowserWorkLogEntry,
+    ComputerAction,
+)
 from .causal_takeover import (
     CAUSAL_TIMELINE_KEY,
     ActionTimeline,
@@ -23,7 +31,13 @@ from .reversibility import REVERSIBILITY_KEY, ReversibilityDetector
 
 __all__ = [
     "BlastRadiusDetector",
+    "BROWSER_ACTION_KEY",
+    "BrowserAction",
+    "BrowserActionDetector",
+    "BrowserWorkLog",
+    "BrowserWorkLogEntry",
     "CAUSAL_TIMELINE_KEY",
+    "ComputerAction",
     "ActionTimeline",
     "CausalTakeoverDetector",
     "DestructiveCommandDetector",
