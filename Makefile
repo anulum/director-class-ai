@@ -34,6 +34,9 @@ build: ## Build sdist + wheel
 bench: ## Run the action-plane benchmark
 	$(PY) -m benchmarks.action_plane
 
+bench-evidence: ## Run action benchmark with evidence-grade metadata
+	$(PY) -m benchmarks.action_evidence
+
 redteam: ## Run the adversarial red-team benchmark
 	$(PY) -m benchmarks.adversarial_red_team
 
