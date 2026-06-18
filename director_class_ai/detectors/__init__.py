@@ -23,6 +23,7 @@ from .llm_judge import (
     LLMJudgeDetector,
     prompt_judge,
 )
+from .pii import PIIContentDetector, PIIMatch, PIIModerationBackend, PIIModerationResult
 from .response_nli import ResponseNLIDetector, ResponseNLIScorer
 from .semantic_action_support import SemanticActionSupportDetector, SupportScorer
 from .token_span import TokenSpanContentDetector
@@ -36,6 +37,10 @@ __all__ = [
     "JudgeResult",
     "JudgeSpec",
     "LLMJudgeDetector",
+    "PIIContentDetector",
+    "PIIMatch",
+    "PIIModerationBackend",
+    "PIIModerationResult",
     "ResponseNLIDetector",
     "ResponseNLIScorer",
     "SemanticActionSupportDetector",
