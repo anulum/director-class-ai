@@ -28,6 +28,9 @@ sast: ## SAST scan (bandit + semgrep via uvx)
 spdx: ## Verify SPDX headers
 	$(PY) tools/check_spdx.py
 
+repository-readiness: ## Validate local repository readiness evidence
+	$(PY) tools/check_repository_readiness.py
+
 build: ## Build sdist + wheel
 	$(PY) -m build --sdist --wheel
 
@@ -48,5 +51,5 @@ import-external: ## Import reviewed external JSONL: make import-external SURFACE
 redteam: ## Run the adversarial red-team benchmark
 	$(PY) -m benchmarks.adversarial_red_team
 
-preflight: spdx phase4-intake lint types test ## Full local gate before commit
+preflight: spdx repository-readiness phase4-intake lint types test ## Full local gate before commit
 	@echo "preflight OK"
