@@ -40,6 +40,9 @@ def test_metrics_are_well_formed() -> None:
     assert result["per_category"]
     assert result["authored_metrics"]["n"] == result["n"]
     assert result["external_metrics"]["n"] == 0
+    assert result["corpus_partitions"]["authored"]["n"] == result["n"]
+    assert result["corpus_partitions"]["external"]["n"] == 0
+    assert result["corpus_partitions"]["customer_private"]["n"] == 0
 
 
 def test_measured_recall_and_false_block_hold() -> None:

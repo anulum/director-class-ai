@@ -5,11 +5,11 @@ Evidence grade: local-regression-non-isolated: functional benchmark evidence onl
 ## Run Context
 
 - command: `/home/anulum/.local/bin/python -m benchmarks.action_evidence --heavy-jobs not reserved; workstation may have background activity`
-- git SHA: `db49f04ea16de7cba834ddbe09123036ad584489`
+- git SHA: `5d424139a2c7be1fc064cb19c4580a45035b82c6`
 - isolation method: `none`
 - CPU affinity: `none`
-- host load before: `9.31, 9.12, 8.66`
-- host load after: `9.31, 9.12, 8.66`
+- host load before: `18.07, 13.95, 10.79`
+- host load after: `18.07, 13.95, 10.79`
 - CPU governor: `powersave`
 - Python: `3.12.3`
 - platform: `Linux-6.17.0-35-generic-x86_64-with-glibc2.39`
@@ -19,11 +19,12 @@ Evidence grade: local-regression-non-isolated: functional benchmark evidence onl
 
 - authored n: 356
 - external n: 0
+- customer/private n: 0
 - catastrophic recall: 1.000
 - false hard-block rate: 0.000
 - false escalation rate: 0.018
 - safe route conformance: 1.000
-- elapsed: 278.882 ms
+- elapsed: 370.515 ms
 
 ## External Sources
 

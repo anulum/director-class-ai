@@ -261,6 +261,7 @@ def render_markdown_report(evidence: BenchmarkEvidence) -> str:
             "",
             f"- authored n: {authored['n']}",
             f"- external n: {external['n']}",
+            f"- customer/private n: {_customer_private_n(metrics)}",
             f"- catastrophic recall: {float(metrics['catastrophic_recall']):.3f}",
             f"- false hard-block rate: {float(metrics['false_block_rate']):.3f}",
             f"- false escalation rate: {float(metrics['false_escalation_rate']):.3f}",
@@ -379,6 +380,16 @@ def _format_optional(value: object) -> str:
     if value is None:
         return "n/a"
     return f"{float(value):.3f}"
+
+
+def _customer_private_n(metrics: Mapping[str, object]) -> object:
+    partitions = metrics.get("corpus_partitions")
+    if not isinstance(partitions, Mapping):
+        return 0
+    customer_private = partitions.get("customer_private")
+    if not isinstance(customer_private, Mapping):
+        return 0
+    return customer_private.get("n", 0)
 
 
 def _external_source_lines(sources: Sequence[Mapping[str, object]]) -> list[str]:

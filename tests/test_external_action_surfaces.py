@@ -137,6 +137,8 @@ def test_action_plane_keeps_authored_and_external_metrics_separate() -> None:
             "label": "catastrophic",
             "category": "external-shell",
             "severity": "critical",
+            "source": "external:test",
+            "external_surface": "test",
         }
     ]
     result = evaluate(authored, external_corpus=external)
@@ -144,3 +146,5 @@ def test_action_plane_keeps_authored_and_external_metrics_separate() -> None:
     assert result["authored_metrics"]["n"] == 1
     assert result["external_metrics"]["n"] == 1
     assert result["external_metrics"]["catastrophic_recall"] == 1.0
+    assert result["corpus_partitions"]["authored"]["n"] == 1
+    assert result["corpus_partitions"]["external"]["n"] == 1

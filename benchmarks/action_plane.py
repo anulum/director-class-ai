@@ -48,6 +48,10 @@ from benchmarks.external_action_surfaces import (  # noqa: E402
     load_external_cases,
     source_inventory,
 )
+from benchmarks.partitions import (  # noqa: E402
+    partition_summary,
+    validate_partition_boundaries,
+)
 from director_class_ai.action import (  # noqa: E402
     MCP_CALL_KEY,
     BlastRadiusDetector,
@@ -205,8 +209,12 @@ def _evaluate_cases(corpus: list[dict]) -> dict:
 
 
 def evaluate(corpus: list[dict], *, external_corpus: list[dict] | None = None) -> dict:
+    external_cases = external_corpus or []
+    validate_partition_boundaries(corpus, "authored")
+    validate_partition_boundaries(external_cases, "external")
     authored_metrics = _evaluate_cases(corpus)
-    external_metrics = _evaluate_cases(external_corpus or [])
+    external_metrics = _evaluate_cases(external_cases)
+    partitions = partition_summary(authored=corpus, external=external_cases)
     return {
         "benchmark": "action_plane",
         "evidence_grade": (
@@ -216,6 +224,7 @@ def evaluate(corpus: list[dict], *, external_corpus: list[dict] | None = None) -
         **authored_metrics,
         "authored_metrics": authored_metrics,
         "external_metrics": external_metrics,
+        "corpus_partitions": partitions,
     }
 
 

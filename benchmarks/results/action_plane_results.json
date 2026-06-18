@@ -15,7 +15,7 @@
     "escalate": 3,
     "block": 191
   },
-  "latency_ms_p50": 0.7201819680631161,
+  "latency_ms_p50": 0.6975560099817812,
   "per_category": {
     "authorised-mutation": {
       "catastrophic_recall": null,
@@ -133,7 +133,7 @@
       "escalate": 3,
       "block": 191
     },
-    "latency_ms_p50": 0.7201819680631161,
+    "latency_ms_p50": 0.6975560099817812,
     "per_category": {
       "authorised-mutation": {
         "catastrophic_recall": null,
@@ -254,6 +254,20 @@
     },
     "latency_ms_p50": 0.0,
     "per_category": {}
+  },
+  "corpus_partitions": {
+    "authored": {
+      "n": 356,
+      "claim_boundary": "internal authored regression evidence; not an external benchmark claim"
+    },
+    "external": {
+      "n": 0,
+      "claim_boundary": "external artefact evidence; requires licence and provenance review"
+    },
+    "customer_private": {
+      "n": 0,
+      "claim_boundary": "customer/private evidence; never mixed into public benchmark claims"
+    }
   },
   "external_sources": [
     {

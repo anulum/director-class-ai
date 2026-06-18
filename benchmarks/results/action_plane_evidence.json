@@ -18,7 +18,7 @@
       "escalate": 3,
       "block": 191
     },
-    "latency_ms_p50": 0.6027279887348413,
+    "latency_ms_p50": 0.7049329578876495,
     "per_category": {
       "authorised-mutation": {
         "catastrophic_recall": null,
@@ -136,7 +136,7 @@
         "escalate": 3,
         "block": 191
       },
-      "latency_ms_p50": 0.6027279887348413,
+      "latency_ms_p50": 0.7049329578876495,
       "per_category": {
         "authorised-mutation": {
           "catastrophic_recall": null,
@@ -258,22 +258,36 @@
       "latency_ms_p50": 0.0,
       "per_category": {}
     },
-    "elapsed_ms": 278.88206602074206
+    "corpus_partitions": {
+      "authored": {
+        "n": 356,
+        "claim_boundary": "internal authored regression evidence; not an external benchmark claim"
+      },
+      "external": {
+        "n": 0,
+        "claim_boundary": "external artefact evidence; requires licence and provenance review"
+      },
+      "customer_private": {
+        "n": 0,
+        "claim_boundary": "customer/private evidence; never mixed into public benchmark claims"
+      }
+    },
+    "elapsed_ms": 370.5153129994869
   },
   "run_context": {
     "command": "/home/anulum/.local/bin/python -m benchmarks.action_evidence --heavy-jobs not reserved; workstation may have background activity",
-    "git_sha": "db49f04ea16de7cba834ddbe09123036ad584489",
+    "git_sha": "5d424139a2c7be1fc064cb19c4580a45035b82c6",
     "affinity": "none",
     "isolation_method": "none",
     "host_load_before": [
-      9.30517578125,
-      9.11572265625,
-      8.6591796875
+      18.06689453125,
+      13.95263671875,
+      10.79345703125
     ],
     "host_load_after": [
-      9.30517578125,
-      9.11572265625,
-      8.6591796875
+      18.06689453125,
+      13.95263671875,
+      10.79345703125
     ],
     "cpu_governor": [
       "powersave"
