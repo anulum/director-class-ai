@@ -14,6 +14,7 @@ imports nothing heavy, so this package imports cleanly without director-ai and i
 unit-tested with injected scorers / judge functions.
 """
 
+from .citation import CitationCoverageDetector, CitationTrace, CitationTracer
 from .contradiction import ContradictionContentDetector
 from .llm_judge import (
     JudgePanel,
@@ -28,6 +29,9 @@ from .token_span import TokenSpanContentDetector
 
 __all__ = [
     "ContradictionContentDetector",
+    "CitationCoverageDetector",
+    "CitationTrace",
+    "CitationTracer",
     "JudgePanel",
     "JudgeResult",
     "JudgeSpec",
