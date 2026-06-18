@@ -24,13 +24,14 @@ detectors fired), so the trail is safe to retain.
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 if TYPE_CHECKING:
     from ..core.governor import AuditRecord
@@ -38,6 +39,10 @@ if TYPE_CHECKING:
 __all__ = ["AuditChainSink", "ChainVerification", "verify_chain"]
 
 _GENESIS = "0" * 64
+_RustEntryHash: TypeAlias = Callable[[str, str], str]
+_RustVerifyChain: TypeAlias = Callable[
+    [Sequence[str], str | None], tuple[bool, int | None, str]
+]
 
 
 def _approval_state(permitted: bool, escalated: bool) -> str:
@@ -46,9 +51,43 @@ def _approval_state(permitted: bool, escalated: bool) -> str:
     return "permitted" if permitted else "blocked"
 
 
-def _entry_hash(prev_hash: str, payload: dict[str, object]) -> str:
+def _load_rust_entry_hash() -> _RustEntryHash | None:
+    try:
+        module = importlib.import_module("director_class_ai._rust")
+    except ImportError:
+        return None
+    entry_hash = getattr(module, "audit_entry_hash", None)
+    return entry_hash if callable(entry_hash) else None
+
+
+def _load_rust_verify_chain() -> _RustVerifyChain | None:
+    try:
+        module = importlib.import_module("director_class_ai._rust")
+    except ImportError:
+        return None
+    verify = getattr(module, "audit_verify_chain", None)
+    return verify if callable(verify) else None
+
+
+_RUST_ENTRY_HASH = _load_rust_entry_hash()
+_RUST_VERIFY_CHAIN = _load_rust_verify_chain()
+
+
+def _entry_hash_python(prev_hash: str, payload: dict[str, object]) -> str:
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256((prev_hash + canonical).encode("utf-8")).hexdigest()
+
+
+def _entry_hash(prev_hash: str, payload: dict[str, object]) -> str:
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    python_hash = hashlib.sha256((prev_hash + canonical).encode("utf-8")).hexdigest()
+    if _RUST_ENTRY_HASH is None:
+        return python_hash
+    try:
+        rust_hash = _RUST_ENTRY_HASH(prev_hash, canonical)
+    except Exception:
+        return python_hash
+    return rust_hash if rust_hash == python_hash else python_hash
 
 
 @dataclass
@@ -119,6 +158,21 @@ def verify_chain(path: str | Path) -> ChainVerification:
     path = Path(path)
     if not path.exists():
         return ChainVerification(False, None, "audit log does not exist")
+    python_result = _verify_chain_python(path)
+    if _RUST_VERIFY_CHAIN is None:
+        return python_result
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        head_path = path.with_suffix(path.suffix + ".head")
+        head_json = head_path.read_text(encoding="utf-8") if head_path.exists() else None
+        rust_result = ChainVerification(*_RUST_VERIFY_CHAIN(lines, head_json))
+    except Exception:
+        return python_result
+    return rust_result if rust_result == python_result else python_result
+
+
+def _verify_chain_python(path: Path) -> ChainVerification:
+    """Python reference verifier used as the parity oracle for Rust."""
     prev_hash = _GENESIS
     expected_seq = 0
     last_hash = _GENESIS

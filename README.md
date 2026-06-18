@@ -91,11 +91,11 @@ resolves them into one `Verdict`. Architecture and roadmap: `docs/internal/`.
 
 Wheels include the optional `director_class_ai._rust` PyO3 extension for
 security-critical command de-obfuscation, destructive-command matching, and MCP
-structural scanning. The Python APIs remain stable: they attempt the Rust
-implementation, compare the result with the Python reference implementation, and
-fall back to Python if parity fails or the extension is unavailable. Source-tree
-development therefore stays pure Python, while packaged deployments can exercise
-the compiled path.
+structural scanning, plus audit hash-chain primitives. The Python APIs remain
+stable: they attempt the Rust implementation, compare the result with the Python
+reference implementation, and fall back to Python if parity fails or the
+extension is unavailable. Source-tree development therefore stays pure Python,
+while packaged deployments can exercise the compiled path.
 
 ## Claim boundaries
 

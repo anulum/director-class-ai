@@ -8,9 +8,12 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 import threading
+from types import SimpleNamespace
 
+import director_class_ai.audit.chain as audit_chain
 from director_class_ai.action import DestructiveCommandDetector
 from director_class_ai.audit import AuditChainSink, verify_chain
 from director_class_ai.core import (
@@ -228,3 +231,69 @@ def test_last_skips_blank_lines_on_append(tmp_path) -> None:
     _governor(p).review(EvaluationRequest(action="ls"))  # _last must skip the blank
     assert verify_chain(p).ok is True
     assert json.loads(p.read_text().splitlines()[-1])["seq"] == 4
+
+
+class TestRustAuditPrimitivesParity:
+    def test_loader_ignores_missing_callables(self, monkeypatch) -> None:
+        module = SimpleNamespace(audit_entry_hash=object(), audit_verify_chain=object())
+        monkeypatch.setattr(importlib, "import_module", lambda _: module)
+        assert audit_chain._load_rust_entry_hash() is None
+        assert audit_chain._load_rust_verify_chain() is None
+
+    def test_entry_hash_uses_python_when_rust_unavailable(self, monkeypatch) -> None:
+        payload = {"seq": 0, "prev_hash": "0" * 64, "risk": 1.0}
+        monkeypatch.setattr(audit_chain, "_RUST_ENTRY_HASH", None)
+        expected = audit_chain._entry_hash_python("0" * 64, payload)
+        assert audit_chain._entry_hash("0" * 64, payload) == expected
+
+    def test_entry_hash_mismatch_falls_back_to_python(self, monkeypatch) -> None:
+        payload = {"seq": 0, "prev_hash": "0" * 64, "risk": 1.0}
+        monkeypatch.setattr(audit_chain, "_RUST_ENTRY_HASH", lambda _prev, _payload: "x")
+        expected = audit_chain._entry_hash_python("0" * 64, payload)
+        assert audit_chain._entry_hash("0" * 64, payload) == expected
+
+    def test_entry_hash_exception_falls_back_to_python(self, monkeypatch) -> None:
+        payload = {"seq": 0, "prev_hash": "0" * 64, "risk": 1.0}
+
+        def broken_hash(_prev: str, _payload: str) -> str:
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(audit_chain, "_RUST_ENTRY_HASH", broken_hash)
+        expected = audit_chain._entry_hash_python("0" * 64, payload)
+        assert audit_chain._entry_hash("0" * 64, payload) == expected
+
+    def test_verify_mismatch_falls_back_to_python(self, tmp_path, monkeypatch) -> None:
+        p = tmp_path / "audit.jsonl"
+        _populate(p)
+
+        def wrong_verify(_lines, _head):
+            return (False, 0, "wrong")
+
+        monkeypatch.setattr(audit_chain, "_RUST_VERIFY_CHAIN", wrong_verify)
+        assert verify_chain(p) == audit_chain._verify_chain_python(p)
+
+    def test_verify_exception_falls_back_to_python(self, tmp_path, monkeypatch) -> None:
+        p = tmp_path / "audit.jsonl"
+        _populate(p)
+
+        def broken_verify(_lines, _head):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(audit_chain, "_RUST_VERIFY_CHAIN", broken_verify)
+        assert verify_chain(p) == audit_chain._verify_chain_python(p)
+
+    def test_installed_rust_primitives_match_python_when_present(self, tmp_path) -> None:
+        if audit_chain._RUST_ENTRY_HASH is None or audit_chain._RUST_VERIFY_CHAIN is None:
+            return
+        p = tmp_path / "audit.jsonl"
+        _populate(p)
+        payload = {"seq": 0, "prev_hash": "0" * 64, "risk": 1.0}
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        assert audit_chain._RUST_ENTRY_HASH("0" * 64, canonical) == (
+            audit_chain._entry_hash_python("0" * 64, payload)
+        )
+        lines = p.read_text(encoding="utf-8").splitlines()
+        head = p.with_suffix(".jsonl.head").read_text(encoding="utf-8")
+        assert audit_chain.ChainVerification(
+            *audit_chain._RUST_VERIFY_CHAIN(lines, head)
+        ) == audit_chain._verify_chain_python(p)

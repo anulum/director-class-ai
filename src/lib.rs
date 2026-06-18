@@ -16,6 +16,8 @@ use flate2::read::{GzDecoder, ZlibDecoder};
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use regex::{Captures, Regex};
+use serde_json::Value;
+use sha2::{Digest, Sha256};
 use unicode_normalization::UnicodeNormalization;
 use xz2::read::XzDecoder;
 
@@ -187,12 +189,28 @@ fn mcp_structural_scan(
     )
 }
 
+#[pyfunction]
+fn audit_entry_hash(prev_hash: &str, canonical_payload: &str) -> PyResult<String> {
+    Ok(audit_entry_hash_internal(prev_hash, canonical_payload))
+}
+
+#[pyfunction]
+#[pyo3(signature = (lines, head_json=None))]
+fn audit_verify_chain(
+    lines: Vec<String>,
+    head_json: Option<String>,
+) -> PyResult<(bool, Option<i64>, String)> {
+    Ok(audit_verify_chain_internal(&lines, head_json.as_deref()))
+}
+
 #[pymodule]
 #[pyo3(name = "_rust")]
 fn rust_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(expand, module)?)?;
     module.add_function(wrap_pyfunction!(destructive_match, module)?)?;
     module.add_function(wrap_pyfunction!(mcp_structural_scan, module)?)?;
+    module.add_function(wrap_pyfunction!(audit_entry_hash, module)?)?;
+    module.add_function(wrap_pyfunction!(audit_verify_chain, module)?)?;
     Ok(())
 }
 
@@ -1232,6 +1250,153 @@ fn mcp_is_destination(key: &str, value: &str) -> bool {
 fn mcp_is_sensitive(key: &str, value: &str) -> bool {
     MCP_SENSITIVE_KEYS.contains(&key.to_ascii_lowercase().as_str())
         || MCP_SENSITIVE_VALUE.is_match(value)
+}
+
+fn audit_entry_hash_internal(prev_hash: &str, canonical_payload: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(prev_hash.as_bytes());
+    hasher.update(canonical_payload.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+fn audit_verify_chain_internal(
+    lines: &[String],
+    head_json: Option<&str>,
+) -> (bool, Option<i64>, String) {
+    let mut prev_hash = "0".repeat(64);
+    let mut expected_seq: i64 = 0;
+    let mut last_hash = prev_hash.clone();
+    let mut last_seq: i64 = -1;
+
+    for (index, line) in lines.iter().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let Ok(mut entry) = serde_json::from_str::<Value>(line) else {
+            return (
+                false,
+                Some(index as i64),
+                "corrupt / truncated JSON line".to_owned(),
+            );
+        };
+        let Some(object) = entry.as_object_mut() else {
+            return (
+                false,
+                Some(index as i64),
+                "corrupt / truncated JSON line".to_owned(),
+            );
+        };
+        let stored = object
+            .remove("entry_hash")
+            .and_then(|value| value.as_str().map(str::to_owned));
+        let seq = object.get("seq").and_then(Value::as_i64);
+        if seq != Some(expected_seq) {
+            return (
+                false,
+                Some(index as i64),
+                "sequence number out of order".to_owned(),
+            );
+        }
+        let linked = object.get("prev_hash").and_then(Value::as_str);
+        if linked != Some(prev_hash.as_str()) {
+            return (
+                false,
+                Some(index as i64),
+                "prev_hash does not chain".to_owned(),
+            );
+        }
+        let canonical = python_canonical_json(&entry);
+        let recomputed = audit_entry_hash_internal(&prev_hash, &canonical);
+        if stored.as_deref() != Some(recomputed.as_str()) {
+            return (
+                false,
+                Some(index as i64),
+                "entry_hash mismatch (mutated)".to_owned(),
+            );
+        }
+        prev_hash = recomputed.clone();
+        last_hash = recomputed;
+        last_seq = expected_seq;
+        expected_seq += 1;
+    }
+
+    if let Some(head_text) = head_json {
+        let Ok(head) = serde_json::from_str::<Value>(head_text) else {
+            return (
+                false,
+                Some(last_seq),
+                "head sidecar mismatch (tail truncated)".to_owned(),
+            );
+        };
+        let head_seq = head.get("seq").and_then(Value::as_i64);
+        let head_hash = head.get("entry_hash").and_then(Value::as_str);
+        if head_seq != Some(last_seq) || head_hash != Some(last_hash.as_str()) {
+            return (
+                false,
+                Some(last_seq),
+                "head sidecar mismatch (tail truncated)".to_owned(),
+            );
+        }
+    }
+    (true, None, String::new())
+}
+
+fn python_canonical_json(value: &Value) -> String {
+    match value {
+        Value::Null => "null".to_owned(),
+        Value::Bool(flag) => flag.to_string(),
+        Value::Number(number) => number.to_string(),
+        Value::String(text) => python_json_string(text),
+        Value::Array(values) => {
+            let body = values
+                .iter()
+                .map(python_canonical_json)
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("[{body}]")
+        }
+        Value::Object(object) => {
+            let mut keys: Vec<&String> = object.keys().collect();
+            keys.sort();
+            let body = keys
+                .into_iter()
+                .map(|key| {
+                    format!(
+                        "{}:{}",
+                        python_json_string(key),
+                        python_canonical_json(&object[key])
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("{{{body}}}")
+        }
+    }
+}
+
+fn python_json_string(text: &str) -> String {
+    let mut out = String::from("\"");
+    for ch in text.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\u{08}' => out.push_str("\\b"),
+            '\u{0c}' => out.push_str("\\f"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            ch if ch < ' ' => out.push_str(&format!("\\u{:04x}", ch as u32)),
+            ch if ch.is_ascii() => out.push(ch),
+            ch => {
+                let mut units = [0_u16; 2];
+                for unit in ch.encode_utf16(&mut units) {
+                    out.push_str(&format!("\\u{unit:04x}"));
+                }
+            }
+        }
+    }
+    out.push('"');
+    out
 }
 
 fn is_unscoped_update(form: &str) -> bool {
