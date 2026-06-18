@@ -16,6 +16,12 @@ unit-tested with injected scorers / judge functions.
 
 from .citation import CitationCoverageDetector, CitationTrace, CitationTracer
 from .contradiction import ContradictionContentDetector
+from .injection import (
+    InjectionPromptDetector,
+    InjectionScreenBackend,
+    InjectionScreenFinding,
+    InjectionScreenResult,
+)
 from .llm_judge import (
     JudgePanel,
     JudgeResult,
@@ -33,6 +39,10 @@ __all__ = [
     "CitationCoverageDetector",
     "CitationTrace",
     "CitationTracer",
+    "InjectionPromptDetector",
+    "InjectionScreenBackend",
+    "InjectionScreenFinding",
+    "InjectionScreenResult",
     "JudgePanel",
     "JudgeResult",
     "JudgeSpec",
