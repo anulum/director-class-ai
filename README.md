@@ -88,6 +88,24 @@ director-class-guard --surface kubernetes -- kubectl get pods
 director-class-guard --surface shell --execute -- printf guard-ok
 ```
 
+## External benchmark artefacts
+
+External action benchmark rows are never inferred from benchmark names. A local
+JSONL export must pass the source-review gate before it can enter the external
+partition:
+
+```bash
+python tools/import_external_action_surface.py \
+  --surface AgentDojo-style \
+  --input-jsonl /path/to/licence-reviewed-export.jsonl
+python -m benchmarks.action_evidence
+```
+
+The import tool refuses unreviewed surfaces, validates the action-case schema,
+copies the artefact into `benchmarks/external_sources/`, and writes a receipt
+containing the source hash and licence review. Current committed evidence still
+reports external n=0 because no third-party JSONL artefacts are vendored.
+
 ## Design
 
 The ensemble runs detectors concurrently and cheap-first (tiered cascade), so the

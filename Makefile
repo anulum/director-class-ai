@@ -37,6 +37,11 @@ bench: ## Run the action-plane benchmark
 bench-evidence: ## Run action benchmark with evidence-grade metadata
 	$(PY) -m benchmarks.action_evidence
 
+import-external: ## Import reviewed external JSONL: make import-external SURFACE=... INPUT=...
+	@test -n "$(SURFACE)" || (echo "SURFACE is required" && exit 2)
+	@test -n "$(INPUT)" || (echo "INPUT is required" && exit 2)
+	$(PY) tools/import_external_action_surface.py --surface "$(SURFACE)" --input-jsonl "$(INPUT)"
+
 redteam: ## Run the adversarial red-team benchmark
 	$(PY) -m benchmarks.adversarial_red_team
 

@@ -17,12 +17,14 @@ from pathlib import Path
 from typing import Literal, cast
 
 __all__ = [
+    "CaseRow",
     "ExternalSource",
     "ExternalSourceReview",
     "load_external_cases",
     "load_manifest",
     "load_source_reviews",
     "source_inventory",
+    "validate_external_case_rows",
 ]
 
 _HERE = Path(__file__).resolve().parent
@@ -238,9 +240,37 @@ def load_external_cases(
                 f"{source.surface}"
             )
         loaded = _load_jsonl(artifact_path)
-        _validate_external_cases(loaded, artifact_path)
+        validate_external_case_rows(loaded, artifact_path)
         cases.extend(_with_external_metadata(source, review, loaded))
     return cases
+
+
+def validate_external_case_rows(cases: Iterable[CaseRow], path: Path) -> None:
+    """Validate external rows before they enter benchmark partitions.
+
+    Parameters
+    ----------
+    cases:
+        Parsed JSON object rows from a local external artefact.
+    path:
+        Path used in validation errors.
+
+    Raises
+    ------
+    ValueError
+        If required fields are missing, labels are outside the benchmark
+        contract, or case identifiers are duplicated.
+    """
+    ids: set[str] = set()
+    for case in cases:
+        missing = _REQUIRED.difference(case)
+        if missing:
+            raise ValueError(f"{path}: case {case.get('id', '<unknown>')} missing fields")
+        if case["label"] not in _LABELS:
+            raise ValueError(f"{path}: case {case['id']} has bad label {case['label']!r}")
+        if case["id"] in ids:
+            raise ValueError(f"{path}: duplicate external id {case['id']}")
+        ids.add(str(case["id"]))
 
 
 def _review_path(manifest_path: Path, review_path: Path | None) -> Path:
@@ -265,19 +295,6 @@ def _load_jsonl(path: Path) -> list[CaseRow]:
             raise ValueError(f"{path}:{lineno} must contain a JSON object")
         rows.append(value)
     return rows
-
-
-def _validate_external_cases(cases: Iterable[CaseRow], path: Path) -> None:
-    ids: set[str] = set()
-    for case in cases:
-        missing = _REQUIRED.difference(case)
-        if missing:
-            raise ValueError(f"{path}: case {case.get('id', '<unknown>')} missing fields")
-        if case["label"] not in _LABELS:
-            raise ValueError(f"{path}: case {case['id']} has bad label {case['label']!r}")
-        if case["id"] in ids:
-            raise ValueError(f"{path}: duplicate external id {case['id']}")
-        ids.add(str(case["id"]))
 
 
 def _with_external_metadata(

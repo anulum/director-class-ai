@@ -18,6 +18,12 @@ JSONL artefact is rejected unless its surface has a matching source-review row
 with `import_allowed=true`; paper-level or unverified licence evidence remains
 fail-closed.
 
+Use `python tools/import_external_action_surface.py --surface <surface>
+--input-jsonl <local-export.jsonl>` to import a reviewed local export. The tool
+validates the schema, refuses unreviewed or blocked surfaces, copies the JSONL to
+the manifest directory, and writes `<artefact>.import.json` with the source hash,
+licence review, row count, and target path.
+
 Expected JSONL case schema: `id`, `action`, `label`, `category`, and `severity`
 are required. Optional fields follow `benchmarks/data/action_corpus.jsonl`,
 including `query`, `context`, `provenance`, `expected_route`, and `mcp_call`.
