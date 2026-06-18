@@ -1,21 +1,24 @@
 # Director-Class AI
 
-**High-assurance multi-detector governance for autonomous and mission-critical
-systems.** A separate commercial product from the Apache-licensed `director-ai`
-base: a parallel detector ensemble plus an action-plane effector kill-switch that
-governs three planes at once —
+**Runtime action-control and evidence layer for autonomous AI agents.** A
+separate commercial product from the Apache-licensed `director-ai` base:
+Director-Class AI sits between an autonomous agent and its effectors. It reviews
+high-impact shell, SQL, infrastructure, API, and MCP tool actions before
+dispatch; uncertain or high-risk actions escalate to human approval and emit
+tamper-evident audit/evidence records.
+
+The parallel detector ensemble governs three planes at once —
 
 - **Content** — is what the system *says* true and grounded?
 - **Integrity** — was the input / context tampered with?
 - **Action** — is what the system *does* safe to execute?
 
-The action plane is the differentiator: a mandatory checkpoint between an
-autonomous agent's decision and the real effector (shell, SQL, infra, API) that
-catches catastrophic commands *before* they run. It is fail-closed — a missed
-`rm -rf /` is catastrophic, a false block is a minor inconvenience — so an
-uncertain critical action escalates to a human rather than being allowed.
+The action plane is the differentiator. Prompt and content checks are supporting
+signals that feed effector-bound governance; they are not positioned as a
+standalone prevention guarantee. Current benchmark evidence is local functional
+evidence, not a public advantage claim.
 
-## Kill-switch in five lines
+## Action checkpoint in five lines
 
 ```python
 from director_class_ai.action import DestructiveCommandDetector
@@ -83,6 +86,14 @@ common safe case clears in microseconds and only a flagged action pays for the
 full ensemble. Every detector — content, integrity, or action — emits the same
 `DetectorSignal`, and a per-plane fusion (fail-open content, fail-closed action)
 resolves them into one `Verdict`. Architecture and roadmap: `docs/internal/`.
+
+## Claim boundaries
+
+Public copy, investor copy, and demos use the same bounded claim language in
+`docs/CLAIM_BOUNDARIES.md`. The primary category is runtime action-control and
+evidence for autonomous agents. Do not claim comparative benchmark leadership,
+certification, or production readiness until the corresponding evidence gates are
+complete.
 
 ## Licence
 

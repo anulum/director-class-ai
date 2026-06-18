@@ -5,16 +5,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "director-class-ai"
 version = "0.1.0"
-description = "High-assurance multi-detector governance for autonomous and mission-critical systems"
+description = "Runtime action-control and evidence layer for autonomous AI agents"
 readme = "README.md"
 requires-python = ">=3.11"
 license-files = ["LICENSE"]
 authors = [{ name = "Miroslav Šotek", email = "protoscience@anulum.li" }]
 keywords = [
     "ai-safety",
-    "guardrails",
+    "runtime-action-control",
+    "evidence",
     "agent-governance",
-    "kill-switch",
     "hallucination-detection",
 ]
 # Proprietary commercial product. "Private :: Do Not Upload" makes PyPI reject an

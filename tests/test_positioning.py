@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial
+# Director-Class AI — commercial product (licence pending); not the Apache base.
+# © Concepts 1996–2026 Miroslav Šotek. All rights reserved.
+# © Code 2020–2026 Miroslav Šotek. All rights reserved.
+# ORCID: 0009-0009-3560-0851
+# Contact: www.anulum.li | protoscience@anulum.li
+# Director-Class AI — positioning tests
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from director_class_ai.positioning import (
+    canonical_claim_language,
+    rejected_claim_reasons,
+)
+
+_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _normalise(text: str) -> str:
+    return " ".join(text.split())
+
+
+def test_canonical_claim_language_defines_action_control_category() -> None:
+    language = canonical_claim_language()
+
+    assert language.primary_category == (
+        "Runtime action-control and evidence layer for autonomous AI agents."
+    )
+    assert "prompt filter" in language.investor_summary
+    assert "not another prompt filter" in language.investor_summary
+    assert "local functional behaviour" in " ".join(language.allowed_claims)
+
+
+def test_blocked_claim_detection_finds_forbidden_positioning() -> None:
+    reasons = rejected_claim_reasons(
+        "Director-Class AI is a generic prompt filter with benchmark advantage "
+        "and production-ready kill-switch claims."
+    )
+
+    assert len(reasons) == 3
+    assert any("effector-bound action governance" in reason for reason in reasons)
+    assert any("external artefacts" in reason for reason in reasons)
+    assert any("deployment hardening" in reason for reason in reasons)
+
+
+def test_readme_uses_bounded_public_category() -> None:
+    readme = (_ROOT / "README.md").read_text(encoding="utf-8")
+    language = canonical_claim_language()
+
+    assert language.primary_category in readme
+    assert language.public_summary in _normalise(readme)
+    assert "production-ready kill-switch" not in readme
+    assert "benchmark advantage" not in readme
+    assert "generic prompt filter" not in readme
+
+
+def test_public_claim_document_matches_canonical_language() -> None:
+    claim_doc = (_ROOT / "docs" / "CLAIM_BOUNDARIES.md").read_text(encoding="utf-8")
+    language = canonical_claim_language()
+
+    assert language.public_markdown() in claim_doc
+    assert language.demo_summary in claim_doc
+
+
+def test_internal_investor_copy_matches_canonical_language() -> None:
+    investor_doc = (_ROOT / "docs" / "internal" / "INVESTOR_POSITIONING.md").read_text(
+        encoding="utf-8"
+    )
+    language = canonical_claim_language()
+
+    assert language.investor_markdown() in investor_doc
+    assert language.benchmark_boundary in investor_doc
+    assert language.certification_boundary in investor_doc
