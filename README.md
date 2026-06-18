@@ -29,6 +29,27 @@ verdict = guard.evaluate(EvaluationRequest(action="rm -rf /"))
 assert verdict.allow is False and verdict.requires_human is True
 ```
 
+## Getting started
+
+Use the onboarding guide for a clean local setup, first guard run, and evidence
+boundary check:
+
+```bash
+python -m pip install -e ".[dev]"
+python demos/action_checkpoint.py
+make preflight
+make bench-evidence
+```
+
+Detailed operator docs live in `docs/`:
+
+- `docs/index.md` — documentation index and runtime surface map.
+- `docs/onboarding.md` — setup, first guard run, and local verification.
+- `docs/demos.md` — command guard, SDK, MCP gateway, and SIEM export examples.
+- `docs/evidence.md` — benchmark evidence and claim boundaries.
+- `notebooks/action_checkpoint.ipynb` — notebook walkthrough of the action
+  checkpoint.
+
 ## Python middleware
 
 Applications that dispatch tools directly can put the SDK middleware in front of
@@ -194,9 +215,11 @@ event = package.to_json()
 
 ```bash
 python -m pytest                       # tests + 100% coverage gate
-ruff check director_class_ai tests benchmarks
-ruff format --check director_class_ai tests benchmarks
+ruff check director_class_ai tests benchmarks tools
+ruff format --check director_class_ai tests benchmarks tools
 mypy --strict director_class_ai
+python tools/check_documentation_surface.py
+python demos/action_checkpoint.py
 bandit -r director_class_ai -ll
 uvx semgrep scan --config p/python --config p/security-audit director_class_ai   # SAST, no local install
 python -m build --sdist --wheel        # packaging

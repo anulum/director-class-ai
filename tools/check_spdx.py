@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 _TAG = "SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial"
-_ROOTS = ("director_class_ai", "tests", "benchmarks", "tools")
+_ROOTS = ("director_class_ai", "tests", "benchmarks", "tools", "demos")
 
 
 def offenders(repo_root: Path) -> list[Path]:

@@ -2,6 +2,7 @@
 # Director-Class AI — developer task runner
 .DEFAULT_GOAL := help
 PY ?= python
+.PHONY: help test lint fmt types sast spdx repository-readiness docs build bench bench-evidence phase4-intake import-external redteam preflight
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -11,12 +12,12 @@ test: ## Run tests with the 100% coverage gate
 	$(PY) -m pytest
 
 lint: ## Check style (ruff check + format --check)
-	$(PY) -m ruff check director_class_ai tests benchmarks tools
-	$(PY) -m ruff format --check director_class_ai tests benchmarks tools
+	$(PY) -m ruff check director_class_ai tests benchmarks tools demos
+	$(PY) -m ruff format --check director_class_ai tests benchmarks tools demos
 
 fmt: ## Auto-fix style
-	$(PY) -m ruff check --fix director_class_ai tests benchmarks tools
-	$(PY) -m ruff format director_class_ai tests benchmarks tools
+	$(PY) -m ruff check --fix director_class_ai tests benchmarks tools demos
+	$(PY) -m ruff format director_class_ai tests benchmarks tools demos
 
 types: ## Strict type-check
 	$(PY) -m mypy --strict director_class_ai
@@ -30,6 +31,10 @@ spdx: ## Verify SPDX headers
 
 repository-readiness: ## Validate local repository readiness evidence
 	$(PY) tools/check_repository_readiness.py
+
+docs: ## Validate public docs, demos, and notebook entry points
+	$(PY) tools/check_documentation_surface.py
+	$(PY) demos/action_checkpoint.py >/tmp/director-class-action-demo.json
 
 build: ## Build sdist + wheel
 	$(PY) -m build --sdist --wheel
@@ -51,5 +56,5 @@ import-external: ## Import reviewed external JSONL: make import-external SURFACE
 redteam: ## Run the adversarial red-team benchmark
 	$(PY) -m benchmarks.adversarial_red_team
 
-preflight: spdx repository-readiness phase4-intake lint types test ## Full local gate before commit
+preflight: spdx repository-readiness phase4-intake docs lint types test ## Full local gate before commit
 	@echo "preflight OK"
