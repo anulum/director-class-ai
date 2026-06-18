@@ -15,6 +15,7 @@ import pytest
 
 from benchmarks.action_plane import evaluate
 from benchmarks.external_action_surfaces import (
+    _DEFAULT_MANIFEST,
     ExternalSource,
     load_external_cases,
     load_manifest,
@@ -72,6 +73,22 @@ def test_missing_external_artifact_is_skipped_not_fabricated(tmp_path: Path) -> 
     )
     assert load_external_cases(manifest) == []
     assert source_inventory(manifest)[0]["loaded"] is False
+
+
+def test_default_manifest_covers_required_surface_families() -> None:
+    surfaces = {source.surface for source in load_manifest(_DEFAULT_MANIFEST)}
+
+    assert surfaces == {
+        "AgentDojo-style",
+        "MSB MCP Security Bench-style",
+        "MCPSecBench-style",
+        "MCP-SafetyBench-style",
+        "SkillInject-style",
+        "InjecAgent-style",
+        "Agent Security Bench-style",
+        "Browser-computer-use injection-style",
+    }
+    assert all(item["loaded"] is False for item in source_inventory(_DEFAULT_MANIFEST))
 
 
 def test_present_external_jsonl_is_loaded_with_source_metadata(tmp_path: Path) -> None:

@@ -18,7 +18,7 @@
       "escalate": 3,
       "block": 191
     },
-    "latency_ms_p50": 0.7049329578876495,
+    "latency_ms_p50": 0.5019739619456232,
     "per_category": {
       "authorised-mutation": {
         "catastrophic_recall": null,
@@ -136,7 +136,7 @@
         "escalate": 3,
         "block": 191
       },
-      "latency_ms_p50": 0.7049329578876495,
+      "latency_ms_p50": 0.5019739619456232,
       "per_category": {
         "authorised-mutation": {
           "catastrophic_recall": null,
@@ -272,22 +272,22 @@
         "claim_boundary": "customer/private evidence; never mixed into public benchmark claims"
       }
     },
-    "elapsed_ms": 370.5153129994869
+    "elapsed_ms": 190.0976049946621
   },
   "run_context": {
     "command": "/home/anulum/.local/bin/python -m benchmarks.action_evidence --heavy-jobs not reserved; workstation may have background activity",
-    "git_sha": "5d424139a2c7be1fc064cb19c4580a45035b82c6",
+    "git_sha": "8a33b4da6c2d15f1948c0ebdc12e59e9975d05b1",
     "affinity": "none",
     "isolation_method": "none",
     "host_load_before": [
-      18.06689453125,
-      13.95263671875,
-      10.79345703125
+      4.82666015625,
+      32.4248046875,
+      64.55224609375
     ],
     "host_load_after": [
-      18.06689453125,
-      13.95263671875,
-      10.79345703125
+      4.82666015625,
+      32.4248046875,
+      64.55224609375
     ],
     "cpu_governor": [
       "powersave"
@@ -312,6 +312,33 @@
       "loaded": false
     },
     {
+      "surface": "MSB MCP Security Bench-style",
+      "threat_taxonomy": "MCP server/tool security and confused-deputy misuse",
+      "licence": "Not vendored; verify upstream licence before local import",
+      "provenance": "Local export required; not copied into this repo",
+      "local_artifact": "msb_mcp_security_action_cases.jsonl",
+      "status": "absent",
+      "loaded": false
+    },
+    {
+      "surface": "MCPSecBench-style",
+      "threat_taxonomy": "MCP protocol attack and unsafe tool-call behaviour",
+      "licence": "Not vendored; verify upstream licence before local import",
+      "provenance": "Local export required; not copied into this repo",
+      "local_artifact": "mcpsecbench_action_cases.jsonl",
+      "status": "absent",
+      "loaded": false
+    },
+    {
+      "surface": "MCP-SafetyBench-style",
+      "threat_taxonomy": "MCP safety and tool-use attack surfaces",
+      "licence": "Not vendored; verify upstream licence before local import",
+      "provenance": "Local export required; not copied into this repo",
+      "local_artifact": "mcp_safetybench_action_cases.jsonl",
+      "status": "absent",
+      "loaded": false
+    },
+    {
       "surface": "SkillInject-style",
       "threat_taxonomy": "Skill/tool supply-chain instruction injection",
       "licence": "Not vendored; verify upstream licence before local import",
@@ -321,11 +348,29 @@
       "loaded": false
     },
     {
-      "surface": "MCP-security",
-      "threat_taxonomy": "MCP confused-deputy, exfiltration, schema and tool-call misuse",
+      "surface": "InjecAgent-style",
+      "threat_taxonomy": "Agent tool-use injection and malicious instruction transfer",
       "licence": "Not vendored; verify upstream licence before local import",
       "provenance": "Local export required; not copied into this repo",
-      "local_artifact": "mcp_security_action_cases.jsonl",
+      "local_artifact": "injecagent_action_cases.jsonl",
+      "status": "absent",
+      "loaded": false
+    },
+    {
+      "surface": "Agent Security Bench-style",
+      "threat_taxonomy": "Agent security tasks, unsafe action routing, and tool misuse",
+      "licence": "Not vendored; verify upstream licence before local import",
+      "provenance": "Local export required; not copied into this repo",
+      "local_artifact": "agent_security_bench_action_cases.jsonl",
+      "status": "absent",
+      "loaded": false
+    },
+    {
+      "surface": "Browser-computer-use injection-style",
+      "threat_taxonomy": "Browser/computer-use prompt injection, UI drift, and exfiltration",
+      "licence": "Not vendored; verify upstream licence before local import",
+      "provenance": "Local export required; not copied into this repo",
+      "local_artifact": "browser_computer_use_action_cases.jsonl",
       "status": "absent",
       "loaded": false
     }

@@ -5,11 +5,11 @@ Evidence grade: local-regression-non-isolated: functional benchmark evidence onl
 ## Run Context
 
 - command: `/home/anulum/.local/bin/python -m benchmarks.action_evidence --heavy-jobs not reserved; workstation may have background activity`
-- git SHA: `5d424139a2c7be1fc064cb19c4580a45035b82c6`
+- git SHA: `8a33b4da6c2d15f1948c0ebdc12e59e9975d05b1`
 - isolation method: `none`
 - CPU affinity: `none`
-- host load before: `18.07, 13.95, 10.79`
-- host load after: `18.07, 13.95, 10.79`
+- host load before: `4.83, 32.42, 64.55`
+- host load after: `4.83, 32.42, 64.55`
 - CPU governor: `powersave`
 - Python: `3.12.3`
 - platform: `Linux-6.17.0-35-generic-x86_64-with-glibc2.39`
@@ -24,13 +24,18 @@ Evidence grade: local-regression-non-isolated: functional benchmark evidence onl
 - false hard-block rate: 0.000
 - false escalation rate: 0.018
 - safe route conformance: 1.000
-- elapsed: 370.515 ms
+- elapsed: 190.098 ms
 
 ## External Sources
 
 - AgentDojo-style: loaded=False, licence=Not vendored; verify upstream licence before local import, status=absent
+- MSB MCP Security Bench-style: loaded=False, licence=Not vendored; verify upstream licence before local import, status=absent
+- MCPSecBench-style: loaded=False, licence=Not vendored; verify upstream licence before local import, status=absent
+- MCP-SafetyBench-style: loaded=False, licence=Not vendored; verify upstream licence before local import, status=absent
 - SkillInject-style: loaded=False, licence=Not vendored; verify upstream licence before local import, status=absent
-- MCP-security: loaded=False, licence=Not vendored; verify upstream licence before local import, status=absent
+- InjecAgent-style: loaded=False, licence=Not vendored; verify upstream licence before local import, status=absent
+- Agent Security Bench-style: loaded=False, licence=Not vendored; verify upstream licence before local import, status=absent
+- Browser-computer-use injection-style: loaded=False, licence=Not vendored; verify upstream licence before local import, status=absent
 
 ## Claim Boundary
 

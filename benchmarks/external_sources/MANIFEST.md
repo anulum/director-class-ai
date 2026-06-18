@@ -20,5 +20,10 @@ including `query`, `context`, `provenance`, `expected_route`, and `mcp_call`.
 | Surface | Threat taxonomy | Licence | Provenance | Local artefact | Status |
 |---|---|---|---|---|---|
 | AgentDojo-style | Indirect prompt injection into tool/action use | Not vendored; verify upstream licence before local import | Local export required; not copied into this repo | agentdojo_action_cases.jsonl | absent |
+| MSB MCP Security Bench-style | MCP server/tool security and confused-deputy misuse | Not vendored; verify upstream licence before local import | Local export required; not copied into this repo | msb_mcp_security_action_cases.jsonl | absent |
+| MCPSecBench-style | MCP protocol attack and unsafe tool-call behaviour | Not vendored; verify upstream licence before local import | Local export required; not copied into this repo | mcpsecbench_action_cases.jsonl | absent |
+| MCP-SafetyBench-style | MCP safety and tool-use attack surfaces | Not vendored; verify upstream licence before local import | Local export required; not copied into this repo | mcp_safetybench_action_cases.jsonl | absent |
 | SkillInject-style | Skill/tool supply-chain instruction injection | Not vendored; verify upstream licence before local import | Local export required; not copied into this repo | skillinject_action_cases.jsonl | absent |
-| MCP-security | MCP confused-deputy, exfiltration, schema and tool-call misuse | Not vendored; verify upstream licence before local import | Local export required; not copied into this repo | mcp_security_action_cases.jsonl | absent |
+| InjecAgent-style | Agent tool-use injection and malicious instruction transfer | Not vendored; verify upstream licence before local import | Local export required; not copied into this repo | injecagent_action_cases.jsonl | absent |
+| Agent Security Bench-style | Agent security tasks, unsafe action routing, and tool misuse | Not vendored; verify upstream licence before local import | Local export required; not copied into this repo | agent_security_bench_action_cases.jsonl | absent |
+| Browser-computer-use injection-style | Browser/computer-use prompt injection, UI drift, and exfiltration | Not vendored; verify upstream licence before local import | Local export required; not copied into this repo | browser_computer_use_action_cases.jsonl | absent |
