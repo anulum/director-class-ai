@@ -82,6 +82,78 @@ static PRINT_COMMAND: Lazy<Regex> = Lazy::new(|| {
 static SCRATCH_ABS: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^/(?:tmp|var/tmp)(?:/|$)").expect("valid regex"));
 static DESTRUCTIVE_RULES: Lazy<Vec<Rule>> = Lazy::new(build_destructive_rules);
+static MCP_MUTATING: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?i)\b(?:rm|delete|del|drop|destroy|truncate|wipe|purge|format|overwrite|erase|prune|shred|unlink|update|insert|write|create|deploy|push|send|post|put|patch|exec|install|move|mv|chmod|chown|kill|shutdown|reboot|grant|revoke|transfer|publish|merge|reset|rebase)\b",
+    )
+    .expect("valid MCP mutating regex")
+});
+static MCP_IRREVERSIBLE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?i)\b(?:rm|delete|del|drop|destroy|truncate|wipe|purge|format|mkfs|overwrite|erase|prune|shred|unlink)\b",
+    )
+    .expect("valid MCP irreversible regex")
+});
+static MCP_SYSTEM_TARGET: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?i)(?:\s|^)(?:/(?:etc|var|usr|boot|dev|bin|lib|root|home|sys|proc)\b|/\s*$|/\*|~)|[A-Za-z]:\\Windows",
+    )
+    .expect("valid MCP system-target regex")
+});
+static MCP_OFF_HOST: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)\bhttps?://|\bftp://|@[\w.-]+:").expect("valid regex"));
+static MCP_SENSITIVE_VALUE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(concat!(
+        r"AKIA[0-9A-Z]{12,}|",
+        r"g",
+        r"hp_[A-Za-z0-9]{20,}|",
+        r"xox[baprs]-[A-Za-z0-9-]{10,}|",
+        r"sk-[A-Za-z0-9]{20,}|",
+        r"-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----"
+    ))
+    .expect("valid MCP sensitive-value regex")
+});
+static MCP_TRAVERSAL: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"(?:^|[\s,;:="'(\\/])\.\.(?:[\\/]|$)"#).expect("valid regex"));
+static MCP_READ_VERBS: &[&str] = &[
+    "get", "read", "list", "search", "fetch", "view", "show", "describe", "query", "find",
+    "lookup", "count", "inspect", "grep", "open", "cat", "load", "download", "scan", "stat",
+];
+static MCP_DESTINATION_KEYS: &[&str] = &[
+    "url",
+    "uri",
+    "endpoint",
+    "webhook",
+    "callback",
+    "host",
+    "hostname",
+    "target",
+    "dest",
+    "destination",
+    "to",
+    "recipient",
+    "address",
+    "server",
+];
+static MCP_SENSITIVE_KEYS: Lazy<Vec<&'static str>> = Lazy::new(|| {
+    vec![
+        concat!("to", "ken"),
+        concat!("sec", "ret"),
+        concat!("pass", "word"),
+        "passwd",
+        "api_key",
+        "apikey",
+        "access_key",
+        concat!("sec", "ret_key"),
+        "private_key",
+        "credential",
+        "credentials",
+        "authorization",
+        "auth",
+        "session",
+        "cookie",
+    ]
+});
 
 #[pyfunction]
 fn expand(command: &str, max_depth: usize, max_forms: usize) -> PyResult<Vec<String>> {
@@ -99,11 +171,28 @@ fn destructive_match(forms: Vec<String>) -> PyResult<Option<(String, String, Str
     }))
 }
 
+#[pyfunction]
+fn mcp_structural_scan(
+    tool: &str,
+    arguments: Vec<(String, String, String, bool)>,
+) -> PyResult<Option<(f64, String, String)>> {
+    Ok(
+        mcp_structural_scan_internal(tool, &arguments).map(|matched| {
+            (
+                matched.score,
+                matched.severity.name().to_owned(),
+                matched.rationale,
+            )
+        }),
+    )
+}
+
 #[pymodule]
 #[pyo3(name = "_rust")]
 fn rust_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(expand, module)?)?;
     module.add_function(wrap_pyfunction!(destructive_match, module)?)?;
+    module.add_function(wrap_pyfunction!(mcp_structural_scan, module)?)?;
     Ok(())
 }
 
@@ -620,6 +709,7 @@ fn strip_shell_quotes(value: &str) -> String {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 enum MatchSeverity {
+    Medium = 2,
     High = 3,
     Critical = 4,
 }
@@ -627,6 +717,7 @@ enum MatchSeverity {
 impl MatchSeverity {
     fn name(self) -> &'static str {
         match self {
+            Self::Medium => "medium",
             Self::High => "high",
             Self::Critical => "critical",
         }
@@ -977,6 +1068,170 @@ fn pick_better(current: Option<MatchResult>, candidate: MatchResult) -> Option<M
     } else {
         Some(candidate)
     }
+}
+
+struct McpFinding {
+    score: f64,
+    severity: MatchSeverity,
+    reason: String,
+}
+
+struct McpScanResult {
+    score: f64,
+    severity: MatchSeverity,
+    rationale: String,
+}
+
+fn mcp_structural_scan_internal(
+    tool: &str,
+    arguments: &[(String, String, String, bool)],
+) -> Option<McpScanResult> {
+    let mut findings = Vec::new();
+    findings.extend(mcp_taint_findings(tool, arguments));
+    findings.extend(mcp_confused_deputy_findings(tool, arguments));
+    findings.extend(mcp_exfiltration_findings(arguments));
+    findings.extend(mcp_traversal_findings(arguments));
+    if findings.is_empty() {
+        return None;
+    }
+    findings.sort_by(|left, right| {
+        right
+            .severity
+            .cmp(&left.severity)
+            .then_with(|| right.score.total_cmp(&left.score))
+    });
+    let top_score = findings[0].score;
+    let top_severity = findings[0].severity;
+    let mut reasons: Vec<&str> = Vec::new();
+    for finding in &findings {
+        if !reasons.iter().any(|reason| *reason == finding.reason) {
+            reasons.push(&finding.reason);
+        }
+        if reasons.len() >= 3 {
+            break;
+        }
+    }
+    Some(McpScanResult {
+        score: top_score,
+        severity: top_severity,
+        rationale: reasons.join("; "),
+    })
+}
+
+fn mcp_taint_findings(tool: &str, arguments: &[(String, String, String, bool)]) -> Vec<McpFinding> {
+    let mut findings = Vec::new();
+    for (key, value, origin, tainted) in arguments {
+        if !tainted {
+            continue;
+        }
+        if mcp_tool_is_mutating(tool) || MCP_MUTATING.is_match(value) {
+            findings.push(McpFinding {
+                score: 0.85,
+                severity: MatchSeverity::High,
+                reason: format!(
+                    "argument '{key}' sourced from '{origin}' content drives a state-changing tool call (injection→effector path)"
+                ),
+            });
+        } else {
+            findings.push(McpFinding {
+                score: 0.6,
+                severity: MatchSeverity::Medium,
+                reason: format!("argument '{key}' sourced from '{origin}' content"),
+            });
+        }
+    }
+    findings
+}
+
+fn mcp_confused_deputy_findings(
+    tool: &str,
+    arguments: &[(String, String, String, bool)],
+) -> Vec<McpFinding> {
+    if !mcp_tool_is_read(tool) || mcp_tool_is_mutating(tool) {
+        return Vec::new();
+    }
+    let mut findings = Vec::new();
+    for (key, value, _, _) in arguments {
+        if MCP_SYSTEM_TARGET.is_match(value) {
+            findings.push(McpFinding {
+                score: 0.7,
+                severity: MatchSeverity::High,
+                reason: format!(
+                    concat!(
+                        "read-class tool '{}' pointed at a system / sec",
+                        "ret path via '{}'"
+                    ),
+                    tool, key
+                ),
+            });
+        } else if MCP_IRREVERSIBLE.is_match(value) || MCP_MUTATING.is_match(value) {
+            findings.push(McpFinding {
+                score: 0.6,
+                severity: MatchSeverity::Medium,
+                reason: format!(
+                    "read-class tool '{tool}' carries a state-changing argument '{key}'"
+                ),
+            });
+        }
+    }
+    findings
+}
+
+fn mcp_exfiltration_findings(arguments: &[(String, String, String, bool)]) -> Vec<McpFinding> {
+    let mut has_destination = false;
+    let mut has_sensitive = false;
+    for (key, value, _, _) in arguments {
+        has_destination = has_destination || mcp_is_destination(key, value);
+        has_sensitive = has_sensitive || mcp_is_sensitive(key, value);
+    }
+    if has_destination && has_sensitive {
+        vec![McpFinding {
+            score: 0.85,
+            severity: MatchSeverity::High,
+            reason: concat!(
+                "sec",
+                "ret-bearing argument paired with an external destination (data-exfiltration shape)"
+            )
+            .to_owned(),
+        }]
+    } else {
+        Vec::new()
+    }
+}
+
+fn mcp_traversal_findings(arguments: &[(String, String, String, bool)]) -> Vec<McpFinding> {
+    let mut findings = Vec::new();
+    for (key, value, _, _) in arguments {
+        if MCP_TRAVERSAL.is_match(value) {
+            findings.push(McpFinding {
+                score: 0.6,
+                severity: MatchSeverity::Medium,
+                reason: format!("path traversal in argument '{key}'"),
+            });
+        }
+    }
+    findings
+}
+
+fn mcp_tool_is_mutating(tool: &str) -> bool {
+    MCP_MUTATING.is_match(&tool.replace(['_', '-'], " "))
+}
+
+fn mcp_tool_is_read(tool: &str) -> bool {
+    tool.to_ascii_lowercase()
+        .split(|ch: char| !ch.is_ascii_alphabetic())
+        .filter(|part| !part.is_empty())
+        .any(|part| MCP_READ_VERBS.contains(&part))
+}
+
+fn mcp_is_destination(key: &str, value: &str) -> bool {
+    MCP_DESTINATION_KEYS.contains(&key.to_ascii_lowercase().as_str())
+        || MCP_OFF_HOST.is_match(value)
+}
+
+fn mcp_is_sensitive(key: &str, value: &str) -> bool {
+    MCP_SENSITIVE_KEYS.contains(&key.to_ascii_lowercase().as_str())
+        || MCP_SENSITIVE_VALUE.is_match(value)
 }
 
 fn is_unscoped_update(form: &str) -> bool {

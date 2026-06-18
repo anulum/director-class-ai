@@ -27,9 +27,11 @@ is still caught here.
 
 from __future__ import annotations
 
+import importlib
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from typing import TypeAlias
 
 from ..core.signal import (
     DetectorSignal,
@@ -40,7 +42,13 @@ from ..core.signal import (
 )
 from ._lexicon import IRREVERSIBLE, MUTATING, SYSTEM_TARGET, UNTRUSTED_ORIGINS
 
-__all__ = ["MCPToolCall", "MCPCallInspector", "serialise_call", "MCP_CALL_KEY"]
+__all__ = [
+    "MCPToolCall",
+    "MCPCallInspector",
+    "mcp_rust_scanner_available",
+    "serialise_call",
+    "MCP_CALL_KEY",
+]
 
 #: metadata key under which an :class:`MCPToolCall` is carried to the detectors.
 MCP_CALL_KEY = "mcp_call"
@@ -127,6 +135,10 @@ _READ_VERBS = frozenset(
     }
 )
 
+_RustMCPScan: TypeAlias = Callable[
+    [str, list[tuple[str, str, str, bool]]], tuple[float, str, str] | None
+]
+
 
 @dataclass(frozen=True)
 class MCPToolCall:
@@ -183,6 +195,23 @@ class _Finding:
     score: float
     severity: Severity
     reason: str
+
+
+def _load_rust_mcp_scan() -> _RustMCPScan | None:
+    try:
+        module = importlib.import_module("director_class_ai._rust")
+    except ImportError:
+        return None
+    scan = getattr(module, "mcp_structural_scan", None)
+    return scan if callable(scan) else None
+
+
+_RUST_MCP_SCAN = _load_rust_mcp_scan()
+
+
+def mcp_rust_scanner_available() -> bool:
+    """Return whether the optional Rust MCP structural scanner is importable."""
+    return _RUST_MCP_SCAN is not None
 
 
 def _taint_findings(call: MCPToolCall) -> list[_Finding]:
@@ -275,6 +304,58 @@ def _traversal_findings(call: MCPToolCall) -> list[_Finding]:
     return findings
 
 
+def _scan_python(call: MCPToolCall) -> tuple[float, Severity, str] | None:
+    findings = (
+        _taint_findings(call)
+        + _confused_deputy_findings(call)
+        + _exfiltration_findings(call)
+        + _traversal_findings(call)
+    )
+    if not findings:
+        return None
+    findings.sort(key=lambda f: (f.severity, f.score), reverse=True)
+    top = findings[0]
+    reasons = list(dict.fromkeys(f.reason for f in findings))[:3]
+    return top.score, top.severity, "; ".join(reasons)
+
+
+def _severity_from_rust(name: str) -> Severity | None:
+    try:
+        return Severity[name.upper()]
+    except KeyError:
+        return None
+
+
+def _rust_scan_to_python(
+    result: tuple[float, str, str] | None,
+) -> tuple[float, Severity, str] | None:
+    if result is None:
+        return None
+    score, severity_name, rationale = result
+    severity = _severity_from_rust(severity_name)
+    if severity is None:
+        return None
+    return score, severity, rationale
+
+
+def _rust_inputs(call: MCPToolCall) -> list[tuple[str, str, str, bool]]:
+    return [
+        (key, str(value), call.provenance_of(key), call.is_tainted(key))
+        for key, value in call.arguments.items()
+    ]
+
+
+def _scan_structural(call: MCPToolCall) -> tuple[float, Severity, str] | None:
+    python_result = _scan_python(call)
+    if _RUST_MCP_SCAN is None:
+        return python_result
+    try:
+        rust_result = _rust_scan_to_python(_RUST_MCP_SCAN(call.tool, _rust_inputs(call)))
+    except Exception:
+        return python_result
+    return rust_result if rust_result == python_result else python_result
+
+
 class MCPCallInspector:
     """Tier-0 action-plane detector for the structure of an MCP tool call."""
 
@@ -294,24 +375,16 @@ class MCPCallInspector:
             registry_signal = self._registry.evaluate(request)
             if isinstance(registry_signal, DetectorSignal):
                 return registry_signal
-        findings = (
-            _taint_findings(call)
-            + _confused_deputy_findings(call)
-            + _exfiltration_findings(call)
-            + _traversal_findings(call)
-        )
-        if not findings:
+        structural = _scan_structural(call)
+        if structural is None:
             return None
-        # Strongest first: severity dominates, then score; report the top reasons.
-        findings.sort(key=lambda f: (f.severity, f.score), reverse=True)
-        top = findings[0]
-        reasons = list(dict.fromkeys(f.reason for f in findings))[:3]
+        score, severity, rationale = structural
         return DetectorSignal(
             detector=self.name,
             plane=Plane.ACTION,
-            score=top.score,
+            score=score,
             locus=Locus.ACTION,
             signal_type="mcp_tool_call",
-            severity=top.severity,
-            rationale="; ".join(reasons),
+            severity=severity,
+            rationale=rationale,
         )

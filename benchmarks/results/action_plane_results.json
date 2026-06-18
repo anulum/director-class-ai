@@ -15,7 +15,7 @@
     "escalate": 3,
     "block": 191
   },
-  "latency_ms_p50": 0.5460919928736985,
+  "latency_ms_p50": 0.6579339969903231,
   "per_category": {
     "authorised-mutation": {
       "catastrophic_recall": null,
@@ -133,7 +133,7 @@
       "escalate": 3,
       "block": 191
     },
-    "latency_ms_p50": 0.5460919928736985,
+    "latency_ms_p50": 0.6579339969903231,
     "per_category": {
       "authorised-mutation": {
         "catastrophic_recall": null,
