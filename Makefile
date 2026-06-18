@@ -37,6 +37,9 @@ bench: ## Run the action-plane benchmark
 bench-evidence: ## Run action benchmark with evidence-grade metadata
 	$(PY) -m benchmarks.action_evidence
 
+phase4-intake: ## Validate Phase 4 task intake metadata
+	$(PY) tools/check_phase4_task_intake.py
+
 import-external: ## Import reviewed external JSONL: make import-external SURFACE=... INPUT=...
 	@test -n "$(SURFACE)" || (echo "SURFACE is required" && exit 2)
 	@test -n "$(INPUT)" || (echo "INPUT is required" && exit 2)
@@ -45,5 +48,5 @@ import-external: ## Import reviewed external JSONL: make import-external SURFACE
 redteam: ## Run the adversarial red-team benchmark
 	$(PY) -m benchmarks.adversarial_red_team
 
-preflight: spdx lint types test ## Full local gate before commit
+preflight: spdx phase4-intake lint types test ## Full local gate before commit
 	@echo "preflight OK"
