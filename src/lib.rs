@@ -6,7 +6,7 @@
 // Contact: www.anulum.li | protoscience@anulum.li
 // Director-Class AI — Rust command de-obfuscation core
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::io::Read;
 
 use base64::engine::general_purpose::STANDARD;
@@ -203,6 +203,32 @@ fn audit_verify_chain(
     Ok(audit_verify_chain_internal(&lines, head_json.as_deref()))
 }
 
+#[pyfunction]
+fn meta_extract_signal_features(
+    signals: Vec<(String, f64, String, String, String, f64)>,
+) -> PyResult<Vec<(String, f64)>> {
+    Ok(meta_extract_signal_features_internal(&signals))
+}
+
+#[pyfunction]
+fn meta_risk(
+    weights: Vec<(String, f64)>,
+    bias: f64,
+    features: Vec<(String, f64)>,
+) -> PyResult<f64> {
+    Ok(meta_risk_internal(&weights, bias, &features))
+}
+
+#[pyfunction]
+fn meta_fit(
+    rows: Vec<(Vec<(String, f64)>, i32)>,
+    iters: usize,
+    lr: f64,
+    l2: f64,
+) -> PyResult<(Vec<(String, f64)>, f64)> {
+    Ok(meta_fit_internal(&rows, iters, lr, l2))
+}
+
 #[pymodule]
 #[pyo3(name = "_rust")]
 fn rust_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -211,6 +237,9 @@ fn rust_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(mcp_structural_scan, module)?)?;
     module.add_function(wrap_pyfunction!(audit_entry_hash, module)?)?;
     module.add_function(wrap_pyfunction!(audit_verify_chain, module)?)?;
+    module.add_function(wrap_pyfunction!(meta_extract_signal_features, module)?)?;
+    module.add_function(wrap_pyfunction!(meta_risk, module)?)?;
+    module.add_function(wrap_pyfunction!(meta_fit, module)?)?;
     Ok(())
 }
 
@@ -1397,6 +1426,122 @@ fn python_json_string(text: &str) -> String {
     }
     out.push('"');
     out
+}
+
+fn meta_sigmoid(z: f64) -> f64 {
+    if z >= 0.0 {
+        1.0 / (1.0 + (-z).exp())
+    } else {
+        let e = z.exp();
+        e / (1.0 + e)
+    }
+}
+
+fn meta_extract_signal_features_internal(
+    signals: &[(String, f64, String, String, String, f64)],
+) -> Vec<(String, f64)> {
+    let mut features = vec![
+        ("signal_count".to_owned(), signals.len() as f64),
+        ("max_score".to_owned(), 0.0),
+        ("sum_score".to_owned(), 0.0),
+        ("mean_score".to_owned(), 0.0),
+        ("max_severity".to_owned(), 0.0),
+    ];
+    if signals.is_empty() {
+        return features;
+    }
+
+    let mut total = 0.0;
+    let mut max_score = 0.0_f64;
+    let mut max_severity = 0.0_f64;
+    for (detector, score, signal_type, locus, severity_name, severity_value) in signals {
+        total += *score;
+        max_score = max_score.max(*score);
+        max_severity = max_severity.max(*severity_value);
+        for (prefix, value) in [
+            ("detector", detector.as_str()),
+            ("signal_type", signal_type.as_str()),
+            ("locus", locus.as_str()),
+            ("severity", severity_name.as_str()),
+        ] {
+            meta_feature_max(&mut features, format!("{prefix}:{value}"), *score);
+        }
+    }
+
+    meta_feature_set(&mut features, "max_score", max_score);
+    meta_feature_set(&mut features, "sum_score", total.min(signals.len() as f64));
+    meta_feature_set(&mut features, "mean_score", total / signals.len() as f64);
+    meta_feature_set(&mut features, "max_severity", max_severity / 4.0);
+    features
+}
+
+fn meta_feature_set(features: &mut [(String, f64)], key: &str, value: f64) {
+    if let Some((_, current)) = features.iter_mut().find(|(name, _)| name == key) {
+        *current = value;
+    }
+}
+
+fn meta_feature_max(features: &mut Vec<(String, f64)>, key: String, value: f64) {
+    if let Some((_, current)) = features.iter_mut().find(|(name, _)| name == &key) {
+        *current = current.max(value);
+    } else {
+        features.push((key, value));
+    }
+}
+
+fn meta_risk_internal(weights: &[(String, f64)], bias: f64, features: &[(String, f64)]) -> f64 {
+    let weight_map: BTreeMap<&str, f64> = weights
+        .iter()
+        .map(|(name, value)| (name.as_str(), *value))
+        .collect();
+    let mut z = bias;
+    for (name, value) in features {
+        z += weight_map.get(name.as_str()).copied().unwrap_or(0.0) * value;
+    }
+    meta_sigmoid(z)
+}
+
+fn meta_fit_internal(
+    rows: &[(Vec<(String, f64)>, i32)],
+    iters: usize,
+    lr: f64,
+    l2: f64,
+) -> (Vec<(String, f64)>, f64) {
+    let mut feature_names = BTreeSet::new();
+    for (features, _) in rows {
+        for (name, _) in features {
+            feature_names.insert(name.clone());
+        }
+    }
+    let mut weights: BTreeMap<String, f64> =
+        feature_names.into_iter().map(|name| (name, 0.0)).collect();
+    let mut bias = 0.0;
+    let n = rows.len() as f64;
+    for _ in 0..iters {
+        let mut grad: BTreeMap<String, f64> =
+            weights.keys().map(|name| (name.clone(), 0.0)).collect();
+        let mut grad_bias = 0.0;
+        for (features, label) in rows {
+            let z = bias
+                + features
+                    .iter()
+                    .map(|(name, value)| weights.get(name).copied().unwrap_or(0.0) * value)
+                    .sum::<f64>();
+            let err = meta_sigmoid(z) - f64::from(*label);
+            grad_bias += err;
+            for (name, value) in features {
+                if let Some(current) = grad.get_mut(name) {
+                    *current += err * value;
+                }
+            }
+        }
+        bias -= lr * grad_bias / n;
+        for (name, weight) in weights.iter_mut() {
+            let gradient = grad.get(name).copied().unwrap_or(0.0);
+            *weight -= lr * ((gradient / n) + (l2 * *weight));
+        }
+    }
+    (weights.into_iter().collect(), bias)
 }
 
 fn is_unscoped_update(form: &str) -> bool {

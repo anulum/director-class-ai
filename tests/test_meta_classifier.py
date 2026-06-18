@@ -8,10 +8,13 @@
 
 from __future__ import annotations
 
+import importlib
+from types import SimpleNamespace
 from typing import cast
 
 import pytest
 
+import director_class_ai.core.meta_classifier as meta_classifier
 from director_class_ai.core import (
     DetectorSignal,
     Locus,
@@ -149,3 +152,158 @@ def test_meta_classifier_fusion_policy_is_explicit_opt_in() -> None:
     assert default.allow is False
     assert learned.allow is True
     assert learned.plane_risk[Plane.CONTENT] == pytest.approx(0.018, abs=0.001)
+
+
+class TestRustMetaClassifierParity:
+    def test_loader_ignores_missing_callables(self, monkeypatch) -> None:
+        module = SimpleNamespace(
+            meta_extract_signal_features=object(),
+            meta_risk=object(),
+            meta_fit=object(),
+        )
+        monkeypatch.setattr(importlib, "import_module", lambda _: module)
+
+        assert meta_classifier._load_rust_extract_features() is None
+        assert meta_classifier._load_rust_risk() is None
+        assert meta_classifier._load_rust_fit() is None
+
+    def test_feature_mismatch_falls_back_to_python(self, monkeypatch) -> None:
+        signals = [_sig(score=0.7)]
+        monkeypatch.setattr(
+            meta_classifier,
+            "_RUST_EXTRACT_FEATURES",
+            lambda _rows: [("signal_count", 999.0)],
+        )
+
+        assert meta_classifier.extract_signal_features(
+            signals
+        ) == meta_classifier._extract_signal_features_python(signals)
+
+    def test_feature_exception_falls_back_to_python(self, monkeypatch) -> None:
+        signals = [_sig(score=0.7)]
+
+        def broken_extract(_rows):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(meta_classifier, "_RUST_EXTRACT_FEATURES", broken_extract)
+        assert meta_classifier.extract_signal_features(
+            signals
+        ) == meta_classifier._extract_signal_features_python(signals)
+
+    def test_risk_mismatch_and_exception_fall_back_to_python(self, monkeypatch) -> None:
+        model = SignalMetaClassifier(weights={"max_score": 3.0}, bias=-1.0)
+        signals = [_sig(score=0.7)]
+        expected = model.risk(signals)
+
+        monkeypatch.setattr(meta_classifier, "_RUST_RISK", lambda _w, _b, _f: 0.0)
+        assert model.risk(signals) == pytest.approx(expected)
+
+        def broken_risk(_weights, _bias, _features):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(meta_classifier, "_RUST_RISK", broken_risk)
+        assert model.risk(signals) == pytest.approx(expected)
+
+    def test_fit_mismatch_and_exception_fall_back_to_python(self, monkeypatch) -> None:
+        observations = [([_sig(score=0.1)], 0), ([_sig(score=0.9)], 1)]
+        expected = fit_signal_meta_classifier(observations, iters=20, lr=0.2)
+        monkeypatch.setattr(
+            meta_classifier,
+            "_RUST_FIT",
+            lambda _rows, _iters, _lr, _l2: ([("max_score", 999.0)], 0.0),
+        )
+        assert fit_signal_meta_classifier(observations, iters=20, lr=0.2) == expected
+
+        def broken_fit(_rows, _iters, _lr, _l2):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(meta_classifier, "_RUST_FIT", broken_fit)
+        assert fit_signal_meta_classifier(observations, iters=20, lr=0.2) == expected
+
+    def test_model_match_helper_rejects_structural_drift(self) -> None:
+        rows = [({"max_score": 0.7}, 1)]
+        reference = SignalMetaClassifier(weights={"max_score": 1.0}, bias=0.0)
+
+        assert (
+            meta_classifier._model_matches_rows(
+                reference, SignalMetaClassifier(weights={"other": 1.0}, bias=0.0), rows
+            )
+            is False
+        )
+        assert (
+            meta_classifier._model_matches_rows(
+                reference,
+                SignalMetaClassifier(weights={"max_score": 2.0}, bias=0.0),
+                rows,
+            )
+            is False
+        )
+        assert (
+            meta_classifier._model_matches_rows(
+                reference,
+                SignalMetaClassifier(weights={"max_score": 1.0}, bias=1.0),
+                rows,
+            )
+            is False
+        )
+        assert (
+            meta_classifier._model_matches_rows(
+                SignalMetaClassifier(weights={"max_score": 0.0}, bias=0.0),
+                SignalMetaClassifier(weights={"max_score": 0.0000000000005}, bias=0.0),
+                [({"max_score": 1_000_000_000_000.0}, 1)],
+            )
+            is False
+        )
+
+    def test_model_match_helper_accepts_equivalent_models(self) -> None:
+        rows = [({"max_score": 0.7}, 1)]
+        model = SignalMetaClassifier(weights={"max_score": 1.0}, bias=0.0)
+
+        assert meta_classifier._model_matches_rows(model, model, rows) is True
+
+    def test_installed_rust_meta_primitives_match_python_when_present(self) -> None:
+        if (
+            meta_classifier._RUST_EXTRACT_FEATURES is None
+            or meta_classifier._RUST_RISK is None
+            or meta_classifier._RUST_FIT is None
+        ):
+            return
+        signals = [
+            _sig(detector="nli", score=0.8, signal_type="contradiction"),
+            _sig(detector="span", score=0.3, signal_type="unsupported"),
+        ]
+        features = meta_classifier._extract_signal_features_python(signals)
+        assert (
+            dict(
+                meta_classifier._RUST_EXTRACT_FEATURES(
+                    meta_classifier._rust_signal_rows(signals)
+                )
+            )
+            == features
+        )
+
+        model = SignalMetaClassifier(weights={"max_score": 3.0}, bias=-1.0)
+        assert meta_classifier._RUST_RISK(
+            list(model.weights.items()), model.bias, list(features.items())
+        ) == pytest.approx(model.risk(signals))
+
+        observations = [([_sig(score=0.1)], 0), ([_sig(score=0.9)], 1)]
+        rows = [
+            (meta_classifier._extract_signal_features_python(row_signals), label)
+            for row_signals, label in observations
+        ]
+        rust_weights, rust_bias = meta_classifier._RUST_FIT(
+            [(list(row_features.items()), label) for row_features, label in rows],
+            20,
+            0.2,
+            0.001,
+        )
+        rust_model = SignalMetaClassifier(weights=dict(rust_weights), bias=rust_bias)
+        python_model = meta_classifier._fit_signal_meta_classifier_python(
+            rows,
+            {name for row_features, _label in rows for name in row_features},
+            iters=20,
+            lr=0.2,
+            l2=0.001,
+        )
+        assert meta_classifier._model_matches_rows(python_model, rust_model, rows)
