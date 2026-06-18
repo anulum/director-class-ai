@@ -125,6 +125,22 @@ service = ApprovalService(
 )
 ```
 
+## Evidence packages
+
+`director_class_ai.evidence` emits redacted decision evidence for audit,
+compliance, and incident response. Packages bind the request digest, policy
+profile, capability grant ids, detector firings, approval state, action route,
+optional benchmark replay id, and hash-chain proof. Control mappings use bounded
+language for OWASP LLM risks, NIST AI RMF / GenAI profile, MCP security
+considerations, and buyer controls; they do not assert certification.
+
+```python
+from director_class_ai.evidence import build_evidence_package
+
+package = build_evidence_package(decision, policy_profile="pilot")
+event = package.to_json()
+```
+
 ## Local verification
 
 ```bash
