@@ -1,0 +1,22 @@
+[package]
+name = "director_class_ai_rust"
+version = "0.1.0"
+edition = "2021"
+license = "LicenseRef-Director-Class-AI-Commercial"
+description = "Rust command de-obfuscation core for Director-Class AI"
+repository = "https://github.com/anulum/director-class-ai"
+publish = false
+
+[lib]
+name = "director_class_ai_rust"
+crate-type = ["cdylib"]
+
+[dependencies]
+base64 = "0.22"
+bzip2 = "0.5"
+flate2 = "1.0"
+once_cell = "1.19"
+pyo3 = { version = "0.23", features = ["extension-module"] }
+regex = "1.10"
+unicode-normalization = "0.1"
+xz2 = "0.1"

@@ -8,8 +8,17 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+import pytest
+
+import director_class_ai.action._normalize as normalize
 from director_class_ai.action import DestructiveCommandDetector
-from director_class_ai.action._normalize import expand
+from director_class_ai.action._normalize import (
+    _expand_python,
+    expand,
+    rust_backend_available,
+)
 from director_class_ai.core import EvaluationRequest, Severity
 
 DET = DestructiveCommandDetector()
@@ -348,3 +357,80 @@ class TestExpandBounds:
         # a plain command yields no further transforms after the first layer
         forms = expand("ls -la")
         assert "ls -la" in forms
+
+
+class TestRustExpandParity:
+    def test_rust_backend_status_is_boolean(self) -> None:
+        assert isinstance(rust_backend_available(), bool)
+
+    def test_public_expand_preserves_python_reference_forms(self) -> None:
+        commands = (
+            "rm -r -f /",
+            "r''m -rf /",
+            "echo cm0gLXJmIC8K | base64 -d | bash",
+            r"\x72\x6d\x20\x2d\x72\x66\x20\x2f",
+            r"printf '\162\155' | xargs -I{} {} -rf /",
+            "X=rm; $X -rf /",
+            "{rm,-rf,/}",
+            "r\u200bm -rf /",
+        )
+        for command in commands:
+            assert expand(command) == _expand_python(command)
+
+    def test_loader_ignores_extension_without_callable_expand(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            normalize.importlib,
+            "import_module",
+            lambda _: SimpleNamespace(expand="not-callable"),
+        )
+
+        assert normalize._load_rust_expand() is None
+
+    def test_public_expand_accepts_exact_rust_parity(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        reference = _expand_python("rm -r -f /")
+
+        monkeypatch.setattr(normalize, "_load_rust_expand", lambda: lambda *_: reference)
+
+        assert normalize.expand("rm -r -f /") == reference
+
+    def test_public_expand_falls_back_on_rust_exception(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def broken_expand(command: str, max_depth: int, max_forms: int) -> list[str]:
+            raise RuntimeError("rust backend unavailable")
+
+        monkeypatch.setattr(normalize, "_load_rust_expand", lambda: broken_expand)
+
+        assert normalize.expand("rm -r -f /") == _expand_python("rm -r -f /")
+
+    def test_public_expand_falls_back_on_rust_mismatch(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(normalize, "_load_rust_expand", lambda: lambda *_: ["rm"])
+
+        assert normalize.expand("rm -r -f /") == _expand_python("rm -r -f /")
+
+    def test_installed_rust_backend_matches_reference_on_contract_cases(self) -> None:
+        if not rust_backend_available():
+            assert expand("rm -rf /") == _expand_python("rm -rf /")
+            return
+
+        from director_class_ai import _rust
+
+        commands = (
+            "rm -r -f /",
+            "r''m -rf /",
+            "echo cm0gLXJmIC8K | base64 -d | bash",
+            r"\x72\x6d\x20\x2d\x72\x66\x20\x2f",
+            r"\162\155",
+            "X=rm; $X -rf /",
+            "{rm,-rf,/}",
+            "$((2+3))",
+            "r\u200bm -rf /",
+        )
+        for command in commands:
+            assert _rust.expand(command, 4, 64) == _expand_python(command)

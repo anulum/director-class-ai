@@ -29,13 +29,15 @@ import base64
 import binascii
 import bz2
 import gzip
+import importlib
 import lzma
 import re
 import shlex
 import unicodedata
 import zlib
+from collections.abc import Callable
 
-__all__ = ["expand"]
+__all__ = ["expand", "rust_backend_available"]
 
 _MAX_DEPTH = 4
 _MAX_FORMS = 64
@@ -102,6 +104,23 @@ _HOMOGLYPHS = str.maketrans(
         "χ": "x",
     }
 )
+
+_RustExpand = Callable[[str, int, int], list[str]]
+
+
+def _load_rust_expand() -> _RustExpand | None:
+    """Return the optional Rust expander when the extension is installed."""
+    try:
+        rust_module = importlib.import_module("director_class_ai._rust")
+    except ImportError:
+        return None
+    expand_rust = getattr(rust_module, "expand", None)
+    return expand_rust if callable(expand_rust) else None
+
+
+def rust_backend_available() -> bool:
+    """Return whether the optional Rust normalisation extension can be imported."""
+    return _load_rust_expand() is not None
 
 
 def _printable_text(raw: bytes) -> str | None:
@@ -460,10 +479,10 @@ def _transform_once(command: str) -> list[str]:
     return out
 
 
-def expand(
+def _expand_python(
     command: str, *, max_depth: int = _MAX_DEPTH, max_forms: int = _MAX_FORMS
 ) -> list[str]:
-    """Return *command* plus its de-obfuscated equivalents, peeled recursively.
+    """Return the Python reference expansion for one command.
 
     ``max_depth`` bounds the nesting peeled (base64-in-hex-in-…) and ``max_forms``
     caps the breadth so a hostile input cannot blow up the work.
@@ -493,3 +512,24 @@ def expand(
             break
         frontier = nxt
     return forms
+
+
+def expand(
+    command: str, *, max_depth: int = _MAX_DEPTH, max_forms: int = _MAX_FORMS
+) -> list[str]:
+    """Return *command* plus its de-obfuscated equivalents, peeled recursively.
+
+    The optional Rust extension is used only when it produces the same ordered
+    forms as the Python reference. That parity guard keeps detector behaviour
+    stable while allowing the security-critical normalisation path to be
+    rustified incrementally.
+    """
+    reference = _expand_python(command, max_depth=max_depth, max_forms=max_forms)
+    rust_expand = _load_rust_expand()
+    if rust_expand is None:
+        return reference
+    try:
+        rust_forms = rust_expand(command, max_depth, max_forms)
+    except (RuntimeError, ValueError):
+        return reference
+    return rust_forms if rust_forms == reference else reference

@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.8,<2"]
+build-backend = "maturin"
 
 [project]
 name = "director-class-ai"
@@ -48,11 +48,10 @@ dev = [
     "hypothesis>=6",
 ]
 
-[tool.setuptools.packages.find]
-include = ["director_class_ai*"]
-
-[tool.setuptools.package-data]
-director_class_ai = ["py.typed"]
+[tool.maturin]
+module-name = "director_class_ai._rust"
+python-source = "."
+include = ["director_class_ai/py.typed"]
 
 [tool.ruff]
 line-length = 90
