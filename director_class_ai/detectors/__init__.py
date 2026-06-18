@@ -22,6 +22,7 @@ from .llm_judge import (
     LLMJudgeDetector,
     prompt_judge,
 )
+from .response_nli import ResponseNLIDetector, ResponseNLIScorer
 from .semantic_action_support import SemanticActionSupportDetector, SupportScorer
 from .token_span import TokenSpanContentDetector
 
@@ -31,6 +32,8 @@ __all__ = [
     "JudgeResult",
     "JudgeSpec",
     "LLMJudgeDetector",
+    "ResponseNLIDetector",
+    "ResponseNLIScorer",
     "SemanticActionSupportDetector",
     "SupportScorer",
     "TokenSpanContentDetector",

@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from director_class_ai.core import EvaluationRequest, Locus, Plane
 from director_class_ai.detectors import (
     ContradictionContentDetector,
+    ResponseNLIDetector,
     TokenSpanContentDetector,
 )
 
@@ -91,5 +92,51 @@ class TestContradictionAdapter:
 
     def test_missing_context_or_response_returns_none(self) -> None:
         adapter = ContradictionContentDetector(_FakeContradictionScorer(0.9))
+        assert adapter.evaluate(EvaluationRequest(response="r")) is None
+        assert adapter.evaluate(EvaluationRequest(context="c")) is None
+
+
+class _FakeResponseNLIScorer:
+    def __init__(self, value: float) -> None:
+        self._value = value
+        self.calls: list[tuple[str, str]] = []
+
+    def score(self, premise: str, hypothesis: str) -> float:
+        self.calls.append((premise, hypothesis))
+        return self._value
+
+
+class TestResponseNLIAdapter:
+    def test_divergent_response_flags_content_signal(self) -> None:
+        scorer = _FakeResponseNLIScorer(0.72)
+        adapter = ResponseNLIDetector(scorer)
+        sig = adapter.evaluate(
+            EvaluationRequest(context="The value is 10.", response="The value is 12.")
+        )
+
+        assert sig is not None
+        assert sig.plane is Plane.CONTENT and sig.locus is Locus.RESPONSE
+        assert sig.signal_type == "response_not_entailed"
+        assert sig.score == 0.72
+        assert sig.rationale.endswith("(divergence 0.72)")
+        assert scorer.calls == [("The value is 10.", "The value is 12.")]
+
+    def test_high_divergence_raises_severity(self) -> None:
+        adapter = ResponseNLIDetector(_FakeResponseNLIScorer(0.91))
+        sig = adapter.evaluate(EvaluationRequest(context="A", response="B"))
+
+        assert sig is not None
+        assert sig.severity.name == "HIGH"
+
+    def test_below_threshold_returns_none(self) -> None:
+        adapter = ResponseNLIDetector(_FakeResponseNLIScorer(0.2))
+        assert adapter.evaluate(EvaluationRequest(context="A", response="A")) is None
+
+    def test_custom_threshold(self) -> None:
+        adapter = ResponseNLIDetector(_FakeResponseNLIScorer(0.4), threshold=0.3)
+        assert adapter.evaluate(EvaluationRequest(context="A", response="B")) is not None
+
+    def test_missing_context_or_response_returns_none(self) -> None:
+        adapter = ResponseNLIDetector(_FakeResponseNLIScorer(0.9))
         assert adapter.evaluate(EvaluationRequest(response="r")) is None
         assert adapter.evaluate(EvaluationRequest(context="c")) is None
