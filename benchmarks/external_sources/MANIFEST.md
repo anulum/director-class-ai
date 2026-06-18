@@ -13,6 +13,11 @@ the action-plane benchmark only when the corresponding local JSONL artefact is
 present. Missing artefacts are skipped and recorded as not loaded; no examples are
 fabricated from benchmark names.
 
+`SOURCE_LEDGER.json` is the structured licence/provenance gate. A present local
+JSONL artefact is rejected unless its surface has a matching source-review row
+with `import_allowed=true`; paper-level or unverified licence evidence remains
+fail-closed.
+
 Expected JSONL case schema: `id`, `action`, `label`, `category`, and `severity`
 are required. Optional fields follow `benchmarks/data/action_corpus.jsonl`,
 including `query`, `context`, `provenance`, `expected_route`, and `mcp_call`.

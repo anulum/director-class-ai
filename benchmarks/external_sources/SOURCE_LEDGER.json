@@ -1,0 +1,98 @@
+[
+  {
+    "surface": "AgentDojo-style",
+    "upstream_url": "https://github.com/ethz-spylab/agentdojo",
+    "licence": "MIT",
+    "licence_url": "https://github.com/ethz-spylab/agentdojo/blob/main/LICENSE",
+    "licence_status": "allow",
+    "provenance_review": "Repository page and licence identify MIT; import still requires a local JSONL export that preserves upstream notices.",
+    "import_allowed": true,
+    "reviewed_at": "2026-06-18",
+    "citation": "https://openreview.net/forum?id=m1YYAQjO3w",
+    "notes": "Do not copy examples into authored corpus; load only under external partition."
+  },
+  {
+    "surface": "MSB MCP Security Bench-style",
+    "upstream_url": "https://github.com/dongsenzhang/MSB",
+    "licence": "MIT",
+    "licence_url": "https://github.com/dongsenzhang/MSB",
+    "licence_status": "allow",
+    "provenance_review": "Repository page identifies MIT; import still requires a local JSONL export that preserves upstream notices.",
+    "import_allowed": true,
+    "reviewed_at": "2026-06-18",
+    "citation": "https://openreview.net/forum?id=irxxkFMrry",
+    "notes": "Use only external partition rows with MSB source metadata."
+  },
+  {
+    "surface": "MCPSecBench-style",
+    "upstream_url": "https://github.com/AIS2Lab/MCPSecBench",
+    "licence": "MIT",
+    "licence_url": "https://github.com/AIS2Lab/MCPSecBench",
+    "licence_status": "allow",
+    "provenance_review": "Repository page states release under MIT; import still requires a local JSONL export that preserves upstream notices.",
+    "import_allowed": true,
+    "reviewed_at": "2026-06-18",
+    "citation": "https://arxiv.org/abs/2508.13220",
+    "notes": "Keep MCP host/provider evaluation rows separate from authored regression rows."
+  },
+  {
+    "surface": "MCP-SafetyBench-style",
+    "upstream_url": "https://github.com/xjzzzzzzzz/MCPSafety",
+    "licence": "not verified for repository artefacts",
+    "licence_url": "https://openreview.net/forum?id=7XYjeL46co",
+    "licence_status": "requires_review",
+    "provenance_review": "Paper page is CC BY 4.0, but repository artefact licence was not verified from the local review; fail closed.",
+    "import_allowed": false,
+    "reviewed_at": "2026-06-18",
+    "citation": "https://openreview.net/forum?id=7XYjeL46co",
+    "notes": "Do not load local JSONL exports until repository data licence is verified."
+  },
+  {
+    "surface": "SkillInject-style",
+    "upstream_url": "https://www.skill-inject.com/",
+    "licence": "not verified for benchmark artefacts",
+    "licence_url": "",
+    "licence_status": "requires_review",
+    "provenance_review": "Benchmark availability was identified, but local-use licence evidence was not verified; fail closed.",
+    "import_allowed": false,
+    "reviewed_at": "2026-06-18",
+    "citation": "https://arxiv.org/abs/2602.20156",
+    "notes": "Use taxonomy alignment only until an artefact licence is reviewed."
+  },
+  {
+    "surface": "InjecAgent-style",
+    "upstream_url": "https://github.com/uiuc-kang-lab/InjecAgent",
+    "licence": "not verified for repository artefacts",
+    "licence_url": "",
+    "licence_status": "requires_review",
+    "provenance_review": "Repository describes the benchmark, but local-use licence evidence was not found in this review; fail closed.",
+    "import_allowed": false,
+    "reviewed_at": "2026-06-18",
+    "citation": "https://arxiv.org/abs/2403.02691",
+    "notes": "Do not load local exports until repository licence terms are verified."
+  },
+  {
+    "surface": "Agent Security Bench-style",
+    "upstream_url": "https://github.com/agiresearch/ASB",
+    "licence": "MIT",
+    "licence_url": "https://github.com/agiresearch/ASB/blob/main/LICENSE",
+    "licence_status": "allow",
+    "provenance_review": "Repository licence is MIT; import still requires a local JSONL export that preserves upstream notices.",
+    "import_allowed": true,
+    "reviewed_at": "2026-06-18",
+    "citation": "https://openreview.net/forum?id=V4y0CpX4hK",
+    "notes": "Keep scenario and attack-family metadata in the external partition."
+  },
+  {
+    "surface": "Browser-computer-use injection-style",
+    "upstream_url": "https://arxiv.org/abs/2506.02456",
+    "licence": "not verified for benchmark artefacts",
+    "licence_url": "",
+    "licence_status": "requires_review",
+    "provenance_review": "Browser/computer-use benchmark direction is tracked, but local artefact licence was not verified; fail closed.",
+    "import_allowed": false,
+    "reviewed_at": "2026-06-18",
+    "citation": "https://arxiv.org/abs/2506.02456",
+    "notes": "Use original authored browser cases until an external artefact licence is reviewed."
+  }
+]

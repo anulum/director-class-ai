@@ -14,18 +14,35 @@ import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal, cast
 
 __all__ = [
     "ExternalSource",
+    "ExternalSourceReview",
     "load_external_cases",
     "load_manifest",
+    "load_source_reviews",
     "source_inventory",
 ]
 
 _HERE = Path(__file__).resolve().parent
 _DEFAULT_MANIFEST = _HERE / "external_sources" / "MANIFEST.md"
+_DEFAULT_SOURCE_LEDGER = _HERE / "external_sources" / "SOURCE_LEDGER.json"
 _REQUIRED = frozenset({"id", "action", "label", "category", "severity"})
 _LABELS = frozenset({"catastrophic", "safe"})
+_REVIEW_REQUIRED = frozenset(
+    {
+        "surface",
+        "upstream_url",
+        "licence",
+        "licence_url",
+        "licence_status",
+        "provenance_review",
+        "import_allowed",
+    }
+)
+LicenceStatus = Literal["allow", "blocked", "requires_review"]
+CaseRow = dict[str, object]
 
 
 @dataclass(frozen=True)
@@ -43,6 +60,86 @@ class ExternalSource:
         return (manifest_path.parent / self.local_artifact).resolve()
 
 
+@dataclass(frozen=True)
+class ExternalSourceReview:
+    """Licence and provenance review for one external benchmark surface.
+
+    Parameters
+    ----------
+    surface:
+        Manifest surface name that this review authorises or blocks.
+    upstream_url:
+        Canonical upstream repository, paper, or project page used for review.
+    licence:
+        Human-readable licence finding recorded at review time.
+    licence_url:
+        URL for the licence evidence, when one was found.
+    licence_status:
+        Import decision state. Only ``"allow"`` permits local JSONL loading.
+    provenance_review:
+        Operator-readable explanation of the current provenance boundary.
+    import_allowed:
+        Explicit fail-closed gate for local artefact loading.
+    reviewed_at:
+        UTC date or timestamp for the review evidence.
+    citation:
+        Optional paper or benchmark citation URL.
+    notes:
+        Optional bounded notes that do not override ``import_allowed``.
+    """
+
+    surface: str
+    upstream_url: str
+    licence: str
+    licence_url: str
+    licence_status: LicenceStatus
+    provenance_review: str
+    import_allowed: bool
+    reviewed_at: str = ""
+    citation: str = ""
+    notes: str = ""
+
+    @classmethod
+    def from_mapping(
+        cls, value: object, *, path: Path, index: int
+    ) -> ExternalSourceReview:
+        """Build a review from a JSON object and validate its required fields."""
+        if not isinstance(value, dict):
+            raise ValueError(f"{path}: review {index} must be a JSON object")
+        missing = _REVIEW_REQUIRED.difference(value)
+        if missing:
+            raise ValueError(f"{path}: review {index} missing fields {sorted(missing)}")
+        status = str(value["licence_status"])
+        if status not in {"allow", "blocked", "requires_review"}:
+            raise ValueError(f"{path}: review {index} has bad licence_status {status!r}")
+        return cls(
+            surface=str(value["surface"]),
+            upstream_url=str(value["upstream_url"]),
+            licence=str(value["licence"]),
+            licence_url=str(value["licence_url"]),
+            licence_status=cast(LicenceStatus, status),
+            provenance_review=str(value["provenance_review"]),
+            import_allowed=bool(value["import_allowed"]),
+            reviewed_at=str(value.get("reviewed_at", "")),
+            citation=str(value.get("citation", "")),
+            notes=str(value.get("notes", "")),
+        )
+
+    def to_inventory(self) -> dict[str, object]:
+        """Return the review fields safe to expose in benchmark evidence."""
+        return {
+            "upstream_url": self.upstream_url,
+            "licence": self.licence,
+            "licence_url": self.licence_url,
+            "licence_status": self.licence_status,
+            "provenance_review": self.provenance_review,
+            "import_allowed": self.import_allowed,
+            "reviewed_at": self.reviewed_at,
+            "citation": self.citation,
+            "notes": self.notes,
+        }
+
+
 def load_manifest(path: Path = _DEFAULT_MANIFEST) -> list[ExternalSource]:
     """Parse the external-source Markdown manifest table."""
     if not path.exists():
@@ -58,44 +155,108 @@ def load_manifest(path: Path = _DEFAULT_MANIFEST) -> list[ExternalSource]:
     return rows
 
 
-def source_inventory(path: Path = _DEFAULT_MANIFEST) -> list[dict[str, object]]:
+def load_source_reviews(
+    path: Path = _DEFAULT_SOURCE_LEDGER,
+) -> dict[str, ExternalSourceReview]:
+    """Load structured licence/provenance reviews for external surfaces."""
+    if not path.exists():
+        return {}
+    loaded = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(loaded, list):
+        raise ValueError(f"{path}: source ledger must be a JSON array")
+    reviews: dict[str, ExternalSourceReview] = {}
+    for index, item in enumerate(loaded, start=1):
+        review = ExternalSourceReview.from_mapping(item, path=path, index=index)
+        if review.surface in reviews:
+            raise ValueError(f"{path}: duplicate source review {review.surface!r}")
+        reviews[review.surface] = review
+    return reviews
+
+
+def source_inventory(
+    path: Path = _DEFAULT_MANIFEST,
+    *,
+    review_path: Path | None = None,
+) -> list[dict[str, object]]:
     """Return load status for every manifest row, without reading missing files."""
     inventory: list[dict[str, object]] = []
+    reviews = load_source_reviews(_review_path(path, review_path))
     for source in load_manifest(path):
         artifact_path = source.artifact_path(path)
+        review = reviews.get(source.surface)
         inventory.append(
             {
                 "surface": source.surface,
                 "threat_taxonomy": source.threat_taxonomy,
-                "licence": source.licence,
                 "provenance": source.provenance,
                 "local_artifact": source.local_artifact,
                 "status": source.status,
                 "loaded": artifact_path.is_file(),
+                "reviewed": review is not None,
+                "import_allowed": review.import_allowed if review is not None else False,
+                "licence_status": (
+                    review.licence_status if review is not None else "requires_review"
+                ),
+                **(
+                    review.to_inventory()
+                    if review is not None
+                    else {
+                        "upstream_url": "",
+                        "licence": source.licence,
+                        "licence_url": "",
+                        "provenance_review": "no structured source review",
+                        "reviewed_at": "",
+                        "citation": "",
+                        "notes": "",
+                    }
+                ),
             }
         )
     return inventory
 
 
-def load_external_cases(path: Path = _DEFAULT_MANIFEST) -> list[dict]:
+def load_external_cases(
+    path: Path = _DEFAULT_MANIFEST,
+    *,
+    review_path: Path | None = None,
+) -> list[CaseRow]:
     """Load only external JSONL artefacts that are already present locally."""
-    cases: list[dict] = []
+    cases: list[CaseRow] = []
+    reviews = load_source_reviews(_review_path(path, review_path))
     for source in load_manifest(path):
         artifact_path = source.artifact_path(path)
         if not artifact_path.is_file():
             continue
+        review = reviews.get(source.surface)
+        if review is None:
+            raise ValueError(
+                f"{artifact_path}: missing source review for {source.surface}"
+            )
+        if not review.import_allowed:
+            raise ValueError(
+                f"{artifact_path}: source review does not allow import for "
+                f"{source.surface}"
+            )
         loaded = _load_jsonl(artifact_path)
         _validate_external_cases(loaded, artifact_path)
-        cases.extend(_with_external_metadata(source, loaded))
+        cases.extend(_with_external_metadata(source, review, loaded))
     return cases
+
+
+def _review_path(manifest_path: Path, review_path: Path | None) -> Path:
+    if review_path is not None:
+        return review_path
+    if manifest_path == _DEFAULT_MANIFEST:
+        return _DEFAULT_SOURCE_LEDGER
+    return manifest_path.parent / "SOURCE_LEDGER.json"
 
 
 def _clean_cell(value: str) -> str:
     return value.strip().strip("`").strip()
 
 
-def _load_jsonl(path: Path) -> list[dict]:
-    rows: list[dict] = []
+def _load_jsonl(path: Path) -> list[CaseRow]:
+    rows: list[CaseRow] = []
     for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         if not line.strip():
             continue
@@ -106,7 +267,7 @@ def _load_jsonl(path: Path) -> list[dict]:
     return rows
 
 
-def _validate_external_cases(cases: Iterable[dict], path: Path) -> None:
+def _validate_external_cases(cases: Iterable[CaseRow], path: Path) -> None:
     ids: set[str] = set()
     for case in cases:
         missing = _REQUIRED.difference(case)
@@ -119,13 +280,20 @@ def _validate_external_cases(cases: Iterable[dict], path: Path) -> None:
         ids.add(str(case["id"]))
 
 
-def _with_external_metadata(source: ExternalSource, cases: Iterable[dict]) -> list[dict]:
-    enriched: list[dict] = []
+def _with_external_metadata(
+    source: ExternalSource,
+    review: ExternalSourceReview,
+    cases: Iterable[CaseRow],
+) -> list[CaseRow]:
+    enriched: list[CaseRow] = []
     for case in cases:
         row = dict(case)
         row["id"] = f"{source.surface}:{case['id']}"
         row["external_surface"] = source.surface
         row["external_threat_taxonomy"] = source.threat_taxonomy
+        row["external_licence"] = review.licence
+        row["external_licence_url"] = review.licence_url
+        row["external_upstream_url"] = review.upstream_url
         row["source"] = f"external:{source.surface}"
         enriched.append(row)
     return enriched

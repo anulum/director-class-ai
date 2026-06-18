@@ -15,7 +15,7 @@
     "escalate": 3,
     "block": 191
   },
-  "latency_ms_p50": 0.5110540078021586,
+  "latency_ms_p50": 0.5554080125875771,
   "per_category": {
     "authorised-mutation": {
       "catastrophic_recall": null,
@@ -133,7 +133,7 @@
       "escalate": 3,
       "block": 191
     },
-    "latency_ms_p50": 0.5110540078021586,
+    "latency_ms_p50": 0.5554080125875771,
     "per_category": {
       "authorised-mutation": {
         "catastrophic_recall": null,
@@ -273,74 +273,146 @@
     {
       "surface": "AgentDojo-style",
       "threat_taxonomy": "Indirect prompt injection into tool/action use",
-      "licence": "Not vendored; verify upstream licence before local import",
       "provenance": "Local export required; not copied into this repo",
       "local_artifact": "agentdojo_action_cases.jsonl",
       "status": "absent",
-      "loaded": false
+      "loaded": false,
+      "reviewed": true,
+      "import_allowed": true,
+      "licence_status": "allow",
+      "upstream_url": "https://github.com/ethz-spylab/agentdojo",
+      "licence": "MIT",
+      "licence_url": "https://github.com/ethz-spylab/agentdojo/blob/main/LICENSE",
+      "provenance_review": "Repository page and licence identify MIT; import still requires a local JSONL export that preserves upstream notices.",
+      "reviewed_at": "2026-06-18",
+      "citation": "https://openreview.net/forum?id=m1YYAQjO3w",
+      "notes": "Do not copy examples into authored corpus; load only under external partition."
     },
     {
       "surface": "MSB MCP Security Bench-style",
       "threat_taxonomy": "MCP server/tool security and confused-deputy misuse",
-      "licence": "Not vendored; verify upstream licence before local import",
       "provenance": "Local export required; not copied into this repo",
       "local_artifact": "msb_mcp_security_action_cases.jsonl",
       "status": "absent",
-      "loaded": false
+      "loaded": false,
+      "reviewed": true,
+      "import_allowed": true,
+      "licence_status": "allow",
+      "upstream_url": "https://github.com/dongsenzhang/MSB",
+      "licence": "MIT",
+      "licence_url": "https://github.com/dongsenzhang/MSB",
+      "provenance_review": "Repository page identifies MIT; import still requires a local JSONL export that preserves upstream notices.",
+      "reviewed_at": "2026-06-18",
+      "citation": "https://openreview.net/forum?id=irxxkFMrry",
+      "notes": "Use only external partition rows with MSB source metadata."
     },
     {
       "surface": "MCPSecBench-style",
       "threat_taxonomy": "MCP protocol attack and unsafe tool-call behaviour",
-      "licence": "Not vendored; verify upstream licence before local import",
       "provenance": "Local export required; not copied into this repo",
       "local_artifact": "mcpsecbench_action_cases.jsonl",
       "status": "absent",
-      "loaded": false
+      "loaded": false,
+      "reviewed": true,
+      "import_allowed": true,
+      "licence_status": "allow",
+      "upstream_url": "https://github.com/AIS2Lab/MCPSecBench",
+      "licence": "MIT",
+      "licence_url": "https://github.com/AIS2Lab/MCPSecBench",
+      "provenance_review": "Repository page states release under MIT; import still requires a local JSONL export that preserves upstream notices.",
+      "reviewed_at": "2026-06-18",
+      "citation": "https://arxiv.org/abs/2508.13220",
+      "notes": "Keep MCP host/provider evaluation rows separate from authored regression rows."
     },
     {
       "surface": "MCP-SafetyBench-style",
       "threat_taxonomy": "MCP safety and tool-use attack surfaces",
-      "licence": "Not vendored; verify upstream licence before local import",
       "provenance": "Local export required; not copied into this repo",
       "local_artifact": "mcp_safetybench_action_cases.jsonl",
       "status": "absent",
-      "loaded": false
+      "loaded": false,
+      "reviewed": true,
+      "import_allowed": false,
+      "licence_status": "requires_review",
+      "upstream_url": "https://github.com/xjzzzzzzzz/MCPSafety",
+      "licence": "not verified for repository artefacts",
+      "licence_url": "https://openreview.net/forum?id=7XYjeL46co",
+      "provenance_review": "Paper page is CC BY 4.0, but repository artefact licence was not verified from the local review; fail closed.",
+      "reviewed_at": "2026-06-18",
+      "citation": "https://openreview.net/forum?id=7XYjeL46co",
+      "notes": "Do not load local JSONL exports until repository data licence is verified."
     },
     {
       "surface": "SkillInject-style",
       "threat_taxonomy": "Skill/tool supply-chain instruction injection",
-      "licence": "Not vendored; verify upstream licence before local import",
       "provenance": "Local export required; not copied into this repo",
       "local_artifact": "skillinject_action_cases.jsonl",
       "status": "absent",
-      "loaded": false
+      "loaded": false,
+      "reviewed": true,
+      "import_allowed": false,
+      "licence_status": "requires_review",
+      "upstream_url": "https://www.skill-inject.com/",
+      "licence": "not verified for benchmark artefacts",
+      "licence_url": "",
+      "provenance_review": "Benchmark availability was identified, but local-use licence evidence was not verified; fail closed.",
+      "reviewed_at": "2026-06-18",
+      "citation": "https://arxiv.org/abs/2602.20156",
+      "notes": "Use taxonomy alignment only until an artefact licence is reviewed."
     },
     {
       "surface": "InjecAgent-style",
       "threat_taxonomy": "Agent tool-use injection and malicious instruction transfer",
-      "licence": "Not vendored; verify upstream licence before local import",
       "provenance": "Local export required; not copied into this repo",
       "local_artifact": "injecagent_action_cases.jsonl",
       "status": "absent",
-      "loaded": false
+      "loaded": false,
+      "reviewed": true,
+      "import_allowed": false,
+      "licence_status": "requires_review",
+      "upstream_url": "https://github.com/uiuc-kang-lab/InjecAgent",
+      "licence": "not verified for repository artefacts",
+      "licence_url": "",
+      "provenance_review": "Repository describes the benchmark, but local-use licence evidence was not found in this review; fail closed.",
+      "reviewed_at": "2026-06-18",
+      "citation": "https://arxiv.org/abs/2403.02691",
+      "notes": "Do not load local exports until repository licence terms are verified."
     },
     {
       "surface": "Agent Security Bench-style",
       "threat_taxonomy": "Agent security tasks, unsafe action routing, and tool misuse",
-      "licence": "Not vendored; verify upstream licence before local import",
       "provenance": "Local export required; not copied into this repo",
       "local_artifact": "agent_security_bench_action_cases.jsonl",
       "status": "absent",
-      "loaded": false
+      "loaded": false,
+      "reviewed": true,
+      "import_allowed": true,
+      "licence_status": "allow",
+      "upstream_url": "https://github.com/agiresearch/ASB",
+      "licence": "MIT",
+      "licence_url": "https://github.com/agiresearch/ASB/blob/main/LICENSE",
+      "provenance_review": "Repository licence is MIT; import still requires a local JSONL export that preserves upstream notices.",
+      "reviewed_at": "2026-06-18",
+      "citation": "https://openreview.net/forum?id=V4y0CpX4hK",
+      "notes": "Keep scenario and attack-family metadata in the external partition."
     },
     {
       "surface": "Browser-computer-use injection-style",
       "threat_taxonomy": "Browser/computer-use prompt injection, UI drift, and exfiltration",
-      "licence": "Not vendored; verify upstream licence before local import",
       "provenance": "Local export required; not copied into this repo",
       "local_artifact": "browser_computer_use_action_cases.jsonl",
       "status": "absent",
-      "loaded": false
+      "loaded": false,
+      "reviewed": true,
+      "import_allowed": false,
+      "licence_status": "requires_review",
+      "upstream_url": "https://arxiv.org/abs/2506.02456",
+      "licence": "not verified for benchmark artefacts",
+      "licence_url": "",
+      "provenance_review": "Browser/computer-use benchmark direction is tracked, but local artefact licence was not verified; fail closed.",
+      "reviewed_at": "2026-06-18",
+      "citation": "https://arxiv.org/abs/2506.02456",
+      "notes": "Use original authored browser cases until an external artefact licence is reviewed."
     }
   ]
 }

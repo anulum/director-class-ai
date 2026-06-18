@@ -40,6 +40,7 @@ import json
 import sys
 import time
 from collections import defaultdict
+from collections.abc import Mapping
 from pathlib import Path
 
 sys.path.insert(0, ".")
@@ -75,6 +76,8 @@ from director_class_ai.core import (  # noqa: E402
 _CORPUS = Path(__file__).parent / "data" / "action_corpus.jsonl"
 _EXTERNAL_MANIFEST = Path(__file__).parent / "external_sources" / "MANIFEST.md"
 _RESULTS = Path(__file__).parent / "results" / "action_plane_results.json"
+CaseRow = dict[str, object]
+MetricRow = dict[str, object]
 
 # An expected_route in the corpus maps to the operational outcome it should yield.
 _ROUTE_OUTCOME = {
@@ -93,8 +96,16 @@ def _outcome(decision: Decision) -> str:
     return "escalate" if decision.escalated else "block"
 
 
-def _load(path: Path) -> list[dict]:
-    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+def _load(path: Path) -> list[CaseRow]:
+    rows: list[CaseRow] = []
+    for lineno, line in enumerate(path.read_text().splitlines(), start=1):
+        if not line.strip():
+            continue
+        loaded = json.loads(line)
+        if not isinstance(loaded, dict):
+            raise ValueError(f"{path}:{lineno} must contain a JSON object")
+        rows.append(loaded)
+    return rows
 
 
 def _governor() -> Governor:
@@ -113,35 +124,37 @@ def _governor() -> Governor:
     return Governor(ensemble=ensemble)  # no approver: escalation => not permitted
 
 
-def _request(case: dict) -> EvaluationRequest:
+def _request(case: Mapping[str, object]) -> EvaluationRequest:
     """Build the evaluation request, with the structured MCP path when present."""
-    metadata = dict(case.get("metadata", {}))
+    metadata = _mapping(case.get("metadata"))
     mcp = case.get("mcp_call")
-    if mcp:
+    if isinstance(mcp, Mapping):
         call = MCPToolCall(
-            server=mcp.get("server", ""),
-            tool=mcp.get("tool", ""),
-            arguments=mcp.get("arguments", {}),
-            arg_provenance=mcp.get("arg_provenance", {}),
-            default_provenance=mcp.get("default_provenance", case.get("provenance", "")),
+            server=str(mcp.get("server", "")),
+            tool=str(mcp.get("tool", "")),
+            arguments=_mapping(mcp.get("arguments")),
+            arg_provenance=_string_mapping(mcp.get("arg_provenance")),
+            default_provenance=str(
+                mcp.get("default_provenance", case.get("provenance", ""))
+            ),
         )
         return EvaluationRequest(
             action=serialise_call(call),
-            query=case.get("query", ""),
-            context=case.get("context", ""),
+            query=str(case.get("query", "")),
+            context=str(case.get("context", "")),
             action_provenance=call.default_provenance,
             metadata={**metadata, MCP_CALL_KEY: call},
         )
     return EvaluationRequest(
-        action=case["action"],
-        query=case.get("query", ""),
-        context=case.get("context", ""),
-        action_provenance=case.get("provenance", ""),
+        action=str(case["action"]),
+        query=str(case.get("query", "")),
+        context=str(case.get("context", "")),
+        action_provenance=str(case.get("provenance", "")),
         metadata=metadata,
     )
 
 
-def _evaluate_cases(corpus: list[dict]) -> dict:
+def _evaluate_cases(corpus: list[CaseRow]) -> MetricRow:
     gov = _governor()
     by_cat: dict[str, dict[str, int]] = defaultdict(
         lambda: {"catastrophic": 0, "caught": 0, "safe": 0, "false_block": 0}
@@ -158,7 +171,7 @@ def _evaluate_cases(corpus: list[dict]) -> dict:
         outcome = _outcome(decision)
         outcomes[outcome] += 1
         flagged = outcome != "allow"  # blocked or escalated — a human gate stops it
-        cat = case.get("category", "other")
+        cat = str(case.get("category", "other"))
         if decision.escalated:
             escalated += 1
         if case["label"] == "catastrophic":
@@ -176,7 +189,7 @@ def _evaluate_cases(corpus: list[dict]) -> dict:
             elif outcome == "escalate":  # soft, recoverable — sent to a human
                 false_escalation += 1
             # Conformance: does a safe case's outcome match its declared route?
-            expected = _ROUTE_OUTCOME.get(case.get("expected_route", ""))
+            expected = _ROUTE_OUTCOME.get(str(case.get("expected_route", "")))
             if expected is not None:
                 route_checked += 1
                 route_conformant += outcome == expected
@@ -208,7 +221,11 @@ def _evaluate_cases(corpus: list[dict]) -> dict:
     }
 
 
-def evaluate(corpus: list[dict], *, external_corpus: list[dict] | None = None) -> dict:
+def evaluate(
+    corpus: list[CaseRow],
+    *,
+    external_corpus: list[CaseRow] | None = None,
+) -> MetricRow:
     external_cases = external_corpus or []
     validate_partition_boundaries(corpus, "authored")
     validate_partition_boundaries(external_cases, "external")
@@ -228,7 +245,7 @@ def evaluate(corpus: list[dict], *, external_corpus: list[dict] | None = None) -
     }
 
 
-def _markdown(r: dict) -> str:
+def _markdown(r: Mapping[str, object]) -> str:
     conformance = r["safe_route_conformance"]
     conformance_s = "n/a" if conformance is None else f"{conformance:.3f}"
     lines = [
@@ -244,6 +261,16 @@ def _markdown(r: dict) -> str:
         f"- latency p50: {r['latency_ms_p50']:.3f} ms",
     ]
     return "\n".join(lines)
+
+
+def _mapping(value: object) -> dict[str, object]:
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _string_mapping(value: object) -> dict[str, str]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(key): str(item) for key, item in value.items()}
 
 
 def main() -> None:

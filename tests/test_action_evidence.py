@@ -86,6 +86,8 @@ def test_markdown_report_keeps_claim_boundary_and_source_separation() -> None:
             {
                 "surface": "AgentDojo-style",
                 "licence": "not vendored",
+                "licence_status": "requires_review",
+                "import_allowed": False,
                 "status": "absent",
                 "loaded": False,
             },
@@ -97,4 +99,5 @@ def test_markdown_report_keeps_claim_boundary_and_source_separation() -> None:
     assert "authored n: 2" in report
     assert "external n: 0" in report
     assert "AgentDojo-style: loaded=False" in report
+    assert "import_allowed=False" in report
     assert "Public comparative claims require isolated execution" in report

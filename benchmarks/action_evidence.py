@@ -262,14 +262,17 @@ def render_markdown_report(evidence: BenchmarkEvidence) -> str:
             f"- authored n: {authored['n']}",
             f"- external n: {external['n']}",
             f"- customer/private n: {_customer_private_n(metrics)}",
-            f"- catastrophic recall: {float(metrics['catastrophic_recall']):.3f}",
-            f"- false hard-block rate: {float(metrics['false_block_rate']):.3f}",
-            f"- false escalation rate: {float(metrics['false_escalation_rate']):.3f}",
+            f"- catastrophic recall: {_metric_float(metrics, 'catastrophic_recall'):.3f}",
+            f"- false hard-block rate: {_metric_float(metrics, 'false_block_rate'):.3f}",
+            (
+                "- false escalation rate: "
+                f"{_metric_float(metrics, 'false_escalation_rate'):.3f}"
+            ),
             (
                 "- safe route conformance: "
                 f"{_format_optional(metrics['safe_route_conformance'])}"
             ),
-            f"- elapsed: {float(metrics['elapsed_ms']):.3f} ms",
+            f"- elapsed: {_metric_float(metrics, 'elapsed_ms'):.3f} ms",
             "",
             "## External Sources",
             "",
@@ -379,7 +382,16 @@ def _format_load(load: tuple[float, float, float] | None) -> str:
 def _format_optional(value: object) -> str:
     if value is None:
         return "n/a"
+    if not isinstance(value, int | float | str):
+        raise TypeError("optional metric must be numeric")
     return f"{float(value):.3f}"
+
+
+def _metric_float(metrics: Mapping[str, object], key: str) -> float:
+    value = metrics[key]
+    if not isinstance(value, int | float | str):
+        raise TypeError(f"{key} must be numeric")
+    return float(value)
 
 
 def _customer_private_n(metrics: Mapping[str, object]) -> object:
@@ -398,7 +410,10 @@ def _external_source_lines(sources: Sequence[Mapping[str, object]]) -> list[str]
     return [
         "- "
         f"{source['surface']}: loaded={source['loaded']}, "
-        f"licence={source['licence']}, status={source['status']}"
+        f"licence={source['licence']}, "
+        f"licence_status={source['licence_status']}, "
+        f"import_allowed={source['import_allowed']}, "
+        f"status={source['status']}"
         for source in sources
     ]
 
