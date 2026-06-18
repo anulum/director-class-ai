@@ -26,7 +26,9 @@ guarantee, which is why this is one tier of a defence-in-depth ensemble.
 
 from __future__ import annotations
 
+import importlib
 import re
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from ..core.signal import (
@@ -38,7 +40,7 @@ from ..core.signal import (
 )
 from ._normalize import expand
 
-__all__ = ["DestructiveCommandDetector"]
+__all__ = ["DestructiveCommandDetector", "rust_matcher_available"]
 
 
 @dataclass(frozen=True)
@@ -360,6 +362,31 @@ _SEVERITY_SCORE = {
     Severity.MEDIUM: 0.6,
     Severity.LOW: 0.4,
 }
+_SEVERITY_BY_NAME = {
+    "critical": Severity.CRITICAL,
+    "high": Severity.HIGH,
+    "medium": Severity.MEDIUM,
+    "low": Severity.LOW,
+}
+
+_Match = tuple[Severity | None, str, str]
+_RustMatch = Callable[[Sequence[str]], tuple[str, str, str] | None]
+
+
+def _load_rust_match() -> _RustMatch | None:
+    """Return the optional Rust destructive matcher when it is installed."""
+    try:
+        rust_module = importlib.import_module("director_class_ai._rust")
+    except ImportError:
+        return None
+    match_rust = getattr(rust_module, "destructive_match", None)
+    return match_rust if callable(match_rust) else None
+
+
+def rust_matcher_available() -> bool:
+    """Return whether the optional Rust destructive matcher can be imported."""
+    return _load_rust_match() is not None
+
 
 # ── path-aware classification of a recursive ``rm`` ────────────────────────────
 # A recursive rm is judged by *what it deletes*, not merely that it is recursive:
@@ -425,6 +452,56 @@ def _rm_severity(form: str) -> Severity | None:
     return worst
 
 
+def _match_python(forms: Sequence[str]) -> _Match:
+    """Return the Python reference destructive match across de-obfuscated forms."""
+    best: _Rule | None = None
+    for rule in _RULES:
+        if any(rule.pattern.search(form) for form in forms) and (
+            best is None or rule.severity > best.severity
+        ):
+            best = rule
+
+    rm_severity = max(
+        (severity for form in forms if (severity := _rm_severity(form)) is not None),
+        default=None,
+    )
+    return _select_best_match(best, rm_severity)
+
+
+def _rust_match_to_python(value: tuple[str, str, str] | None) -> _Match:
+    """Convert the optional Rust matcher tuple into Python matcher fields."""
+    if value is None:
+        return None, "", ""
+    severity_name, signal_type, rationale = value
+    return _SEVERITY_BY_NAME.get(severity_name), signal_type, rationale
+
+
+def _match_forms(forms: Sequence[str]) -> _Match:
+    """Return a parity-guarded destructive match for de-obfuscated forms."""
+    reference = _match_python(forms)
+    rust_match = _load_rust_match()
+    if rust_match is None:
+        return reference
+    try:
+        rust_result = _rust_match_to_python(rust_match(forms))
+    except (RuntimeError, ValueError, TypeError):
+        return reference
+    return rust_result if rust_result == reference else reference
+
+
+def _select_best_match(rule: _Rule | None, rm_severity: Severity | None) -> _Match:
+    """Pick the higher-severity of a matched rule and the rm classifier."""
+    if rule is not None and (rm_severity is None or rule.severity >= rm_severity):
+        return rule.severity, rule.signal_type, rule.rationale
+    if rm_severity is not None:
+        return (
+            rm_severity,
+            "destructive_command",
+            "recursive force-delete of a root / home / system / wildcard path",
+        )
+    return None, "", ""
+
+
 class DestructiveCommandDetector:
     """Tier-0 action-plane detector for catastrophic effector commands."""
 
@@ -441,20 +518,7 @@ class DestructiveCommandDetector:
         # catastrophe (split flags, quote-breaks, base64, alias) only has to
         # match in one revealed form to be caught.
         forms = expand(command)
-        best: _Rule | None = None
-        for rule in _RULES:
-            if any(rule.pattern.search(f) for f in forms) and (
-                best is None or rule.severity > best.severity
-            ):
-                best = rule
-
-        # Path-aware recursive-rm classification runs alongside the rule table.
-        rm_severity = max(
-            (s for f in forms if (s := _rm_severity(f)) is not None),
-            default=None,
-        )
-
-        severity, signal_type, rationale = self._strongest(best, rm_severity)
+        severity, signal_type, rationale = _match_forms(forms)
         if severity is None:
             return None
         return DetectorSignal(
@@ -466,18 +530,3 @@ class DestructiveCommandDetector:
             severity=severity,
             rationale=rationale,
         )
-
-    @staticmethod
-    def _strongest(
-        rule: _Rule | None, rm_severity: Severity | None
-    ) -> tuple[Severity | None, str, str]:
-        """Pick the higher-severity of a matched rule and the rm classifier."""
-        if rule is not None and (rm_severity is None or rule.severity >= rm_severity):
-            return rule.severity, rule.signal_type, rule.rationale
-        if rm_severity is not None:
-            return (
-                rm_severity,
-                "destructive_command",
-                "recursive force-delete of a root / home / system / wildcard path",
-            )
-        return None, "", ""

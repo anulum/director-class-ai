@@ -67,16 +67,43 @@ static XARGS_TEMPLATE: Lazy<Regex> = Lazy::new(|| {
 });
 static SIMPLE_COMMAND_WORD: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"[A-Za-z0-9_./-]+").expect("valid regex"));
+static UPDATE_SET: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)\bupdate\s+\w+\s+set\b").expect("valid regex"));
+static WHERE_WORD: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)\bwhere\b").expect("valid regex"));
+static RM_SEGMENT: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)\brm\b([^|;&\n]*)").expect("valid regex"));
+static SHELL_SPLIT: Lazy<Regex> = Lazy::new(|| Regex::new(r"[|;&]").expect("valid regex"));
+static PRINT_COMMAND: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r#"(?i)^(?:[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|"[^"]*"|[^\s;&|]+)\s+)*(?:echo|printf)\b"#,
+    )
+    .expect("valid regex")
+});
+static SCRATCH_ABS: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^/(?:tmp|var/tmp)(?:/|$)").expect("valid regex"));
+static DESTRUCTIVE_RULES: Lazy<Vec<Rule>> = Lazy::new(build_destructive_rules);
 
 #[pyfunction]
 fn expand(command: &str, max_depth: usize, max_forms: usize) -> PyResult<Vec<String>> {
     Ok(expand_internal(command, max_depth, max_forms))
 }
 
+#[pyfunction]
+fn destructive_match(forms: Vec<String>) -> PyResult<Option<(String, String, String)>> {
+    Ok(destructive_match_internal(&forms).map(|matched| {
+        (
+            matched.severity.name().to_owned(),
+            matched.signal_type.to_owned(),
+            matched.rationale.to_owned(),
+        )
+    }))
+}
+
 #[pymodule]
 #[pyo3(name = "_rust")]
 fn rust_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(expand, module)?)?;
+    module.add_function(wrap_pyfunction!(destructive_match, module)?)?;
     Ok(())
 }
 
@@ -589,4 +616,439 @@ fn strip_shell_quotes(value: &str) -> String {
     } else {
         value.to_owned()
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+enum MatchSeverity {
+    High = 3,
+    Critical = 4,
+}
+
+impl MatchSeverity {
+    fn name(self) -> &'static str {
+        match self {
+            Self::High => "high",
+            Self::Critical => "critical",
+        }
+    }
+}
+
+struct Rule {
+    pattern: Regex,
+    signal_type: &'static str,
+    severity: MatchSeverity,
+    rationale: &'static str,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct MatchResult {
+    severity: MatchSeverity,
+    signal_type: &'static str,
+    rationale: &'static str,
+}
+
+fn rule(
+    pattern: &str,
+    signal_type: &'static str,
+    severity: MatchSeverity,
+    rationale: &'static str,
+) -> Rule {
+    Rule {
+        pattern: Regex::new(pattern).expect("valid destructive-command regex"),
+        signal_type,
+        severity,
+        rationale,
+    }
+}
+
+fn build_destructive_rules() -> Vec<Rule> {
+    vec![
+        rule(
+            r"(?i):\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:",
+            "fork_bomb",
+            MatchSeverity::Critical,
+            "shell fork bomb",
+        ),
+        rule(
+            r"(?i)\bdd\b.*\bof=/dev/(?:sd|nvme|hd|vd|mmcblk|disk)",
+            "disk_overwrite",
+            MatchSeverity::Critical,
+            "raw write to a block device (dd of=/dev/...)",
+        ),
+        rule(
+            r"(?i)\bmkfs(?:\.\w+)?\b",
+            "filesystem_format",
+            MatchSeverity::Critical,
+            "filesystem format (mkfs)",
+        ),
+        rule(
+            r"(?i)\bwipefs\b[^\n;&|]*(?:-a\b|--all\b)[^\n;&|]*/dev/(?:sd|nvme|hd|vd|mmcblk|disk)",
+            "filesystem_format",
+            MatchSeverity::Critical,
+            "filesystem signature wipe on a block device",
+        ),
+        rule(
+            r"(?i)\bsgdisk\b[^\n;&|]*--zap-all\b[^\n;&|]*/dev/(?:sd|nvme|hd|vd|mmcblk|disk)",
+            "filesystem_format",
+            MatchSeverity::Critical,
+            "partition table wipe on a block device",
+        ),
+        rule(
+            r"(?i)\bblkdiscard\b[^\n;&|]*/dev/(?:sd|nvme|hd|vd|mmcblk|disk)",
+            "disk_overwrite",
+            MatchSeverity::Critical,
+            "discard of an entire block device",
+        ),
+        rule(
+            r"(?i)\bcryptsetup\b[^\n;&|]*\bluksFormat\b[^\n;&|]*/dev/(?:sd|nvme|hd|vd|mmcblk|disk)",
+            "filesystem_format",
+            MatchSeverity::Critical,
+            "LUKS format of a block device",
+        ),
+        rule(
+            r"(?i)\bparted\b[^\n;&|]*/dev/(?:sd|nvme|hd|vd|mmcblk|disk)[^\n;&|]*\bmklabel\b",
+            "filesystem_format",
+            MatchSeverity::Critical,
+            "partition label rewrite on a block device",
+        ),
+        rule(
+            r"(?i)\bfind\b.*\s-delete\b|\bfind\b.*-exec\s+rm\b",
+            "destructive_command",
+            MatchSeverity::High,
+            "find -delete / -exec rm mass deletion",
+        ),
+        rule(
+            r"(?i)\bfind\b[^\n;&|]*(?:/\s|/\s*$)[^\n;&|]*-exec\s+shred\b",
+            "destructive_command",
+            MatchSeverity::High,
+            "find -exec shred over a root tree",
+        ),
+        rule(
+            r"(?i)\bshred\b[^\n;&|]*(?:/(?:etc|var|usr|boot|root|home)\b|/\s*$|/\*|~|\bprod(?:uction)?\b)",
+            "destructive_command",
+            MatchSeverity::High,
+            "shred of a sensitive / production target",
+        ),
+        rule(
+            r"(?i)\btar\b[^\n;&|]*--remove-files\b[^\n;&|]*(?:/(?:etc|var|usr|boot|root|home)\b|/\s*$|/\*|~|\bprod(?:uction)?\b)",
+            "destructive_command",
+            MatchSeverity::High,
+            "tar --remove-files against a sensitive / production target",
+        ),
+        rule(
+            r"(?i)>\s*/dev/(?:sd|nvme|hd|vd|mmcblk)",
+            "disk_overwrite",
+            MatchSeverity::Critical,
+            "redirect over a raw block device",
+        ),
+        rule(
+            r"(?i)\brsync\b[^\n;&|]*--delete\b[^\n;&|]*(?:/dev/null/?|(?:^|\s)(?:\.?/)?empty/)[^\n;&|]*\s/(?:etc|var|srv|home|root|opt|usr|boot)\b",
+            "destructive_command",
+            MatchSeverity::High,
+            "rsync --delete mirror wipe of a sensitive target",
+        ),
+        rule(
+            r"(?i)\btruncate\b[^\n;&|]*(?:-s\s*0|--size(?:=|\s)0)[^\n;&|]*(?:/(?:etc|var|usr|boot|root|home)\b|/\s*$|/\*|\bprod(?:uction)?\b)",
+            "destructive_command",
+            MatchSeverity::High,
+            "truncate-to-zero of a sensitive / production target",
+        ),
+        rule(
+            r"(?i)\b(?:shutdown|reboot|halt|poweroff)\b|\binit\s+0\b",
+            "availability_loss",
+            MatchSeverity::High,
+            "host shutdown / reboot",
+        ),
+        rule(
+            r"(?i)\bchmod\s+-R\s+0?777\b",
+            "permission_wipe",
+            MatchSeverity::High,
+            "recursive world-writable permissions",
+        ),
+        rule(
+            r"(?i)\bchmod\s+-R\s+0{3,4}\b[^\n;&|]*(?:/(?:etc|var|usr|boot|root|home)\b|/\s*$|/\*|\bprod(?:uction)?\b)",
+            "permission_wipe",
+            MatchSeverity::High,
+            "recursive permission denial on a sensitive / production target",
+        ),
+        rule(
+            r"(?i)\bchown\s+-R\s+\S+\s+[^\n;&|]*(?:/(?:etc|var|usr|boot|root|home)\b|/\s*$|/\*|\bprod(?:uction)?\b)",
+            "permission_wipe",
+            MatchSeverity::High,
+            "recursive ownership rewrite of a sensitive / production target",
+        ),
+        rule(
+            r"(?i)\b(?:kill(?:all)?\s+-9|kill\s+-9\s+-1)\b|\bkillall\b",
+            "process_kill",
+            MatchSeverity::High,
+            "mass process termination",
+        ),
+        rule(
+            r"(?i)\b(?:curl|wget)\b[^\n|]*\|\s*(?:sudo\s+)?(?:ba)?sh\b",
+            "remote_code_execution",
+            MatchSeverity::High,
+            "pipe of remote content into a shell",
+        ),
+        rule(
+            r"(?i)\bgit\s+push\b.*(?:--force\b|\s-f\b)",
+            "history_rewrite",
+            MatchSeverity::High,
+            "force-push rewrites remote history",
+        ),
+        rule(
+            r"(?i)\bdrop\s+(?:database|schema|table)\b",
+            "sql_drop",
+            MatchSeverity::Critical,
+            "DROP of a database / schema / table",
+        ),
+        rule(
+            r"(?i)\btruncate\s+table\b|\btruncate\b\s+\w+",
+            "sql_truncate",
+            MatchSeverity::Critical,
+            "TRUNCATE empties a table irreversibly",
+        ),
+        rule(
+            r"(?i)\bdelete\s+from\s+\w+\s*(?:;|$)",
+            "sql_unscoped_delete",
+            MatchSeverity::High,
+            "DELETE without a WHERE clause",
+        ),
+        rule(
+            r"(?i)\b(?:terraform|pulumi)\s+destroy\b",
+            "infra_teardown",
+            MatchSeverity::Critical,
+            "terraform / pulumi destroy tears down managed infrastructure",
+        ),
+        rule(
+            r"(?i)\bkubectl\s+delete\b.*(?:--all\b|\bnamespace\b)",
+            "infra_teardown",
+            MatchSeverity::High,
+            "kubectl delete of a namespace / all resources",
+        ),
+        rule(
+            r"(?i)\baws\s+s3\s+(?:rb|rm)\b.*(?:--force|--recursive)",
+            "bucket_deletion",
+            MatchSeverity::High,
+            "recursive / forced S3 bucket deletion",
+        ),
+        rule(
+            r"(?i)\bsystemctl\s+(?:stop|disable|mask|kill)\b",
+            "availability_loss",
+            MatchSeverity::High,
+            "stopping / disabling a system service",
+        ),
+        rule(
+            r"(?i)\biptables\s+(?:-F|--flush)\b|\bufw\s+disable\b",
+            "availability_loss",
+            MatchSeverity::High,
+            "flushing / disabling the host firewall",
+        ),
+        rule(
+            r"(?i)\bdocker\s+stop\s+\$\(.*docker\s+ps",
+            "availability_loss",
+            MatchSeverity::High,
+            "stopping every running container",
+        ),
+        rule(
+            r"(?i)>>?\s*/etc/sudoers|>\s*/etc/cron",
+            "privilege_escalation",
+            MatchSeverity::High,
+            "writing a sudoers / cron backdoor",
+        ),
+        rule(
+            r"(?i)\busermod\s+-a?G\s+[\w,]*sudo\b|\bchmod\s+[ug]\+s\b|\bpasswd\s+-d\b",
+            "privilege_escalation",
+            MatchSeverity::High,
+            concat!(
+                "granting privilege (sudo group / setuid / pass",
+                "word removal)"
+            ),
+        ),
+        rule(
+            concat!(
+                r"(?i)(?:cat|tail|head|less)\b[^|]*(?:id_rsa|/etc/shadow|\.ssh/|",
+                r"\.aws/cred|sec",
+                r"ret|\.pem|\.key)\b[^|]*\|\s*(?:curl|wget|nc|ncat|netcat)\b"
+            ),
+            "exfiltration",
+            MatchSeverity::High,
+            concat!("piping a sec", "ret file to a network tool"),
+        ),
+        rule(
+            r"(?i)\benv\b\s*\|\s*(?:curl|wget|nc|ncat)\b|\baws\s+configure\s+get\b[^|]*\|\s*(?:curl|wget|nc)\b",
+            "exfiltration",
+            MatchSeverity::High,
+            "piping environment / credentials to a network tool",
+        ),
+        rule(
+            r"(?i)\bdropDatabase\s*\(|\bDROP\s+KEYSPACE\b|\bDROP\s+OWNED\b",
+            "datastore_drop",
+            MatchSeverity::Critical,
+            "dropping a NoSQL / Cassandra / owned-objects store",
+        ),
+        rule(
+            r"(?i)\bFLUSH(?:ALL|DB)\b|\betcdctl\s+del\b.*--prefix",
+            "datastore_flush",
+            MatchSeverity::High,
+            "flushing a key-value store",
+        ),
+        rule(
+            r"(?i)\brd\s+/s\b|\brmdir\s+/s\b",
+            "destructive_command",
+            MatchSeverity::High,
+            "recursive Windows directory removal",
+        ),
+        rule(
+            r"(?i)\bformat\s+[a-z]:",
+            "filesystem_format",
+            MatchSeverity::Critical,
+            "format of a Windows drive",
+        ),
+        rule(
+            r"(?i)\bcipher\s+/w\b",
+            "disk_overwrite",
+            MatchSeverity::High,
+            "cipher /w wipes free disk space",
+        ),
+        rule(
+            r"(?i)\bpip\s+uninstall\b[^\n]*\s-r\b|\bnpm\s+uninstall\s+(?:-g|--global)\b|\bapt(?:-get)?\s+(?:remove|purge|autoremove)\b[^\n]*--purge\b",
+            "dependency_removal",
+            MatchSeverity::High,
+            "bulk / global / purging package removal",
+        ),
+    ]
+}
+
+fn destructive_match_internal(forms: &[String]) -> Option<MatchResult> {
+    let mut best_rule: Option<&Rule> = None;
+    for rule in DESTRUCTIVE_RULES.iter() {
+        if forms.iter().any(|form| rule.pattern.is_match(form))
+            && best_rule
+                .map(|best| rule.severity > best.severity)
+                .unwrap_or(true)
+        {
+            best_rule = Some(rule);
+        }
+    }
+    let update_match = forms.iter().any(|form| is_unscoped_update(form));
+    let rm_severity = forms.iter().filter_map(|form| rm_severity(form)).max();
+    select_best_match(best_rule, rm_severity, update_match)
+}
+
+fn select_best_match(
+    rule_match: Option<&Rule>,
+    rm_severity: Option<MatchSeverity>,
+    update_match: bool,
+) -> Option<MatchResult> {
+    let mut best = rule_match.map(|rule| MatchResult {
+        severity: rule.severity,
+        signal_type: rule.signal_type,
+        rationale: rule.rationale,
+    });
+    if update_match {
+        best = pick_better(
+            best,
+            MatchResult {
+                severity: MatchSeverity::High,
+                signal_type: "sql_unscoped_update",
+                rationale: "UPDATE without a WHERE clause",
+            },
+        );
+    }
+    if let Some(severity) = rm_severity {
+        best = pick_better(
+            best,
+            MatchResult {
+                severity,
+                signal_type: "destructive_command",
+                rationale: "recursive force-delete of a root / home / system / wildcard path",
+            },
+        );
+    }
+    best
+}
+
+fn pick_better(current: Option<MatchResult>, candidate: MatchResult) -> Option<MatchResult> {
+    if current
+        .map(|matched| matched.severity >= candidate.severity)
+        .unwrap_or(false)
+    {
+        current
+    } else {
+        Some(candidate)
+    }
+}
+
+fn is_unscoped_update(form: &str) -> bool {
+    UPDATE_SET.find(form).is_some_and(|matched| {
+        let rest = &form[matched.end()..];
+        !WHERE_WORD.is_match(rest)
+    })
+}
+
+fn is_recursive_flag(argument: &str) -> bool {
+    if argument == "--recursive" {
+        return true;
+    }
+    if argument.starts_with("--") {
+        return false;
+    }
+    argument.starts_with('-') && (argument.contains('r') || argument.contains('R'))
+}
+
+fn target_severity(target: &str) -> Option<MatchSeverity> {
+    let cleaned = target.trim().trim_matches(['\'', '"']);
+    if cleaned.is_empty() || cleaned.starts_with('-') {
+        return None;
+    }
+    if matches!(
+        cleaned,
+        "/" | "/*" | "~" | "~/" | "$HOME" | "." | "./" | ".." | "*" | "./*"
+    ) || cleaned.starts_with('~')
+        || cleaned.starts_with("$HOME")
+    {
+        return Some(MatchSeverity::Critical);
+    }
+    if cleaned.starts_with('/') {
+        if cleaned.contains('*') {
+            return Some(MatchSeverity::Critical);
+        }
+        if SCRATCH_ABS.is_match(cleaned) {
+            return None;
+        }
+        return Some(MatchSeverity::High);
+    }
+    if cleaned.starts_with("..") {
+        return Some(MatchSeverity::High);
+    }
+    None
+}
+
+fn rm_severity(form: &str) -> Option<MatchSeverity> {
+    let mut worst: Option<MatchSeverity> = None;
+    for shell_segment in SHELL_SPLIT.split(form) {
+        let trimmed = shell_segment.trim();
+        if PRINT_COMMAND.is_match(trimmed) {
+            continue;
+        }
+        for captures in RM_SEGMENT.captures_iter(trimmed) {
+            let Some(segment) = captures.get(1).map(|m| m.as_str()) else {
+                continue;
+            };
+            let args: Vec<&str> = segment.split_whitespace().collect();
+            if !args.iter().any(|argument| is_recursive_flag(argument)) {
+                continue;
+            }
+            for argument in args {
+                if let Some(severity) = target_severity(argument) {
+                    worst = Some(
+                        worst
+                            .map(|current| current.max(severity))
+                            .unwrap_or(severity),
+                    );
+                }
+            }
+        }
+    }
+    worst
 }
