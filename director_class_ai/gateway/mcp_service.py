@@ -26,6 +26,7 @@ payloads are not reflected back to callers.
 
 from __future__ import annotations
 
+import hmac
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -45,6 +46,7 @@ from .mcp import (
 )
 
 __all__ = [
+    "MCP_AUTH_HEADER",
     "MCPGatewayHTTPServer",
     "MCPGatewayService",
     "MCPGatewayServiceConfig",
@@ -52,6 +54,7 @@ __all__ = [
 ]
 
 _Method = Literal["GET", "POST"]
+MCP_AUTH_HEADER = "x-director-class-operator-key"
 
 
 @dataclass(frozen=True)
@@ -61,6 +64,7 @@ class MCPGatewayServiceConfig:
     allow_dynamic_discovery: bool = False
     require_signed_registrations: bool = True
     max_body_bytes: int = 1_048_576
+    operator_key: str = ""
 
 
 @dataclass(frozen=True)
@@ -117,6 +121,8 @@ class MCPGatewayService:
         method: _Method,
         path: str,
         payload: Mapping[str, object] | None = None,
+        *,
+        operator_key: str = "",
     ) -> MCPGatewayServiceResponse:
         """Dispatch a parsed JSON request to the matching service endpoint."""
         if method == "GET" and path == "/healthz":
@@ -124,6 +130,11 @@ class MCPGatewayService:
                 HTTPStatus.OK,
                 {"status": "ok", "registration_count": self.registration_count},
             )
+        if self._config.operator_key and not hmac.compare_digest(
+            operator_key,
+            self._config.operator_key,
+        ):
+            return _error(HTTPStatus.UNAUTHORIZED, "unauthorized")
         if method != "POST":
             return _error(HTTPStatus.METHOD_NOT_ALLOWED, "method_not_allowed")
         if payload is None:
@@ -234,7 +245,13 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         """Handle loopback service health checks."""
-        self._send(self.server.service.handle("GET", self.path))
+        self._send(
+            self.server.service.handle(
+                "GET",
+                self.path,
+                operator_key=self.headers.get(MCP_AUTH_HEADER, ""),
+            )
+        )
 
     def do_POST(self) -> None:
         """Handle JSON POST requests for the MCP gateway service."""
@@ -251,7 +268,14 @@ class _Handler(BaseHTTPRequestHandler):
         if not isinstance(loaded, Mapping):
             self._send(_error(HTTPStatus.BAD_REQUEST, "json_body_must_be_object"))
             return
-        self._send(self.server.service.handle("POST", self.path, loaded))
+        self._send(
+            self.server.service.handle(
+                "POST",
+                self.path,
+                loaded,
+                operator_key=self.headers.get(MCP_AUTH_HEADER, ""),
+            )
+        )
 
     def _send(self, response: MCPGatewayServiceResponse) -> None:
         body = response.to_json()

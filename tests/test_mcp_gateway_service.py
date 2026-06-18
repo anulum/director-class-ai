@@ -16,6 +16,7 @@ from collections.abc import Mapping
 from contextlib import AbstractContextManager
 
 from director_class_ai.gateway import (
+    MCP_AUTH_HEADER,
     MCPGatewayHTTPServer,
     MCPGatewayService,
     MCPGatewayServiceConfig,
@@ -136,6 +137,24 @@ def test_service_dispatch_errors_are_json_responses() -> None:
     assert missing_body.body == {"error": "missing_json_body"}
     assert unknown.status == 404
     assert unknown.body == {"error": "unknown_endpoint"}
+
+
+def test_service_auth_key_protects_non_health_endpoints() -> None:
+    service = MCPGatewayService(
+        config=MCPGatewayServiceConfig(operator_key="operator-key")
+    )
+
+    health = service.handle("GET", "/healthz")
+    missing = service.handle("POST", "/v1/mcp/review", {})
+    bad = service.handle("POST", "/v1/mcp/review", {}, operator_key="bad")
+    good = service.handle("POST", "/v1/mcp/review", {}, operator_key="operator-key")
+
+    assert health.status == 200
+    assert missing.status == 401
+    assert missing.body == {"error": "unauthorized"}
+    assert bad.status == 401
+    assert good.status == 403
+    assert good.body["route"] == "block"
 
 
 def test_service_discovery_rejects_malformed_descriptor_listing() -> None:
@@ -412,6 +431,32 @@ def test_loopback_http_server_rejects_oversized_body() -> None:
     assert body == {"error": "body_too_large"}
 
 
+def test_loopback_http_server_rejects_missing_operator_key() -> None:
+    service = MCPGatewayService(
+        config=MCPGatewayServiceConfig(operator_key="operator-key")
+    )
+    with _running_server(service) as base_url:
+        status, body = _post_error(f"{base_url}/v1/mcp/review", b"{}")
+
+    assert status == 401
+    assert body == {"error": "unauthorized"}
+
+
+def test_loopback_http_server_accepts_operator_key_header() -> None:
+    service = MCPGatewayService(
+        config=MCPGatewayServiceConfig(operator_key="operator-key")
+    )
+    with _running_server(service) as base_url:
+        status, body = _post_error(
+            f"{base_url}/v1/mcp/review",
+            b"{}",
+            headers={MCP_AUTH_HEADER: "operator-key"},
+        )
+
+    assert status == 403
+    assert body["route"] == "block"
+
+
 def test_content_length_parser_rejects_missing_bad_and_negative_values() -> None:
     assert _content_length(None) is None
     assert _content_length("bad") is None
@@ -438,12 +483,17 @@ class _running_server(AbstractContextManager[str]):
         self._thread.join(timeout=5)
 
 
-def _post(url: str, payload: Mapping[str, object]) -> Mapping[str, object]:
+def _post(
+    url: str,
+    payload: Mapping[str, object],
+    *,
+    headers: Mapping[str, str] | None = None,
+) -> Mapping[str, object]:
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
         method="POST",
-        headers={"content-type": "application/json"},
+        headers={"content-type": "application/json", **dict(headers or {})},
     )
     with urllib.request.urlopen(request, timeout=5) as response:
         loaded = json.loads(response.read().decode("utf-8"))
@@ -458,12 +508,17 @@ def _get(url: str) -> Mapping[str, object]:
     return loaded
 
 
-def _post_error(url: str, body: bytes) -> tuple[int, Mapping[str, object]]:
+def _post_error(
+    url: str,
+    body: bytes,
+    *,
+    headers: Mapping[str, str] | None = None,
+) -> tuple[int, Mapping[str, object]]:
     request = urllib.request.Request(
         url,
         data=body,
         method="POST",
-        headers={"content-type": "application/json"},
+        headers={"content-type": "application/json", **dict(headers or {})},
     )
     try:
         urllib.request.urlopen(request, timeout=5)

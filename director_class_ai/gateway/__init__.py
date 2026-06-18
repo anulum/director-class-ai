@@ -22,6 +22,7 @@ from .mcp import (
 )
 from .mcp_cli import MCPGatewayServerOptions, build_gateway_server
 from .mcp_service import (
+    MCP_AUTH_HEADER,
     MCPGatewayHTTPServer,
     MCPGatewayService,
     MCPGatewayServiceConfig,
@@ -39,6 +40,7 @@ __all__ = [
     "MCPResponseDecision",
     "MCPResponseRequest",
     "MCPToolDescriptor",
+    "MCP_AUTH_HEADER",
     "MCPGatewayHTTPServer",
     "MCPGatewayService",
     "MCPGatewayServiceConfig",

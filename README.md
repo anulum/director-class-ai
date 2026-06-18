@@ -68,6 +68,15 @@ discovery, tool calls, and tool responses, but it never dispatches tools.
 director-class-mcp-gateway --host 127.0.0.1 --port 8765
 ```
 
+Binding outside loopback fails closed unless an operator key is supplied through
+an environment variable. Protected requests include that value in the
+`x-director-class-operator-key` header.
+
+```bash
+export DIRECTOR_CLASS_MCP_KEY='operator-key'
+director-class-mcp-gateway --host 0.0.0.0 --operator-key-env DIRECTOR_CLASS_MCP_KEY
+```
+
 ## Command guard
 
 For command-line workflows, `director-class-guard` reviews shell, database,
