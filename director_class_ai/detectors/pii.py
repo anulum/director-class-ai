@@ -38,19 +38,42 @@ _SENSITIVE_CATEGORIES = frozenset({"credit_card", "ssn", "phi", "iban", "passpor
 
 @runtime_checkable
 class PIIMatch(Protocol):
-    """One sensitive-data finding produced by a moderation backend."""
+    """One sensitive-data finding produced by a moderation backend.
 
-    category: str
-    start: int
-    end: int
-    score: float
+    The members are read-only properties so a frozen upstream match (the
+    Director-AI ``ModerationMatch`` dataclass) satisfies the contract without
+    leaking its mutable extra fields into the content plane.
+    """
+
+    @property
+    def category(self) -> str:
+        """The sensitive-data category, e.g. ``"credit_card"``."""
+        ...
+
+    @property
+    def start(self) -> int:
+        """Inclusive start offset of the match in the scanned text."""
+        ...
+
+    @property
+    def end(self) -> int:
+        """Exclusive end offset of the match in the scanned text."""
+        ...
+
+    @property
+    def score(self) -> float:
+        """Match confidence in ``[0, 1]``."""
+        ...
 
 
 @runtime_checkable
 class PIIModerationResult(Protocol):
     """Structured result returned by a PII moderation backend."""
 
-    matches: Sequence[PIIMatch]
+    @property
+    def matches(self) -> Sequence[PIIMatch]:
+        """The sensitive-data findings for the analysed text."""
+        ...
 
 
 @runtime_checkable

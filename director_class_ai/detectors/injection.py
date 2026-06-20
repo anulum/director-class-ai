@@ -35,12 +35,32 @@ InjectionField = Literal["query", "context"]
 
 @runtime_checkable
 class InjectionScreenResult(Protocol):
-    """Screening result returned by a prompt-injection backend."""
+    """Screening result returned by a prompt-injection backend.
 
-    blocked: bool
-    score: float
-    stage: str
-    reason: str
+    The members are read-only properties so a frozen upstream result satisfies
+    the contract; the upstream rationale field is mapped to ``reason`` by an
+    adapter rather than leaking the upstream name into the integrity plane.
+    """
+
+    @property
+    def blocked(self) -> bool:
+        """Whether the backend would block the screened text."""
+        ...
+
+    @property
+    def score(self) -> float:
+        """Injection-risk score in ``[0, 1]``."""
+        ...
+
+    @property
+    def stage(self) -> str:
+        """The screening stage that produced the result."""
+        ...
+
+    @property
+    def reason(self) -> str:
+        """Redacted rationale for the screening outcome."""
+        ...
 
 
 @runtime_checkable
@@ -61,6 +81,73 @@ class InjectionScreenFinding:
     stage: str
     reason: str
     blocked: bool
+
+
+@runtime_checkable
+class _UpstreamScreenResult(Protocol):
+    """The Director-AI ``LayeredPromptGuard`` screen-result surface."""
+
+    @property
+    def blocked(self) -> bool:
+        """Whether the upstream guard would block the text."""
+        ...
+
+    @property
+    def score(self) -> float:
+        """Upstream injection-risk score."""
+        ...
+
+    @property
+    def stage(self) -> str:
+        """Upstream screening stage."""
+        ...
+
+    @property
+    def pattern_reason(self) -> str:
+        """Upstream rationale field, named ``pattern_reason`` upstream."""
+        ...
+
+
+@runtime_checkable
+class _UpstreamPromptGuard(Protocol):
+    """The Director-AI ``LayeredPromptGuard`` screen surface."""
+
+    def screen(self, text: str) -> _UpstreamScreenResult:
+        """Screen ``text`` and return the upstream result."""
+        ...
+
+
+@dataclass(frozen=True)
+class _AdaptedScreen:
+    """An :class:`InjectionScreenResult` mapped from the upstream result."""
+
+    blocked: bool
+    score: float
+    stage: str
+    reason: str
+
+
+class _LayeredPromptGuardBackend:
+    """Adapt an upstream prompt guard to the :class:`InjectionScreenBackend`.
+
+    The upstream guard names its rationale ``pattern_reason``; the integrity
+    detector reads ``reason``. The field is mapped here so the upstream name does
+    not leak into the integrity plane and the detector keeps one stable contract.
+    """
+
+    def __init__(self, guard: _UpstreamPromptGuard) -> None:
+        """Wrap the upstream prompt guard."""
+        self._guard = guard
+
+    def screen(self, text: str) -> _AdaptedScreen:
+        """Screen ``text`` and rename the upstream rationale field to ``reason``."""
+        upstream = self._guard.screen(text)
+        return _AdaptedScreen(
+            blocked=upstream.blocked,
+            score=upstream.score,
+            stage=upstream.stage,
+            reason=upstream.pattern_reason,
+        )
 
 
 class InjectionPromptDetector:
@@ -116,7 +203,8 @@ class InjectionPromptDetector:
         """Load Director-AI's dependency-light layered prompt guard."""
         from director_ai.core.safety.prompt_guard import LayeredPromptGuard
 
-        return cls(LayeredPromptGuard(), fields=fields, threshold=threshold)
+        backend = _LayeredPromptGuardBackend(LayeredPromptGuard())
+        return cls(backend, fields=fields, threshold=threshold)
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
         """Emit an integrity signal when query or context screening fires."""
