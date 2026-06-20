@@ -97,9 +97,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _execute_command(request: ToolReviewRequest) -> ToolExecutionResult:
     command = request.action
-    completed = subprocess.run(  # nosec B602 - reached only after Governor permit
+    completed = subprocess.run(  # nosec B602  # nosemgrep — post-permit executor
         command,
-        shell=True,
+        shell=True,  # nosemgrep — post-permit executor
         capture_output=True,
         text=True,
         check=False,

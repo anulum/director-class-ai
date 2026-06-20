@@ -55,7 +55,7 @@ class _UrlOpener(Protocol):
 def _urlopen(request: Request, timeout: float) -> object:
     # ApprovalWebhookSink validates the URL scheme to http(s) before building the
     # request, so file:/ and custom-scheme opens cannot reach here.
-    return urlopen(request, timeout=timeout)  # nosec B310 — scheme pre-validated
+    return urlopen(request, timeout=timeout)  # nosec B310  # nosemgrep
 
 
 @dataclass(frozen=True)

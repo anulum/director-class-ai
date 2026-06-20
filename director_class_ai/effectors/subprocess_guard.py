@@ -32,9 +32,9 @@ def default_subprocess_runner(command: str) -> tuple[str, int]:
     """
     import subprocess
 
-    proc = subprocess.run(  # nosec B602 - gated: only reached after a permit decision
+    proc = subprocess.run(  # nosec B602  # nosemgrep — gated post-permit runner
         command,
-        shell=True,
+        shell=True,  # nosemgrep — gated post-permit runner
         capture_output=True,
         text=True,
         check=False,

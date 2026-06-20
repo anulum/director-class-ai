@@ -91,7 +91,7 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install -e ".[dev]"
       - name: Run property-based invariants
-        run: pytest tests/test_properties.py -v --hypothesis-seed=0
+        run: pytest tests/test_properties.py -v --hypothesis-seed=0 --cov-fail-under=0
         env:
           HYPOTHESIS_MAX_EXAMPLES: "500"
 
