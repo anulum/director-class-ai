@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Literal, Protocol
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from .queue import ApprovalQueue, ApprovalTicket
@@ -52,7 +53,9 @@ class _UrlOpener(Protocol):
 
 
 def _urlopen(request: Request, timeout: float) -> object:
-    return urlopen(request, timeout=timeout)
+    # ApprovalWebhookSink validates the URL scheme to http(s) before building the
+    # request, so file:/ and custom-scheme opens cannot reach here.
+    return urlopen(request, timeout=timeout)  # nosec B310 — scheme pre-validated
 
 
 @dataclass(frozen=True)
@@ -79,6 +82,14 @@ class ApprovalWebhookSink:
     signing_key: str = ""
     timeout_seconds: float = 5.0
     opener: _UrlOpener = _urlopen
+
+    def __post_init__(self) -> None:
+        """Reject webhook URLs whose scheme is not ``http`` or ``https``."""
+        scheme = urlparse(self.url).scheme
+        if scheme not in ("http", "https"):
+            raise ValueError(
+                f"approval webhook URL must be http or https, got scheme {scheme!r}"
+            )
 
     def publish(self, event: ApprovalWebhookEvent) -> None:
         """Send one redacted approval event to the configured webhook URL."""

@@ -52,15 +52,11 @@ assert decision.permitted is False
 ## 4. Verify the Repo
 
 ```bash
-make repository-readiness
-make phase4-intake
 make preflight
 ```
 
-The readiness gates verify local package identity, licence wiring, workflow
-surfaces, task-intake completeness, strict typing, and tests. Remote CI and
-branch protection remain settings-bound until the local commits are pushed and
-GitHub check names exist.
+`make preflight` runs the SPDX, documentation, lint, strict-typing, and test
+gates locally before a commit.
 
 ## 5. Read the Boundaries
 

@@ -438,3 +438,13 @@ def test_http_server_rejects_invalid_key(tmp_path: Path) -> None:
         thread.join(timeout=5.0)
 
     assert exc.value.code == HTTPStatus.UNAUTHORIZED
+
+
+def test_webhook_sink_rejects_non_http_scheme() -> None:
+    import pytest
+
+    from director_class_ai.approvals.transport import ApprovalWebhookSink
+
+    for bad in ("file:///etc/passwd", "ftp://host/p", "gopher://x"):
+        with pytest.raises(ValueError, match="must be http or https"):
+            ApprovalWebhookSink(bad)

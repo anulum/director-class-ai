@@ -2,7 +2,7 @@
 # Director-Class AI — developer task runner
 .DEFAULT_GOAL := help
 PY ?= python
-.PHONY: help test lint fmt types sast spdx repository-readiness docs build bench bench-evidence phase4-intake import-external redteam preflight
+.PHONY: help test lint fmt types sast spdx docs build bench bench-evidence import-external redteam preflight
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -29,9 +29,6 @@ sast: ## SAST scan (bandit + semgrep via uvx)
 spdx: ## Verify SPDX headers
 	$(PY) tools/check_spdx.py
 
-repository-readiness: ## Validate local repository readiness evidence
-	$(PY) tools/check_repository_readiness.py
-
 docs: ## Validate public docs, demos, and notebook entry points
 	$(PY) tools/check_documentation_surface.py
 	$(PY) demos/action_checkpoint.py >/tmp/director-class-action-demo.json
@@ -45,9 +42,6 @@ bench: ## Run the action-plane benchmark
 bench-evidence: ## Run action benchmark with evidence-grade metadata
 	$(PY) -m benchmarks.action_evidence
 
-phase4-intake: ## Validate Phase 4 task intake metadata
-	$(PY) tools/check_phase4_task_intake.py
-
 import-external: ## Import reviewed external JSONL: make import-external SURFACE=... INPUT=...
 	@test -n "$(SURFACE)" || (echo "SURFACE is required" && exit 2)
 	@test -n "$(INPUT)" || (echo "INPUT is required" && exit 2)
@@ -56,5 +50,5 @@ import-external: ## Import reviewed external JSONL: make import-external SURFACE
 redteam: ## Run the adversarial red-team benchmark
 	$(PY) -m benchmarks.adversarial_red_team
 
-preflight: spdx repository-readiness phase4-intake docs lint types test ## Full local gate before commit
+preflight: spdx docs lint types test ## Full local gate before commit
 	@echo "preflight OK"

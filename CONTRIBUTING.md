@@ -26,5 +26,5 @@ Every change keeps the repo green to the GOTM standard:
 
 ## Records
 
-Design and decisions live in `docs/internal/` (ARCHITECTURE, PLAN, ADVERSARIAL,
-AUDIT_INDEX). Append audit findings to `docs/internal/AUDIT_INDEX.md`.
+Public design notes live under `docs/`. Architecture, roadmap, audit, and
+positioning records are maintained privately by the maintainers.
