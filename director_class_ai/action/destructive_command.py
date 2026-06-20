@@ -6,7 +6,7 @@
 # Contact: www.anulum.li | protoscience@anulum.li
 # Director-Class AI — destructive-command detector (action plane, tier 0)
 
-"""Catch catastrophic effector commands before they run — the kill-switch core.
+"""Catch catastrophic effector commands before they run — the effector-boundary core.
 
 This is the cheap, tier-0 gate on the action plane: a pattern matcher over the
 concrete command an autonomous agent is about to execute (shell, SQL, infra CLI).
@@ -391,7 +391,7 @@ def rust_matcher_available() -> bool:
 # ── path-aware classification of a recursive ``rm`` ────────────────────────────
 # A recursive rm is judged by *what it deletes*, not merely that it is recursive:
 # a project-local or scratch path is an ordinary cleanup, a system / root / home /
-# wildcard path is catastrophic. This is the precision fix for the kill-switch —
+# wildcard path is catastrophic. This is the precision fix for the effector boundary —
 # blocking ``rm -rf node_modules`` makes the guard unusable, missing ``rm -rf /``
 # makes it useless.
 _RM_SEGMENT = re.compile(r"\brm\b([^|;&\n]*)", re.IGNORECASE)
