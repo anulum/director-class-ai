@@ -25,6 +25,7 @@ from .capability_profiles import (
     CapabilitySurfaceProfile,
     load_capability_profile,
 )
+from .history import PolicyHistory
 from .loader import load_profile, load_profile_file
 from .profile import Profile
 from .revision import PolicyFieldChange, PolicyRevision, diff_profiles
@@ -43,6 +44,7 @@ __all__ = [
     "CapabilitySurfaceProfile",
     "OriginRule",
     "PolicyFieldChange",
+    "PolicyHistory",
     "PolicyRevision",
     "Profile",
     "diff_profiles",
