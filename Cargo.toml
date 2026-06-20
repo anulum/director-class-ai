@@ -2,7 +2,7 @@
 name = "director_class_ai_rust"
 version = "0.1.0"
 edition = "2021"
-license = "LicenseRef-Director-Class-AI-Commercial"
+license = "BUSL-1.1"
 description = "Rust command de-obfuscation core for Director-Class AI"
 repository = "https://github.com/anulum/director-class-ai"
 publish = false

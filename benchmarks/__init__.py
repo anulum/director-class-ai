@@ -1,1 +1,1 @@
-# SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial
+# SPDX-License-Identifier: BUSL-1.1

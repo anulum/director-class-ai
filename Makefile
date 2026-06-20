@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial
+# SPDX-License-Identifier: BUSL-1.1
 # Director-Class AI — developer task runner
 .DEFAULT_GOAL := help
 PY ?= python

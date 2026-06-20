@@ -156,8 +156,13 @@ complete.
 
 ## Licence
 
-Proprietary commercial — see `LICENSE`. Source visibility is **not** a grant of
-rights; production use requires a commercial agreement (protoscience@anulum.li).
+Source-available under the **Business Source License 1.1** — see `LICENSE`. You
+may read, modify, and self-host the Licensed Work for your own internal
+operations, including in production. You may **not** offer it to third parties as
+a hosted or managed service, or build a competing product on its governance,
+action-control, kill-switch, or audit functionality, without a commercial licence
+(protoscience@anulum.li). On the Change Date (2030-06-20) the licence converts to
+Apache-2.0.
 
 ## SIEM/SOC export
 

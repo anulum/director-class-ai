@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
 <!-- Director-Class AI - external benchmark source manifest -->
 <!-- (c) Concepts 1996-2026 Miroslav Sotek. All rights reserved. -->
 <!-- (c) Code 2020-2026 Miroslav Sotek. All rights reserved. -->

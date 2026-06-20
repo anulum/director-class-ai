@@ -17,8 +17,9 @@ keywords = [
     "agent-governance",
     "hallucination-detection",
 ]
-# Proprietary commercial product. "Private :: Do Not Upload" makes PyPI reject an
-# accidental publish; the licence terms live in LICENSE (declared via license-files).
+# Source-available under the Business Source License 1.1 (see LICENSE; converts to
+# Apache-2.0 on the Change Date). "Private :: Do Not Upload" keeps the package out
+# of public PyPI — distribution is via the repository, not the index.
 classifiers = [
     "Private :: Do Not Upload",
     "Development Status :: 3 - Alpha",
