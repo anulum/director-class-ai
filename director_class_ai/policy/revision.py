@@ -31,7 +31,12 @@ from dataclasses import dataclass
 
 from .profile import Profile
 
-__all__ = ["PolicyFieldChange", "PolicyRevision", "diff_profiles"]
+__all__ = [
+    "PolicyFieldChange",
+    "PolicyRevision",
+    "diff_profiles",
+    "profile_digest",
+]
 
 
 def _canonical_payload(profile: Profile) -> str:
@@ -52,7 +57,7 @@ def _canonical_payload(profile: Profile) -> str:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"))
 
 
-def _profile_digest(profile: Profile) -> str:
+def profile_digest(profile: Profile) -> str:
     """Return the SHA-256 content address of a profile's governance payload.
 
     Parameters
@@ -147,7 +152,7 @@ class PolicyRevision:
     @property
     def digest(self) -> str:
         """Return the SHA-256 content address of this revision's posture."""
-        return _profile_digest(self.profile)
+        return profile_digest(self.profile)
 
     def diff(self, other: PolicyRevision) -> tuple[PolicyFieldChange, ...]:
         """Return the governance changes from this revision to ``other``.
@@ -194,7 +199,7 @@ class PolicyRevision:
             ``True`` when the live profile's content address equals this
             revision's digest.
         """
-        return _profile_digest(live) == self.digest
+        return profile_digest(live) == self.digest
 
     def child(
         self, profile: Profile, *, author: str, created_at: str, reason: str

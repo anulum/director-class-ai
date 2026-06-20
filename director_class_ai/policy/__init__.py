@@ -25,11 +25,17 @@ from .capability_profiles import (
     CapabilitySurfaceProfile,
     load_capability_profile,
 )
+from .drift import PolicyDriftEvent, PolicyDriftMonitor
 from .history import PolicyHistory
 from .loader import load_profile, load_profile_file
 from .profile import Profile
 from .review import PolicyChangeProposal, PolicyChangeReview
-from .revision import PolicyFieldChange, PolicyRevision, diff_profiles
+from .revision import (
+    PolicyFieldChange,
+    PolicyRevision,
+    diff_profiles,
+    profile_digest,
+)
 
 __all__ = [
     "ACTION_SURFACES",
@@ -46,6 +52,8 @@ __all__ = [
     "OriginRule",
     "PolicyChangeProposal",
     "PolicyChangeReview",
+    "PolicyDriftEvent",
+    "PolicyDriftMonitor",
     "PolicyFieldChange",
     "PolicyHistory",
     "PolicyRevision",
@@ -54,4 +62,5 @@ __all__ = [
     "load_capability_profile",
     "load_profile",
     "load_profile_file",
+    "profile_digest",
 ]
