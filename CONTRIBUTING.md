@@ -1,7 +1,8 @@
 <!-- SPDX-License-Identifier: BUSL-1.1 -->
 # Contributing — Director-Class AI (internal)
 
-Proprietary product (see `LICENSE`); internal contribution guide.
+Source-available under the Business Source License 1.1 (see `LICENSE`); internal
+contribution guide.
 
 ## Standard
 
