@@ -1,5 +1,15 @@
 # Director-Class AI
 
+<p align="center">
+  <a href="https://github.com/anulum/director-class-ai/actions/workflows/ci.yml"><img src="https://github.com/anulum/director-class-ai/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/anulum/director-class-ai/actions/workflows/pre-commit.yml"><img src="https://github.com/anulum/director-class-ai/actions/workflows/pre-commit.yml/badge.svg" alt="Pre-commit"></a>
+  <a href="https://github.com/anulum/director-class-ai/actions/workflows/codeql.yml"><img src="https://github.com/anulum/director-class-ai/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/anulum/director-class-ai"><img src="https://api.securityscorecards.dev/projects/github.com/anulum/director-class-ai/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://codecov.io/gh/anulum/director-class-ai"><img src="https://codecov.io/gh/anulum/director-class-ai/branch/main/graph/badge.svg" alt="Coverage"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-blue.svg" alt="License: BUSL-1.1"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+"></a>
+</p>
+
 **Runtime action-control and evidence layer for autonomous AI agents.** A
 separate commercial product from the Apache-licensed `director-ai` base:
 Director-Class AI sits between an autonomous agent and its effectors. It reviews
