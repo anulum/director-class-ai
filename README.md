@@ -118,6 +118,12 @@ human-required escalation through a durable, digest-scoped approval queue
 (`runtime/approvals.json`). Both paths are configurable with `--audit-log` and
 `--approval-store`.
 
+The posture in force is the approved head of a Guardrail-as-Code ledger
+(`--policy-store`, default `runtime/policy.json`): a posture change approved
+through `director-class-policy` governs the thresholds this review fuses with, so
+an approved relaxation or tightening takes effect at the boundary. With no ledger
+or no approved head, the guard keeps its fail-closed defaults.
+
 ```bash
 director-class-guard --surface kubernetes -- kubectl get pods
 director-class-guard --surface shell --execute -- printf guard-ok

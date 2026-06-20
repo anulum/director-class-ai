@@ -30,6 +30,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
+from ..core.fusion import FusionPolicy
 from .drift import PolicyDriftEvent, PolicyDriftMonitor
 from .exposure import ExposureCase, ExposureReport, PostureExposure
 from .history import PolicyHistory
@@ -85,6 +86,17 @@ class PolicyGovernance:
     def head(self) -> PolicyRevision | None:
         """Return the approved posture in force, or ``None`` when none is set."""
         return self._review.history.head
+
+    def active_fusion_policy(self) -> FusionPolicy | None:
+        """Return the approved head posture as a runtime fusion policy.
+
+        This is the bridge from the governance ledger to enforcement: the fusion
+        policy returned here is what a runtime ensemble should fuse with, so an
+        approved posture change actually governs live decisions. ``None`` when no
+        posture has been approved yet, leaving the enforcer on its safe defaults.
+        """
+        head = self.head
+        return head.profile.to_fusion_policy() if head is not None else None
 
     def propose(
         self, profile: Profile, *, proposer: str, created_at: str, reason: str

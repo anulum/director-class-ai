@@ -27,10 +27,11 @@ _PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
 
 
 def _opts(tmp_path: Path, **kwargs: object) -> CommandGuardOptions:
-    """Build guard options whose audit log and approval queue live under tmp."""
+    """Build guard options whose runtime state lives under tmp."""
     return CommandGuardOptions(
         audit_log=str(tmp_path / "audit.jsonl"),
         approval_store=str(tmp_path / "approvals.json"),
+        policy_store=str(tmp_path / "policy.json"),
         **kwargs,  # type: ignore[arg-type]
     )
 
@@ -41,6 +42,8 @@ def _main_args(tmp_path: Path, *argv: str) -> tuple[str, ...]:
         str(tmp_path / "audit.jsonl"),
         "--approval-store",
         str(tmp_path / "approvals.json"),
+        "--policy-store",
+        str(tmp_path / "policy.json"),
         *argv,
     )
 
@@ -54,6 +57,7 @@ def test_command_guard_options_parse_defaults() -> None:
     assert options.execute is False
     assert options.audit_log == "runtime/audit.jsonl"
     assert options.approval_store == "runtime/approvals.json"
+    assert options.policy_store == "runtime/policy.json"
 
 
 def test_command_guard_options_parse_without_separator() -> None:
@@ -73,10 +77,20 @@ def test_command_guard_options_parse_all_surfaces() -> None:
 
 def test_command_guard_options_parse_audit_and_approval_paths() -> None:
     options = CommandGuardOptions.from_argv(
-        ("--audit-log", "/tmp/a.jsonl", "--approval-store", "/tmp/q.json", "--", "noop")
+        (
+            "--audit-log",
+            "/tmp/a.jsonl",
+            "--approval-store",
+            "/tmp/q.json",
+            "--policy-store",
+            "/tmp/p.json",
+            "--",
+            "noop",
+        )
     )
     assert options.audit_log == "/tmp/a.jsonl"
     assert options.approval_store == "/tmp/q.json"
+    assert options.policy_store == "/tmp/p.json"
 
 
 def test_build_command_request_uses_existing_sdk_contract() -> None:

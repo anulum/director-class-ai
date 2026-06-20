@@ -37,6 +37,7 @@ from ..action import (
 )
 from ..action._lexicon import UNTRUSTED_ORIGINS
 from ..core import Decision, Detector, EvaluationRequest, Governor, ParallelEnsembleScorer
+from ..core.fusion import FusionPolicy
 from ..core.governor import ApprovalHook, AuditSink
 
 __all__ = [
@@ -210,12 +211,21 @@ class ToolReviewMiddleware:
         cls,
         *,
         detectors: Sequence[Detector] | None = None,
+        policy: FusionPolicy | None = None,
         approval: ApprovalHook | None = None,
         audit_sink: AuditSink | None = None,
         executor: ToolExecutor | None = None,
     ) -> ToolReviewMiddleware:
-        """Build middleware with the default action-plane detector ensemble."""
-        ensemble = ParallelEnsembleScorer(tuple(detectors or _default_detectors()))
+        """Build middleware with the default action-plane detector ensemble.
+
+        ``policy`` is the fused governance posture in force. Passing the approved
+        head of a Guardrail-as-Code ledger (``Profile.to_fusion_policy()``) is how
+        an approved posture change actually governs runtime decisions; ``None``
+        keeps the fail-closed default thresholds.
+        """
+        ensemble = ParallelEnsembleScorer(
+            tuple(detectors or _default_detectors()), policy=policy
+        )
         governor = Governor(
             ensemble=ensemble,
             approval=approval,
