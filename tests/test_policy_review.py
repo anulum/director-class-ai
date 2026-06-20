@@ -182,3 +182,24 @@ class TestDeny:
             review.deny(
                 proposal.digest, reviewer="bob", decided_at="2026-06-20T13:00:00Z"
             )
+
+
+def test_proposals_returns_all_pending_and_terminal() -> None:
+    review = _review(_profile())
+    pending = _propose(review, _profile(action_block_threshold=0.5))
+    denied = _propose(review, _profile(action_block_threshold=0.6))
+    review.deny(denied.digest, reviewer="bob", decided_at="2026-06-20T11:00:00Z")
+
+    by_digest = {p.digest: p.status for p in review.proposals}
+    assert by_digest == {pending.digest: "pending", denied.digest: "denied"}
+
+
+def test_restore_rehydrates_history_and_proposals() -> None:
+    review = _review(_profile())
+    proposal = _propose(review, _profile(action_block_threshold=0.5))
+
+    restored = PolicyChangeReview.restore(review.history, review.proposals)
+
+    assert restored.history.head is review.history.head
+    assert restored.get(proposal.digest).digest == proposal.digest
+    assert [p.digest for p in restored.pending()] == [proposal.digest]

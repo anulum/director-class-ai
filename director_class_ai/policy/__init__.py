@@ -27,6 +27,7 @@ from .capability_profiles import (
 )
 from .drift import PolicyDriftEvent, PolicyDriftMonitor
 from .exposure import ExposureCase, ExposureReport, OutcomeChange, PostureExposure
+from .governance import PolicyGovernance
 from .history import PolicyHistory
 from .loader import load_profile, load_profile_file
 from .profile import Profile
@@ -59,6 +60,7 @@ __all__ = [
     "PolicyDriftEvent",
     "PolicyDriftMonitor",
     "PolicyFieldChange",
+    "PolicyGovernance",
     "PolicyHistory",
     "PolicyRevision",
     "PostureExposure",
