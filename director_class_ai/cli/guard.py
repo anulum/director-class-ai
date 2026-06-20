@@ -16,13 +16,19 @@ import subprocess
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
+from ..approvals import ApprovalQueue
+from ..audit import AuditChainSink
 from ..sdk import ToolExecutionResult, ToolReviewMiddleware, ToolReviewRequest
 
 __all__ = ["CommandGuardOptions", "build_command_request", "main", "run_guard"]
 
 CommandSurface = Literal["shell", "database", "cloud", "kubernetes", "http", "custom"]
+
+DEFAULT_AUDIT_LOG = "runtime/audit.jsonl"
+DEFAULT_APPROVAL_STORE = "runtime/approvals.json"
 
 
 @dataclass(frozen=True)
@@ -36,6 +42,8 @@ class CommandGuardOptions:
     context: str = ""
     tenant_id: str = ""
     execute: bool = False
+    audit_log: str = DEFAULT_AUDIT_LOG
+    approval_store: str = DEFAULT_APPROVAL_STORE
 
     @classmethod
     def from_argv(cls, argv: Sequence[str] | None = None) -> CommandGuardOptions:
@@ -52,6 +60,8 @@ class CommandGuardOptions:
             context=args.context,
             tenant_id=args.tenant_id,
             execute=args.execute,
+            audit_log=args.audit_log,
+            approval_store=args.approval_store,
         )
 
 
@@ -73,14 +83,30 @@ def build_command_request(options: CommandGuardOptions) -> ToolReviewRequest:
 
 
 def run_guard(options: CommandGuardOptions) -> dict[str, object]:
-    """Review a command and return a redacted decision event."""
+    """Review a command and return a redacted decision event.
+
+    Every decision is appended to the tamper-evident hash-chained audit log, and
+    an escalated (human-required) action is routed through the durable, digest-
+    scoped approval queue: the first review opens a pending ticket and is not
+    permitted; once a human approves that digest out of band (``director-class-
+    approve``), a single later run with ``--execute`` is permitted exactly once.
+    """
     request = build_command_request(options)
-    decision = ToolReviewMiddleware.default(executor=_execute_command).run(request)
+    Path(options.audit_log).parent.mkdir(parents=True, exist_ok=True)
+    Path(options.approval_store).parent.mkdir(parents=True, exist_ok=True)
+    middleware = ToolReviewMiddleware.default(
+        executor=_execute_command,
+        approval=ApprovalQueue(options.approval_store).request_approval,
+        audit_sink=AuditChainSink(Path(options.audit_log)),
+    )
+    decision = middleware.run(request)
     event = decision.to_audit_event()
     return {
         **event,
         "surface": options.surface,
         "dry_run": not options.execute,
+        "audit_log": options.audit_log,
+        "approval_store": options.approval_store,
     }
 
 
@@ -142,6 +168,16 @@ def _parser() -> argparse.ArgumentParser:
         "--execute",
         action="store_true",
         help="Execute only after a permit decision. Omit for dry-run review.",
+    )
+    parser.add_argument(
+        "--audit-log",
+        default=DEFAULT_AUDIT_LOG,
+        help=f"Tamper-evident hash-chained audit log. Default: {DEFAULT_AUDIT_LOG}.",
+    )
+    parser.add_argument(
+        "--approval-store",
+        default=DEFAULT_APPROVAL_STORE,
+        help=f"Durable digest-scoped approval queue. Default: {DEFAULT_APPROVAL_STORE}.",
     )
     parser.add_argument(
         "command",

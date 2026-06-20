@@ -9,6 +9,8 @@ dist/
 .ruff_cache/
 .coverage
 htmlcov/
+# Runtime state written by the command guard (audit chain + approval queue)
+runtime/
 # Agent/coordination metadata
 .agent_metadata.json
 CLAUDE.md

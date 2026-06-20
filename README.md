@@ -112,12 +112,34 @@ director-class-mcp-gateway --host 0.0.0.0 --operator-key-env DIRECTOR_CLASS_MCP_
 
 For command-line workflows, `director-class-guard` reviews shell, database,
 cloud, Kubernetes, HTTP, and custom commands before optional execution. It is
-dry-run by default.
+dry-run by default, and on every run it appends a privacy-preserving entry to a
+tamper-evident hash-chained audit log (`runtime/audit.jsonl`) and routes any
+human-required escalation through a durable, digest-scoped approval queue
+(`runtime/approvals.json`). Both paths are configurable with `--audit-log` and
+`--approval-store`.
 
 ```bash
 director-class-guard --surface kubernetes -- kubectl get pods
 director-class-guard --surface shell --execute -- printf guard-ok
 ```
+
+An escalated action is not permitted on its own. The first review opens a pending
+ticket bound to the action's request digest; a human approves it out of band with
+`director-class-approve`, after which a single later `--execute` run is permitted
+exactly once (the approval is single-use):
+
+```bash
+# 1. review escalates and prints a request_digest; the action is not permitted
+director-class-guard --surface database -- "DROP TABLE audit_2019"
+# 2. a different human approves that digest
+director-class-approve pending
+director-class-approve approve --digest <request_digest> --approver alice
+# 3. one execution is now permitted; a second review is blocked again
+director-class-guard --surface database --execute -- "DROP TABLE audit_2019"
+```
+
+A hard block (an injected, tainted, or exfiltration action) is never routed to
+approval — it stays blocked regardless of who asked.
 
 ## External benchmark artefacts
 
@@ -189,10 +211,19 @@ director-class-siem-export runtime/audit.jsonl
 
 ## Operator approvals
 
-The approval transport package exposes the existing digest-scoped queue through
-an operator-console adapter, signed webhook events, and a loopback JSON service.
-Responses contain ticket digests, status, timestamps, expiry, and approver
-digests only; raw actions and command output are not returned.
+`director-class-approve` resolves the escalation tickets the command guard opens,
+operating on the same durable queue:
+
+```bash
+director-class-approve pending
+director-class-approve approve --digest <request_digest> --approver alice
+director-class-approve deny --digest <request_digest> --approver alice
+```
+
+The approval transport package additionally exposes the digest-scoped queue
+through an operator-console adapter, signed webhook events, and a loopback JSON
+service. Responses contain ticket digests, status, timestamps, expiry, and
+approver digests only; raw actions and command output are not returned.
 
 ```python
 from director_class_ai.approvals import (

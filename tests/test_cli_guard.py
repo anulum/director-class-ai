@@ -12,6 +12,10 @@ import json
 import tomllib
 from pathlib import Path
 
+import pytest
+
+from director_class_ai.approvals import ApprovalQueue
+from director_class_ai.audit import verify_chain
 from director_class_ai.cli.guard import (
     CommandGuardOptions,
     build_command_request,
@@ -22,6 +26,25 @@ from director_class_ai.cli.guard import (
 _PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
 
 
+def _opts(tmp_path: Path, **kwargs: object) -> CommandGuardOptions:
+    """Build guard options whose audit log and approval queue live under tmp."""
+    return CommandGuardOptions(
+        audit_log=str(tmp_path / "audit.jsonl"),
+        approval_store=str(tmp_path / "approvals.json"),
+        **kwargs,  # type: ignore[arg-type]
+    )
+
+
+def _main_args(tmp_path: Path, *argv: str) -> tuple[str, ...]:
+    return (
+        "--audit-log",
+        str(tmp_path / "audit.jsonl"),
+        "--approval-store",
+        str(tmp_path / "approvals.json"),
+        *argv,
+    )
+
+
 def test_command_guard_options_parse_defaults() -> None:
     options = CommandGuardOptions.from_argv(("--", "echo", "ok"))
 
@@ -29,6 +52,8 @@ def test_command_guard_options_parse_defaults() -> None:
     assert options.command == ("echo", "ok")
     assert options.provenance == "user"
     assert options.execute is False
+    assert options.audit_log == "runtime/audit.jsonl"
+    assert options.approval_store == "runtime/approvals.json"
 
 
 def test_command_guard_options_parse_without_separator() -> None:
@@ -44,6 +69,14 @@ def test_command_guard_options_parse_all_surfaces() -> None:
         )
         assert options.surface == surface
         assert options.provenance == "retrieved"
+
+
+def test_command_guard_options_parse_audit_and_approval_paths() -> None:
+    options = CommandGuardOptions.from_argv(
+        ("--audit-log", "/tmp/a.jsonl", "--approval-store", "/tmp/q.json", "--", "noop")
+    )
+    assert options.audit_log == "/tmp/a.jsonl"
+    assert options.approval_store == "/tmp/q.json"
 
 
 def test_build_command_request_uses_existing_sdk_contract() -> None:
@@ -65,8 +98,8 @@ def test_build_command_request_uses_existing_sdk_contract() -> None:
     assert evaluation.tenant_id == "tenant-a"
 
 
-def test_dry_run_allows_safe_command_without_execution() -> None:
-    event = run_guard(CommandGuardOptions(surface="shell", command=("echo", "ok")))
+def test_dry_run_allows_safe_command_without_execution(tmp_path: Path) -> None:
+    event = run_guard(_opts(tmp_path, surface="shell", command=("echo", "ok")))
 
     assert event["route"] == "allow"
     assert event["permitted"] is True
@@ -75,8 +108,8 @@ def test_dry_run_allows_safe_command_without_execution() -> None:
     assert event["surface"] == "shell"
 
 
-def test_blocked_command_returns_redacted_event() -> None:
-    event = run_guard(CommandGuardOptions(surface="shell", command=("rm", "-rf", "/")))
+def test_blocked_command_returns_redacted_event(tmp_path: Path) -> None:
+    event = run_guard(_opts(tmp_path, surface="shell", command=("rm", "-rf", "/")))
 
     assert event["route"] == "human"
     assert event["permitted"] is False
@@ -85,9 +118,12 @@ def test_blocked_command_returns_redacted_event() -> None:
     assert "rm -rf" not in repr(event)
 
 
-def test_untrusted_cloud_mutation_blocks_without_approval_downgrade() -> None:
+def test_untrusted_cloud_mutation_blocks_without_approval_downgrade(
+    tmp_path: Path,
+) -> None:
     event = run_guard(
-        CommandGuardOptions(
+        _opts(
+            tmp_path,
             surface="cloud",
             command=("deploy", "production"),
             provenance="retrieved",
@@ -101,9 +137,9 @@ def test_untrusted_cloud_mutation_blocks_without_approval_downgrade() -> None:
     assert "origin_taint" in event["firing"]
 
 
-def test_execute_runs_only_after_permit() -> None:
+def test_execute_runs_only_after_permit(tmp_path: Path) -> None:
     event = run_guard(
-        CommandGuardOptions(surface="shell", command=("printf", "guard-ok"), execute=True)
+        _opts(tmp_path, surface="shell", command=("printf", "guard-ok"), execute=True)
     )
 
     assert event["route"] == "allow"
@@ -115,26 +151,66 @@ def test_execute_runs_only_after_permit() -> None:
     assert "guard-ok" not in repr(event)
 
 
-def test_main_writes_json_and_returns_zero_for_dry_run(capsys) -> None:
-    code = main(("--", "echo", "ok"))
-    captured = capsys.readouterr()
-    event = json.loads(captured.out)
+def test_every_decision_is_recorded_to_the_audit_chain(tmp_path: Path) -> None:
+    event = run_guard(_opts(tmp_path, surface="shell", command=("echo", "ok")))
+
+    audit_log = Path(str(event["audit_log"]))
+    assert audit_log.exists()
+    verification = verify_chain(audit_log)
+    assert verification.ok
+    assert len(audit_log.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_escalated_action_opens_a_pending_ticket(tmp_path: Path) -> None:
+    event = run_guard(_opts(tmp_path, surface="shell", command=("rm", "-rf", "/")))
+
+    queue = ApprovalQueue(str(event["approval_store"]))
+    digest = str(event["request_digest"])
+    ticket = queue.get(digest)
+    assert ticket is not None
+    assert ticket.status == "pending"
+    assert [t.digest for t in queue.pending()] == [digest]
+
+
+def test_human_approval_permits_the_action_exactly_once(tmp_path: Path) -> None:
+    first = run_guard(_opts(tmp_path, surface="shell", command=("rm", "-rf", "/")))
+    assert first["permitted"] is False
+
+    queue = ApprovalQueue(str(first["approval_store"]))
+    queue.approve(str(first["request_digest"]), "operator@example.com")
+
+    second = run_guard(_opts(tmp_path, surface="shell", command=("rm", "-rf", "/")))
+    assert second["permitted"] is True  # the approved digest is consumed once
+
+    third = run_guard(_opts(tmp_path, surface="shell", command=("rm", "-rf", "/")))
+    assert third["permitted"] is False  # single-use: a fresh review is blocked again
+
+
+def test_main_writes_json_and_returns_zero_for_dry_run(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = main(_main_args(tmp_path, "--", "echo", "ok"))
+    event = json.loads(capsys.readouterr().out)
 
     assert code == 0
     assert event["route"] == "allow"
     assert event["executed"] is False
 
 
-def test_main_returns_two_for_unpermitted_action(capsys) -> None:
-    code = main(("--", "rm", "-rf", "/"))
+def test_main_returns_two_for_unpermitted_action(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = main(_main_args(tmp_path, "--", "rm", "-rf", "/"))
     event = json.loads(capsys.readouterr().out)
 
     assert code == 2
     assert event["permitted"] is False
 
 
-def test_main_returns_executed_command_exit_code(capsys) -> None:
-    code = main(("--execute", "--", "false"))
+def test_main_returns_executed_command_exit_code(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = main(_main_args(tmp_path, "--execute", "--", "false"))
     event = json.loads(capsys.readouterr().out)
 
     assert code == 1

@@ -32,6 +32,7 @@ classifiers = [
 dependencies = []
 
 [project.scripts]
+director-class-approve = "director_class_ai.cli.approve:main"
 director-class-guard = "director_class_ai.cli.guard:main"
 director-class-mcp-gateway = "director_class_ai.gateway.mcp_cli:main"
 director-class-policy = "director_class_ai.cli.policy:main"
