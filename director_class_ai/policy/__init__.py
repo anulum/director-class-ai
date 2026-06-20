@@ -28,6 +28,7 @@ from .capability_profiles import (
 from .history import PolicyHistory
 from .loader import load_profile, load_profile_file
 from .profile import Profile
+from .review import PolicyChangeProposal, PolicyChangeReview
 from .revision import PolicyFieldChange, PolicyRevision, diff_profiles
 
 __all__ = [
@@ -43,6 +44,8 @@ __all__ = [
     "CapabilityPolicyDetector",
     "CapabilitySurfaceProfile",
     "OriginRule",
+    "PolicyChangeProposal",
+    "PolicyChangeReview",
     "PolicyFieldChange",
     "PolicyHistory",
     "PolicyRevision",
