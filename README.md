@@ -133,7 +133,7 @@ The ensemble runs detectors concurrently and cheap-first (tiered cascade), so th
 common safe case clears in microseconds and only a flagged action pays for the
 full ensemble. Every detector — content, integrity, or action — emits the same
 `DetectorSignal`, and a per-plane fusion (fail-open content, fail-closed action)
-resolves them into one `Verdict`. Architecture and roadmap: `docs/internal/`.
+resolves them into one `Verdict`.
 
 ## Rust normalisation path
 
@@ -148,7 +148,7 @@ compiled path.
 
 ## Claim boundaries
 
-Public copy, investor copy, and demos use the same bounded claim language in
+Public copy and demos use the same bounded claim language in
 `docs/CLAIM_BOUNDARIES.md`. The primary category is runtime action-control and
 evidence for autonomous agents. Do not claim comparative benchmark leadership,
 certification, or production readiness until the corresponding evidence gates are

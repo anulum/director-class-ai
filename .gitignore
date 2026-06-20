@@ -13,3 +13,6 @@ htmlcov/
 .agent_metadata.json
 CLAUDE.md
 .claude/
+# Internal-only product docs (plan, audit, architecture, positioning, research)
+# kept out of the public source release.
+docs/internal/

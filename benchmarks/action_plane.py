@@ -28,8 +28,9 @@ over the safe cases that declare an ``expected_route``, that the decision's
 outcome matches what the corpus says should happen (allow vs escalate).
 
 This is **functional evidence**, not a claim-grade benchmark: the corpus (~305
-authored cases) runs in-repo on a shared workstation. Per the Codex diagnosis, no
-external benchmark claim should be made until it is run isolated and cross-checked
+authored cases) runs in-repo on a shared workstation. Per the infrastructure
+diagnosis, no external benchmark claim should be made until it is run isolated
+and cross-checked
 against AgentDojo / SkillInject / MCPSafeBench-style surfaces — the corpus cases
 are aligned to those threat taxonomies but authored here, not copied.
 """
