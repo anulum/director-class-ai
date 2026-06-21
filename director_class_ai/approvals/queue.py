@@ -30,6 +30,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from ..core.durability import atomic_write_text
 from ..core.governor import digest_request
 from ..core.signal import EvaluationRequest
 
@@ -78,9 +79,11 @@ class ApprovalQueue:
         return {d: ApprovalTicket(**t) for d, t in raw.items()}
 
     def _save(self, tickets: dict[str, ApprovalTicket]) -> None:
-        self.path.write_text(
+        # atomic + fsync: a crash mid-write must not corrupt or empty the queue
+        # and lose every outstanding approval.
+        atomic_write_text(
+            self.path,
             json.dumps({d: asdict(t) for d, t in tickets.items()}),
-            encoding="utf-8",
         )
 
     def _is_expired(self, ticket: ApprovalTicket) -> bool:
