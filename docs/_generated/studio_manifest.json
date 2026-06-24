@@ -1,0 +1,145 @@
+{
+  "content_digest": "sha256:3ed22679915bef073565126faf6379d234889e3bc141489dd018bfc1598f3cbb",
+  "contract_era": "v1",
+  "enumeration": "language-agnostic",
+  "evidence_types": [
+    "studio.action-benchmark.v1",
+    "studio.action-decision.v1",
+    "studio.action-execution.v1",
+    "studio.action-risk.v1",
+    "studio.approval-record.v1",
+    "studio.audit-chain.v1",
+    "studio.capability-profile.v1",
+    "studio.detector-scan.v1"
+  ],
+  "platform_sdk": ">=0.1,<0.2",
+  "protocol_version": "1",
+  "studio": "director-class-ai",
+  "studio_version": "0.1.0",
+  "transport_profile": "local-first",
+  "ui_module": {
+    "exposes": [
+      "./DirectorClassStudioPanel"
+    ],
+    "federation": "module-federation-2",
+    "remote_entry": "/studio/remoteEntry.js"
+  },
+  "verbs": [
+    {
+      "backends": [
+        "python",
+        "rust"
+      ],
+      "produces": [
+        "studio.action-decision.v1"
+      ],
+      "safety_tier": "production",
+      "side_effect": "read-only",
+      "timing": {
+        "class": "interactive"
+      },
+      "verb": "gate"
+    },
+    {
+      "backends": [
+        "python",
+        "rust"
+      ],
+      "produces": [
+        "studio.action-risk.v1"
+      ],
+      "safety_tier": "production",
+      "side_effect": "read-only",
+      "timing": {
+        "class": "interactive"
+      },
+      "verb": "assess"
+    },
+    {
+      "backends": [
+        "python"
+      ],
+      "produces": [
+        "studio.approval-record.v1"
+      ],
+      "safety_tier": "production",
+      "side_effect": "read-only",
+      "timing": {
+        "class": "interactive"
+      },
+      "verb": "approve"
+    },
+    {
+      "backends": [
+        "python",
+        "rust"
+      ],
+      "produces": [
+        "studio.audit-chain.v1"
+      ],
+      "safety_tier": "production",
+      "side_effect": "read-only",
+      "timing": {
+        "class": "batch"
+      },
+      "verb": "audit"
+    },
+    {
+      "backends": [
+        "python",
+        "rust"
+      ],
+      "produces": [
+        "studio.detector-scan.v1"
+      ],
+      "safety_tier": "production",
+      "side_effect": "read-only",
+      "timing": {
+        "class": "interactive"
+      },
+      "verb": "detect"
+    },
+    {
+      "backends": [
+        "python"
+      ],
+      "produces": [
+        "studio.action-execution.v1"
+      ],
+      "safety_tier": "certified",
+      "side_effect": "live-hardware",
+      "timing": {
+        "class": "realtime"
+      },
+      "verb": "actuate"
+    },
+    {
+      "backends": [
+        "python"
+      ],
+      "produces": [
+        "studio.capability-profile.v1"
+      ],
+      "safety_tier": "research",
+      "side_effect": "read-only",
+      "timing": {
+        "class": "batch"
+      },
+      "verb": "certify"
+    },
+    {
+      "backends": [
+        "python"
+      ],
+      "produces": [
+        "studio.action-benchmark.v1"
+      ],
+      "safety_tier": "research",
+      "side_effect": "simulated",
+      "timing": {
+        "class": "batch"
+      },
+      "verb": "benchmark"
+    }
+  ]
+}
