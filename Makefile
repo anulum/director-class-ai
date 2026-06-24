@@ -2,7 +2,7 @@
 # Director-Class AI — developer task runner
 .DEFAULT_GOAL := help
 PY ?= python
-.PHONY: help test lint fmt types sast spdx docs build bench bench-evidence import-external redteam preflight
+.PHONY: help test lint fmt types sast spdx docs build bench bench-evidence import-external redteam repository-readiness phase4-intake preflight
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -50,5 +50,11 @@ import-external: ## Import reviewed external JSONL: make import-external SURFACE
 redteam: ## Run the adversarial red-team benchmark
 	$(PY) -m benchmarks.adversarial_red_team
 
-preflight: spdx docs lint types test ## Full local gate before commit
+repository-readiness: ## Validate repository-readiness gates (license, Makefile, surface)
+	$(PY) tools/check_repository_readiness.py
+
+phase4-intake: ## Validate phase-4 task intake
+	$(PY) tools/check_phase4_task_intake.py
+
+preflight: spdx docs lint types test repository-readiness phase4-intake ## Full local gate before commit
 	@echo "preflight OK"
