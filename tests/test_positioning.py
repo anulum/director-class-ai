@@ -1,5 +1,5 @@
-# SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial
-# Director-Class AI — commercial product (licence pending); not the Apache base.
+# SPDX-License-Identifier: BUSL-1.1
+# Director-Class AI — commercial product (BUSL-1.1); not the Apache base.
 # © Concepts 1996–2026 Miroslav Šotek. All rights reserved.
 # © Code 2020–2026 Miroslav Šotek. All rights reserved.
 # ORCID: 0009-0009-3560-0851
@@ -64,12 +64,11 @@ def test_public_claim_document_matches_canonical_language() -> None:
     assert language.demo_summary in claim_doc
 
 
-def test_internal_investor_copy_matches_canonical_language() -> None:
-    investor_doc = (_ROOT / "docs" / "internal" / "INVESTOR_POSITIONING.md").read_text(
-        encoding="utf-8"
-    )
+def test_investor_markdown_renders_bounded_category() -> None:
     language = canonical_claim_language()
+    markdown = language.investor_markdown()
 
-    assert language.investor_markdown() in investor_doc
-    assert language.benchmark_boundary in investor_doc
-    assert language.certification_boundary in investor_doc
+    assert f"Category: {language.primary_category}" in markdown
+    assert language.investor_summary in markdown
+    assert "Defensible wedge:" in markdown
+    assert "Blocked until evidence exists:" in markdown

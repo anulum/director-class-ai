@@ -9,6 +9,8 @@ dist/
 .ruff_cache/
 .coverage
 htmlcov/
+# Runtime state written by the command guard (audit chain + approval queue)
+runtime/
 # Agent/coordination metadata
 .agent_metadata.json
 CLAUDE.md
@@ -16,3 +18,8 @@ CLAUDE.md
 # Internal-only product docs (plan, audit, architecture, positioning, research)
 # kept out of the public source release.
 docs/internal/
+# Internal governance tooling that reads docs/internal/ — kept local-only.
+tools/check_phase4_task_intake.py
+tools/check_repository_readiness.py
+tests/test_phase4_task_intake.py
+tests/test_repository_readiness.py

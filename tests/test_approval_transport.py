@@ -1,5 +1,5 @@
-# SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial
-# Director-Class AI — commercial product (licence pending); not the Apache base.
+# SPDX-License-Identifier: BUSL-1.1
+# Director-Class AI — commercial product (BUSL-1.1); not the Apache base.
 # © Concepts 1996–2026 Miroslav Šotek. All rights reserved.
 # © Code 2020–2026 Miroslav Šotek. All rights reserved.
 # ORCID: 0009-0009-3560-0851
@@ -438,3 +438,13 @@ def test_http_server_rejects_invalid_key(tmp_path: Path) -> None:
         thread.join(timeout=5.0)
 
     assert exc.value.code == HTTPStatus.UNAUTHORIZED
+
+
+def test_webhook_sink_rejects_non_http_scheme() -> None:
+    import pytest
+
+    from director_class_ai.approvals.transport import ApprovalWebhookSink
+
+    for bad in ("file:///etc/passwd", "ftp://host/p", "gopher://x"):
+        with pytest.raises(ValueError, match="must be http or https"):
+            ApprovalWebhookSink(bad)

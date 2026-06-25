@@ -1,5 +1,5 @@
-# SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial
-# Director-Class AI — commercial product (licence pending); not the Apache base.
+# SPDX-License-Identifier: BUSL-1.1
+# Director-Class AI — commercial product (BUSL-1.1); not the Apache base.
 # © Concepts 1996–2026 Miroslav Šotek. All rights reserved.
 # © Code 2020–2026 Miroslav Šotek. All rights reserved.
 # ORCID: 0009-0009-3560-0851
@@ -23,6 +23,7 @@ and the outcome.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 
 from .history import PolicyHistory
@@ -73,10 +74,40 @@ class PolicyChangeReview:
         self._history = history
         self._proposals: dict[str, PolicyChangeProposal] = {}
 
+    @classmethod
+    def restore(
+        cls,
+        history: PolicyHistory,
+        proposals: Sequence[PolicyChangeProposal],
+    ) -> PolicyChangeReview:
+        """Rehydrate a review from a durable history and its proposals.
+
+        Parameters
+        ----------
+        history : PolicyHistory
+            The gated history, already restored to its full lineage.
+        proposals : sequence of PolicyChangeProposal
+            Every proposal — pending and terminal — to re-register, in order.
+
+        Returns
+        -------
+        PolicyChangeReview
+            A review wrapping ``history`` with ``proposals`` re-registered by
+            content address.
+        """
+        review = cls(history)
+        review._proposals = {p.digest: p for p in proposals}
+        return review
+
     @property
     def history(self) -> PolicyHistory:
         """Return the gated history."""
         return self._history
+
+    @property
+    def proposals(self) -> tuple[PolicyChangeProposal, ...]:
+        """Return every proposal — pending and terminal — in registration order."""
+        return tuple(self._proposals.values())
 
     def propose(
         self, profile: Profile, *, proposer: str, created_at: str, reason: str

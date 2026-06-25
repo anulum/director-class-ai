@@ -1,5 +1,5 @@
-# SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial
-# Director-Class AI — commercial product (licence pending); not the Apache base.
+# SPDX-License-Identifier: BUSL-1.1
+# Director-Class AI — commercial product (BUSL-1.1); not the Apache base.
 # © Concepts 1996–2026 Miroslav Šotek. All rights reserved.
 # © Code 2020–2026 Miroslav Šotek. All rights reserved.
 # ORCID: 0009-0009-3560-0851
@@ -17,7 +17,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-_TAG = "SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial"
+_TAG = "SPDX-License-Identifier: BUSL-1.1"
 _ROOTS = ("director_class_ai", "tests", "benchmarks", "tools", "demos")
 
 

@@ -1,6 +1,13 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- Licence: now distributed under the Business Source License 1.1 (Change Date
+  2030-06-20, Change License Apache-2.0). Self-hosted production use is permitted;
+  offering the work as a hosted/managed service or a competing product on its
+  governance, action-control, kill-switch, or audit functionality requires a
+  commercial licence. SPDX identifier on every file changed to `BUSL-1.1`.
+
 ### Added
 - Authorised-destructive routing: a user-originated, taint-free destructive
   action (force-push a feature branch, DROP/TRUNCATE a user-named table) is

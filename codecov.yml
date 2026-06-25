@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BUSL-1.1
+# Director-Class AI — Codecov configuration
+#
+# Coverage is gated in CI by pytest --cov-fail-under; Codecov is informational
+# only and never fails a check, so an unconfigured or unavailable upload cannot
+# block the build.
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        informational: true
+    patch:
+      default:
+        informational: true
+comment: false

@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: BUSL-1.1
+# Director-Class AI — Citation Metadata
+# © 1996-2026 Miroslav Šotek. All rights reserved.
+# Contact: www.anulum.li | protoscience@anulum.li
+# ORCID: https://orcid.org/0009-0009-3560-0851
+# Licence: Business Source License 1.1 (converts to Apache-2.0 on the Change Date)
+cff-version: 1.2.0
+title: "Director-Class AI"
+message: "If you use this software, please cite it using the metadata below."
+type: software
+authors:
+  - family-names: "Šotek"
+    given-names: "Miroslav"
+    orcid: "https://orcid.org/0009-0009-3560-0851"
+    affiliation: "ANULUM (Switzerland & Liechtenstein)"
+repository-code: "https://github.com/anulum/director-class-ai"
+url: "https://github.com/anulum/director-class-ai"
+abstract: >-
+  A runtime action-control and evidence layer for autonomous AI agents.
+  Director-Class AI sits between an agent and its effectors, reviewing
+  high-impact shell, SQL, infrastructure, API, and MCP tool actions before
+  dispatch; uncertain or high-risk actions escalate to human approval and emit
+  tamper-evident audit and evidence records. A parallel detector ensemble
+  governs three planes at once — content, integrity, and action.
+keywords:
+  - ai-safety
+  - runtime-action-control
+  - agent-governance
+  - guardrails
+  - mcp
+  - audit-evidence
+license: BUSL-1.1
+version: "0.1.0"
+date-released: "2026-06-20"

@@ -1,5 +1,5 @@
-# SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial
-# Director-Class AI — commercial product (licence pending); not the Apache base.
+# SPDX-License-Identifier: BUSL-1.1
+# Director-Class AI — commercial product (BUSL-1.1); not the Apache base.
 # © Concepts 1996–2026 Miroslav Šotek. All rights reserved.
 # © Code 2020–2026 Miroslav Šotek. All rights reserved.
 # ORCID: 0009-0009-3560-0851
@@ -32,6 +32,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeAlias
+
+from ..core.durability import atomic_write_text, durable_append_line
 
 if TYPE_CHECKING:
     from ..core.governor import AuditRecord
@@ -136,11 +138,12 @@ class AuditChainSink:
             }
             entry = dict(payload)
             entry["entry_hash"] = _entry_hash(prev_hash, payload)
-            with self.path.open("a", encoding="utf-8") as fh:
-                fh.write(json.dumps(entry) + "\n")
-            self._head_path.write_text(
+            # fsync the entry to disk before the head advances, so a crash can
+            # never leave a head that points past a record the chain has lost.
+            durable_append_line(self.path, json.dumps(entry) + "\n")
+            atomic_write_text(
+                self._head_path,
                 json.dumps({"seq": seq, "entry_hash": entry["entry_hash"]}),
-                encoding="utf-8",
             )
 
 

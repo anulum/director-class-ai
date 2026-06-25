@@ -1,5 +1,5 @@
-# SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial
-# Director-Class AI — commercial product (licence pending); not the Apache base.
+# SPDX-License-Identifier: BUSL-1.1
+# Director-Class AI — commercial product (BUSL-1.1); not the Apache base.
 # © Concepts 1996–2026 Miroslav Šotek. All rights reserved.
 # © Code 2020–2026 Miroslav Šotek. All rights reserved.
 # ORCID: 0009-0009-3560-0851
@@ -11,7 +11,11 @@
 The detectors and fusion produce a verdict; the Governor turns that verdict into
 a decision *at the boundary* — the single place an action or output must pass
 before a shell runs it, a row is deleted, an API is called. It is the piece that
-makes the ensemble an actual kill-switch rather than an advisory score.
+makes the ensemble an enforced fail-closed checkpoint rather than an advisory
+score. It runs in-process, which gives it coverage of every call the host routes
+through it; a halt that survives a *compromised* agent additionally needs the
+checkpoint placed out of band, in a separate privilege boundary, which this
+in-process checkpoint does not by itself provide.
 
 It is fail-closed by construction:
 
