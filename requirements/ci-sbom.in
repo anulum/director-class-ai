@@ -6,4 +6,4 @@
 # Contact: www.anulum.li | protoscience@anulum.li
 # Director-Class AI — CI SBOM-generation requirements source
 
-cyclonedx-bom>=4,<7
+cyclonedx-bom>=7.3.0,<8
