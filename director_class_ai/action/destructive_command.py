@@ -39,6 +39,11 @@ from ..core.signal import (
     Severity,
 )
 from ._normalize import expand
+from ._shell_segments import (
+    is_print_only_command,
+    shell_segments,
+    starts_with_print_command,
+)
 
 __all__ = ["DestructiveCommandDetector", "rust_matcher_available"]
 
@@ -395,12 +400,6 @@ def rust_matcher_available() -> bool:
 # blocking ``rm -rf node_modules`` makes the guard unusable, missing ``rm -rf /``
 # makes it useless.
 _RM_SEGMENT = re.compile(r"\brm\b([^|;&\n]*)", re.IGNORECASE)
-_SHELL_SPLIT = re.compile(r"[|;&]")
-_PRINT_COMMAND = re.compile(
-    r"^(?:[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|\"[^\"]*\"|[^\s;&|]+)\s+)*"
-    r"(?:echo|printf)\b",
-    re.IGNORECASE,
-)
 _SCRATCH_ABS = re.compile(r"^/(?:tmp|var/tmp)(?:/|$)")
 _CRITICAL_TARGETS = frozenset(
     {"/", "/*", "~", "~/", "$HOME", ".", "./", "..", "*", "./*"}
@@ -437,9 +436,8 @@ def _target_severity(target: str) -> Severity | None:
 def _rm_severity(form: str) -> Severity | None:
     """Severity of a recursive ``rm`` in *form*, or None if absent / local / safe."""
     worst: Severity | None = None
-    for shell_segment in _SHELL_SPLIT.split(form):
-        shell_segment = shell_segment.strip()
-        if _PRINT_COMMAND.match(shell_segment):
+    for shell_segment in shell_segments(form):
+        if starts_with_print_command(shell_segment):
             continue
         for segment in _RM_SEGMENT.findall(shell_segment):
             tokens = segment.split()
@@ -454,6 +452,8 @@ def _rm_severity(form: str) -> Severity | None:
 
 def _match_python(forms: Sequence[str]) -> _Match:
     """Return the Python reference destructive match across de-obfuscated forms."""
+    if forms and is_print_only_command(forms[0]):
+        return None, "", ""
     best: _Rule | None = None
     for rule in _RULES:
         if any(rule.pattern.search(form) for form in forms) and (

@@ -35,6 +35,7 @@ from ..core.signal import (
     Severity,
 )
 from ._lexicon import BREADTH, IRREVERSIBLE, PRODUCTION, SYSTEM_TARGET
+from ._shell_segments import strip_print_segments
 
 __all__ = ["BlastRadiusDetector"]
 
@@ -44,12 +45,6 @@ _WEIGHTS: tuple[tuple[re.Pattern[str], float, str], ...] = (
     (SYSTEM_TARGET, 0.25, "system / high-value target"),
     (PRODUCTION, 0.20, "production scope"),
     (BREADTH, 0.15, "recursive / wildcard / force breadth"),
-)
-_PRINT_SEGMENT = re.compile(
-    r"(?:^|[;&|]\s*)"
-    r"(?:[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|\"[^\"]*\"|[^\s;&|]+)\s+)*"
-    r"(?:echo|printf)\b[^;&|]*",
-    re.IGNORECASE,
 )
 
 
@@ -71,7 +66,7 @@ class BlastRadiusDetector:
 
     def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
         """Emit a blast-radius signal when an irreversible action reaches scope."""
-        command = _PRINT_SEGMENT.sub(" ", (request.action or "")).strip()
+        command = strip_print_segments(request.action or "").strip()
         if not command:
             return None
         risk = 0.0

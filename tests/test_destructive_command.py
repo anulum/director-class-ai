@@ -94,6 +94,7 @@ SAFE = [
     r"printf '\162\155' | xargs -I{} {} -rf ./build",
     "X=rm; echo $X -rf /",
     "echo rm -rf /",
+    "echo 'rm -rf /; rm -rf /etc'",
 ]
 
 
@@ -169,6 +170,9 @@ class TestPathAwareRm:
 
     def test_parent_traversal_is_high(self) -> None:
         assert detect("rm -rf ../sibling").severity is Severity.HIGH
+
+    def test_printed_quoted_separator_does_not_hide_later_command(self) -> None:
+        assert detect("echo 'rm -rf /'; rm -rf /etc").severity is Severity.HIGH
 
     def test_obfuscated_recursive_root_rm_still_critical(self) -> None:
         assert detect("r''m -rf /").severity is Severity.CRITICAL
