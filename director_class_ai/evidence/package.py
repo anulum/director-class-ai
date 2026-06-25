@@ -183,6 +183,7 @@ class EvidencePackage:
     evidence_digest: str = ""
 
     def __post_init__(self) -> None:
+        """Populate the evidence digest from the redacted package payload."""
         if not self.evidence_digest:
             object.__setattr__(self, "evidence_digest", _digest_json(self._payload()))
 

@@ -41,6 +41,7 @@ class Profile:
     capability_profile: str = "deny_all_actions"
 
     def __post_init__(self) -> None:
+        """Validate profile threshold bounds."""
         for attr in (
             "content_threshold",
             "integrity_threshold",

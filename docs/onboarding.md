@@ -55,8 +55,10 @@ assert decision.permitted is False
 make preflight
 ```
 
-`make preflight` runs the SPDX, documentation, lint, strict-typing, and test
-gates locally before a commit.
+`make preflight` runs the SPDX, test-quality, boundary-evidence, godfile,
+documentation, lint, strict-typing, readiness, and intake gates locally before a
+commit. Run focused tests for touched modules locally; GitHub Actions owns the
+full test and coverage gate.
 
 ## 5. Read the Boundaries
 

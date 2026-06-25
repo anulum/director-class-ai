@@ -130,6 +130,7 @@ class DetectorSignal:
     latency_ms: float = 0.0
 
     def __post_init__(self) -> None:
+        """Validate calibrated detector score bounds."""
         if not 0.0 <= self.score <= 1.0:
             raise ValueError(f"score must be in [0, 1], got {self.score}")
         if not 0.0 <= self.calibration <= 1.0:

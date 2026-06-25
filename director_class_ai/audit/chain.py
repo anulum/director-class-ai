@@ -101,6 +101,7 @@ class AuditChainSink:
     clock: Callable[[], float] = time.time
 
     def __post_init__(self) -> None:
+        """Resolve sink paths and initialise the append lock."""
         self.path = Path(self.path)
         self._lock = threading.Lock()
         self._head_path = self.path.with_suffix(self.path.suffix + ".head")
@@ -119,6 +120,7 @@ class AuditChainSink:
         return int(rec["seq"]), str(rec["entry_hash"])
 
     def __call__(self, record: AuditRecord) -> None:
+        """Append one audit record while preserving chain continuity."""
         with self._lock:
             seq, prev_hash = self._last()
             seq += 1

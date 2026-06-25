@@ -76,7 +76,7 @@ class ParallelEnsembleScorer:
         return signals
 
     def _settled_block(self, signals: Sequence[DetectorSignal]) -> bool:
-        """True when a confident high-severity action objection already blocks.
+        """Return whether a confident high-severity action objection already blocks.
 
         Only blocking short-circuits — allowing never does (fail-closed).
         """

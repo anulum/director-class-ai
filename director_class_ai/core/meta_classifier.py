@@ -179,6 +179,7 @@ class SignalMetaClassifier:
     bias: float = 0.0
 
     def __post_init__(self) -> None:
+        """Validate model weights and bias are finite and named."""
         if not math.isfinite(self.bias):
             raise ValueError("bias must be finite")
         for key, value in self.weights.items():

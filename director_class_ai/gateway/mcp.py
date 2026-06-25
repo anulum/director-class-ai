@@ -760,7 +760,6 @@ class MCPGatewayRequest:
 
     def to_evaluation(self) -> EvaluationRequest:
         """Build the Governor request with both MCP inspection paths preserved."""
-
         return EvaluationRequest(
             query=self.query,
             context=self.context,
@@ -841,7 +840,6 @@ class MCPGatewayDecision:
 
     def to_audit_event(self) -> dict[str, object]:
         """Return a SIEM-safe event: identifiers and keys, never raw values."""
-
         return {
             "event_type": "mcp_gateway_decision",
             "server": self.call.server,
@@ -897,7 +895,6 @@ class MCPGateway:
         audit_sink: AuditSink | None = None,
     ) -> MCPGateway:
         """Create a default MCP action gateway from known-good registrations."""
-
         registry = MCPTrustRegistry(
             registrations,
             allow_dynamic_discovery=allow_dynamic_discovery,
@@ -933,7 +930,6 @@ class MCPGateway:
 
     def review_discovery(self, request: MCPDiscoveryRequest) -> MCPDiscoveryDecision:
         """Review a discovery envelope before trusting advertised tools."""
-
         findings = _review_discovery(request)
         permitted = not findings
         return MCPDiscoveryDecision(
@@ -948,13 +944,11 @@ class MCPGateway:
 
     def review_response(self, request: MCPResponseRequest) -> MCPResponseDecision:
         """Review a tool response before it is exposed to later agent steps."""
-
         decision = self._response_governor.review(request.to_evaluation())
         return MCPResponseDecision.from_governor(request, decision)
 
     def review(self, request: MCPGatewayRequest) -> MCPGatewayDecision:
         """Review a typed MCP request without executing the tool."""
-
         decision = self._governor.review(request.to_evaluation())
         return MCPGatewayDecision.from_request_and_governor(
             request,

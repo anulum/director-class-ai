@@ -1,0 +1,570 @@
+{
+  "schema_version": "director-class-ai.test-boundary-evidence.v1",
+  "updated_at": "2026-06-25",
+  "policy": {
+    "source": "agentic-shared/BROADCAST_2026-06-25_real_surface_e2e_test_policy.md",
+    "summary": "Boundary-crossing features must have e2e or integration tests for the actual API, CLI, service, adapter, file format, generated artifact, workflow, storage, or user-facing boundary."
+  },
+  "boundaries": [
+    {
+      "id": "cli-command-guard",
+      "boundary_type": "cli_workflow_storage",
+      "production_surfaces": [
+        "director_class_ai/cli/guard.py",
+        "director_class_ai/sdk/middleware.py",
+        "director_class_ai/audit/chain.py",
+        "director_class_ai/approvals/queue.py"
+      ],
+      "required_behaviour": "Command review CLI parses real options, writes redacted audit records, opens approval tickets, respects dry-run/execute modes, and preserves single-use approval semantics.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_cli_guard.py",
+          "mode": "integration",
+          "covers": "run_guard/main paths, audit JSONL persistence, approval-store persistence, execution gating, console-script declaration"
+        }
+      ]
+    },
+    {
+      "id": "cli-approval-queue",
+      "boundary_type": "cli_storage",
+      "production_surfaces": [
+        "director_class_ai/cli/approve.py",
+        "director_class_ai/approvals/queue.py"
+      ],
+      "required_behaviour": "Operator approval CLI lists, shows, approves, denies, and rejects invalid ticket state through the durable approval store.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_cli_approve.py",
+          "mode": "integration",
+          "covers": "CLI main paths over ApprovalQueue JSON store including unknown/already-decided digests"
+        }
+      ]
+    },
+    {
+      "id": "cli-policy-governance",
+      "boundary_type": "cli_storage_file_format",
+      "production_surfaces": [
+        "director_class_ai/cli/policy.py",
+        "director_class_ai/policy/store.py",
+        "director_class_ai/policy/governance.py"
+      ],
+      "required_behaviour": "Policy CLI reads profile TOML and case JSON, persists governance JSON, exposes candidate changes, detects drift, approves, denies, and rolls back revisions.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_cli_policy.py",
+          "mode": "integration",
+          "covers": "status/propose/approve/deny/expose/drift CLI flows with real temp files"
+        }
+      ]
+    },
+    {
+      "id": "audit-chain-and-siem-export",
+      "boundary_type": "storage_file_format_cli",
+      "production_surfaces": [
+        "director_class_ai/audit/chain.py",
+        "director_class_ai/audit/sinks.py",
+        "director_class_ai/audit/export_cli.py"
+      ],
+      "required_behaviour": "Audit decisions append to hash-chained JSONL, verify across restart/tamper cases, and export redacted SIEM JSONL through API and CLI entry points.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_audit_chain.py",
+          "mode": "integration",
+          "covers": "append, verify, mutation/reorder/deletion/truncation/corrupt-line detection, sidecar handling"
+        },
+        {
+          "file": "tests/test_audit_sinks.py",
+          "mode": "integration",
+          "covers": "verified chain to SIEM JSONL export and malformed detector-list handling"
+        },
+        {
+          "file": "tests/test_audit_export_cli.py",
+          "mode": "integration",
+          "covers": "CLI stdout/file export and fail-closed invalid-chain handling"
+        }
+      ]
+    },
+    {
+      "id": "approval-http-transport",
+      "boundary_type": "http_service_storage_webhook",
+      "production_surfaces": [
+        "director_class_ai/approvals/transport.py",
+        "director_class_ai/approvals/queue.py"
+      ],
+      "required_behaviour": "Approval HTTP service protects endpoints, handles pending/approve/deny requests over real loopback HTTP, emits webhook events, and rejects malformed bodies or invalid operator keys.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_approval_transport.py",
+          "mode": "e2e",
+          "covers": "ThreadingHTTPServer loopback requests, ApprovalQueue persistence, service errors, webhook sink validation"
+        }
+      ]
+    },
+    {
+      "id": "mcp-gateway-contract",
+      "boundary_type": "gateway_adapter_policy",
+      "production_surfaces": [
+        "director_class_ai/gateway/mcp.py",
+        "director_class_ai/action/mcp_inspector.py",
+        "director_class_ai/action/mcp_registry.py",
+        "director_class_ai/policy/capability.py"
+      ],
+      "required_behaviour": "In-process MCP gateway reviews discovery, signed registrations, tool calls, remote auth, capability policy, and tool responses without executing tools or leaking raw argument values.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_mcp_gateway.py",
+          "mode": "integration",
+          "covers": "discovery, signed call review, remote auth fail-closed, capability policy, response review, redacted audit events"
+        },
+        {
+          "file": "tests/test_mcp_inspector.py",
+          "mode": "integration",
+          "covers": "structured MCP call inspection, registry checks, argument taint, traversal/exfiltration, optional Rust parity fallback"
+        },
+        {
+          "file": "tests/test_mcp_registry.py",
+          "mode": "integration",
+          "covers": "registration signatures, schema drift, lookalike names, dynamic discovery policy"
+        }
+      ]
+    },
+    {
+      "id": "mcp-loopback-service",
+      "boundary_type": "http_service_gateway",
+      "production_surfaces": [
+        "director_class_ai/gateway/mcp_service.py",
+        "director_class_ai/gateway/mcp.py"
+      ],
+      "required_behaviour": "Loopback MCP service exposes health/discovery/review/response endpoints, authenticates protected routes, preserves redaction, and rejects malformed or oversized requests.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_mcp_gateway_service.py",
+          "mode": "e2e",
+          "covers": "real loopback HTTP server discovery/review/health/error routes and operator-key handling"
+        }
+      ]
+    },
+    {
+      "id": "mcp-gateway-cli",
+      "boundary_type": "cli_http_service",
+      "production_surfaces": [
+        "director_class_ai/gateway/mcp_cli.py",
+        "director_class_ai/gateway/mcp_service.py"
+      ],
+      "required_behaviour": "MCP gateway CLI parses runtime flags, builds loopback/non-loopback servers safely, exposes health, and closes servers on shutdown paths.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_mcp_gateway_cli.py",
+          "mode": "integration",
+          "covers": "CLI option parsing, loopback binding, operator-key requirement, server lifecycle, console-script declaration"
+        }
+      ]
+    },
+    {
+      "id": "sdk-tool-review-middleware",
+      "boundary_type": "adapter_execution_audit",
+      "production_surfaces": [
+        "director_class_ai/sdk/middleware.py",
+        "director_class_ai/core/governor.py"
+      ],
+      "required_behaviour": "SDK middleware renders tool actions deterministically, reviews without default execution, executes permitted calls exactly once, blocks untrusted mutations, routes approval, and emits digest-only audit events.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_sdk_middleware.py",
+          "mode": "integration",
+          "covers": "review/run paths, dry-run behaviour, executor override, approval route, redacted audit event"
+        }
+      ]
+    },
+    {
+      "id": "authorised-shell-workflow",
+      "boundary_type": "workflow_approval_effector",
+      "production_surfaces": [
+        "director_class_ai/workflows/authorised_execution.py",
+        "director_class_ai/effectors/shell.py",
+        "director_class_ai/approvals/queue.py"
+      ],
+      "required_behaviour": "Authorised destructive shell workflow composes queue, Governor, and shell effector so first review opens a ticket, explicit approval permits one execution, and replay is blocked.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_authorised_execution_workflow.py",
+          "mode": "e2e",
+          "covers": "full approval-to-effector workflow with real queue path and injected executor"
+        },
+        {
+          "file": "tests/test_effectors.py",
+          "mode": "integration",
+          "covers": "shell/MCP effector dry-run, block, escalation, approval, subprocess guard semantics"
+        }
+      ]
+    },
+    {
+      "id": "governance-state-store",
+      "boundary_type": "storage_file_format_workflow",
+      "production_surfaces": [
+        "director_class_ai/policy/store.py",
+        "director_class_ai/policy/history.py",
+        "director_class_ai/policy/governance.py",
+        "director_class_ai/policy/drift.py"
+      ],
+      "required_behaviour": "Policy governance state serialises/deserialises profiles, proposals, revisions, append-only lineage, rollback, exposure, and drift detection without accepting tampered lineage.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_policy_store.py",
+          "mode": "integration",
+          "covers": "governance JSON save/load, unsupported version, tampered lineage"
+        },
+        {
+          "file": "tests/test_policy_history.py",
+          "mode": "integration",
+          "covers": "append-only revision lineage and rollback semantics"
+        },
+        {
+          "file": "tests/test_policy_governance.py",
+          "mode": "integration",
+          "covers": "propose/approve/deny/rollback/expose/drift workflow and persisted reload"
+        },
+        {
+          "file": "tests/test_policy_drift.py",
+          "mode": "integration",
+          "covers": "approved baseline comparison and emitted drift events"
+        }
+      ]
+    },
+    {
+      "id": "evidence-package-and-incident-replay",
+      "boundary_type": "file_format_replay_audit",
+      "production_surfaces": [
+        "director_class_ai/evidence/package.py",
+        "director_class_ai/audit/chain.py"
+      ],
+      "required_behaviour": "Evidence packages bind to audit-chain proofs, redact payloads, preserve capability/control mappings, and replay sanitized incident fixtures across allow/block routes.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_evidence_package.py",
+          "mode": "integration",
+          "covers": "package JSON, hash-chain proof, controls, capability projection, sanitized incident replay"
+        }
+      ]
+    },
+    {
+      "id": "external-action-surface-import",
+      "boundary_type": "cli_file_format_benchmark_data",
+      "production_surfaces": [
+        "tools/import_external_action_surface.py",
+        "benchmarks/external_action_surfaces.py",
+        "benchmarks/partitions.py"
+      ],
+      "required_behaviour": "External action-surface import validates manifest/source ledger/licence decisions, copies only reviewed JSONL, writes receipts, rejects replacement without flag, and rejects malformed rows.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_external_action_import_cli.py",
+          "mode": "integration",
+          "covers": "CLI import path over manifest, source ledger, JSONL input, target JSONL, and receipt files"
+        },
+        {
+          "file": "tests/test_external_action_surfaces.py",
+          "mode": "integration",
+          "covers": "external-source manifest and ledger load/skip/reject behaviour"
+        },
+        {
+          "file": "tests/test_benchmark_partitions.py",
+          "mode": "integration",
+          "covers": "authored/external/private partition validation and claim-boundary metadata"
+        }
+      ]
+    },
+    {
+      "id": "action-benchmark-and-corpus",
+      "boundary_type": "benchmark_pipeline_generated_artifact",
+      "production_surfaces": [
+        "benchmarks/action_plane.py",
+        "benchmarks/action_evidence.py",
+        "benchmarks/corpus/generate.py",
+        "benchmarks/data/action_corpus.jsonl"
+      ],
+      "required_behaviour": "Action benchmark assembles deterministic authored corpus, validates partitions, records run/evidence metadata, and keeps claim boundaries separate from local regression evidence.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_action_benchmark_contract.py",
+          "mode": "integration",
+          "covers": "benchmark result schema, route metrics, detector contract, corpus contract"
+        },
+        {
+          "file": "tests/test_corpus_generator.py",
+          "mode": "integration",
+          "covers": "seed plus catalogue assembly, schema validation, uniqueness, deterministic categories"
+        },
+        {
+          "file": "tests/test_action_evidence.py",
+          "mode": "integration",
+          "covers": "evidence classification, run context JSON, Markdown claim boundary"
+        }
+      ]
+    },
+    {
+      "id": "adaptive-red-team-replay",
+      "boundary_type": "benchmark_replay_workflow",
+      "production_surfaces": [
+        "benchmarks/adversarial_red_team.py",
+        "benchmarks/red_team_replay.py"
+      ],
+      "required_behaviour": "Adaptive red-team replay accepts only curated cases, validates schema/enums, generates mutation families, and feeds replay-ready rows to the benchmark path.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_adversarial_red_team.py",
+          "mode": "integration",
+          "covers": "adversarial benchmark cases and route outcomes through production benchmark helpers"
+        },
+        {
+          "file": "tests/test_red_team_replay.py",
+          "mode": "integration",
+          "covers": "schema rejection, mutation families, curator acceptance, replay readiness"
+        }
+      ]
+    },
+    {
+      "id": "documentation-demo-surface",
+      "boundary_type": "docs_demo_notebook_pipeline",
+      "production_surfaces": [
+        "tools/check_documentation_surface.py",
+        "demos/action_checkpoint.py",
+        "docs/index.md",
+        "notebooks/action_checkpoint.ipynb"
+      ],
+      "required_behaviour": "Documentation surface checker validates docs/notebook/demo entry points, and the action checkpoint demo runs as a subprocess while keeping command text redacted.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_documentation_surface.py",
+          "mode": "e2e",
+          "covers": "copied docs surface validation plus subprocess execution of demos/action_checkpoint.py"
+        }
+      ]
+    },
+    {
+      "id": "studio-federation-manifest",
+      "boundary_type": "generated_artifact_file_format",
+      "production_surfaces": [
+        "director_class_ai/federation/manifest.py",
+        "tools/emit_studio_manifest.py",
+        "docs/_generated/studio_manifest.json"
+      ],
+      "required_behaviour": "Studio federation manifest builds deterministic schema-A JSON, preserves honest side-effect tiers, computes stable digests, and fails drift checks for missing or stale artifacts.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_federation_manifest.py",
+          "mode": "integration",
+          "covers": "manifest schema, digest stability, side-effect tiers, public reexports"
+        },
+        {
+          "file": "tests/test_emit_studio_manifest.py",
+          "mode": "integration",
+          "covers": "real tool file loaded from repository path, emit path, committed-artifact check, missing/stale drift failures"
+        }
+      ]
+    },
+    {
+      "id": "package-and-console-scripts",
+      "boundary_type": "packaging_entry_points",
+      "production_surfaces": [
+        "pyproject.toml",
+        "director_class_ai/__init__.py"
+      ],
+      "required_behaviour": "Package metadata matches runtime version, declares py.typed and console scripts, and named CLI tests confirm entry-point declarations for operational commands.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_packaging.py",
+          "mode": "integration",
+          "covers": "pyproject metadata, package version, py.typed inclusion"
+        },
+        {
+          "file": "tests/test_cli_guard.py",
+          "mode": "integration",
+          "covers": "director-class-guard console-script declaration"
+        },
+        {
+          "file": "tests/test_cli_approve.py",
+          "mode": "integration",
+          "covers": "director-class-approve console-script declaration"
+        },
+        {
+          "file": "tests/test_mcp_gateway_cli.py",
+          "mode": "integration",
+          "covers": "director-class-mcp-gateway console-script declaration"
+        },
+        {
+          "file": "tests/test_audit_export_cli.py",
+          "mode": "integration",
+          "covers": "director-class-siem-export console-script declaration"
+        }
+      ]
+    },
+    {
+      "id": "browser-and-memory-action-surfaces",
+      "boundary_type": "user_facing_action_context",
+      "production_surfaces": [
+        "director_class_ai/action/browser.py",
+        "director_class_ai/action/memory.py",
+        "director_class_ai/action/causal_takeover.py"
+      ],
+      "required_behaviour": "Browser/computer-use and long-horizon memory action signals preserve metadata, detect unsafe user-facing mutations, and keep malicious context from downgrading action-plane blocks.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_browser_action.py",
+          "mode": "integration",
+          "covers": "browser action metadata, unsafe browser/computer-use actions, safe controls"
+        },
+        {
+          "file": "tests/test_memory_threat.py",
+          "mode": "integration",
+          "covers": "memory context serialization, long-horizon malicious instruction signals, safe controls"
+        },
+        {
+          "file": "tests/test_causal_takeover.py",
+          "mode": "integration",
+          "covers": "causal timeline metadata and retrieved/tool-output takeover detection"
+        }
+      ]
+    },
+    {
+      "id": "content-and-model-adapter-contracts",
+      "boundary_type": "adapter_optional_dependency",
+      "production_surfaces": [
+        "director_class_ai/detectors/citation.py",
+        "director_class_ai/detectors/injection.py",
+        "director_class_ai/detectors/pii.py",
+        "director_class_ai/detectors/response_nli.py",
+        "director_class_ai/detectors/semantic_action_support.py",
+        "director_class_ai/detectors/llm_judge.py"
+      ],
+      "required_behaviour": "Content/model-backed adapters run through injected production adapter contracts in tests, keep optional external model loading behind factories, emit real DetectorSignal objects, and redact sensitive values.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_citation_adapter.py",
+          "mode": "integration",
+          "covers": "citation tracer adapter contract, uncited-claim signals, from_pretrained bridge boundary"
+        },
+        {
+          "file": "tests/test_injection_adapter.py",
+          "mode": "integration",
+          "covers": "LayeredPromptGuard backend contract, query/context scanning, redacted rationale"
+        },
+        {
+          "file": "tests/test_pii_adapter.py",
+          "mode": "integration",
+          "covers": "PII backend contract, category/span output, no raw sensitive values"
+        },
+        {
+          "file": "tests/test_content_adapters.py",
+          "mode": "integration",
+          "covers": "contradiction, response NLI, and token-span adapter behaviour through EvaluationRequest"
+        },
+        {
+          "file": "tests/test_semantic_action_support.py",
+          "mode": "integration",
+          "covers": "support-scorer contract and action/task divergence signals"
+        },
+        {
+          "file": "tests/test_llm_judge.py",
+          "mode": "integration",
+          "covers": "judge spec, panel construction, optional model-backed detector boundary"
+        }
+      ]
+    },
+    {
+      "id": "policy-profile-and-capability-surfaces",
+      "boundary_type": "configuration_policy_adapter",
+      "production_surfaces": [
+        "director_class_ai/policy/profile.py",
+        "director_class_ai/policy/loader.py",
+        "director_class_ai/policy/capability.py",
+        "director_class_ai/policy/capability_profiles.py",
+        "director_class_ai/policy/exposure.py",
+        "director_class_ai/policy/review.py",
+        "director_class_ai/policy/revision.py"
+      ],
+      "required_behaviour": "Policy profiles and capability grants validate config, compile origin/action envelopes, expose candidate deltas, and keep review/revision workflows digest-bound.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_policy_profiles.py",
+          "mode": "integration",
+          "covers": "built-in profile compilation and origin/capability envelope behaviour"
+        },
+        {
+          "file": "tests/test_capability_policy.py",
+          "mode": "integration",
+          "covers": "grant matching, origin denial, approval-required routing, audit projection"
+        },
+        {
+          "file": "tests/test_policy_exposure.py",
+          "mode": "integration",
+          "covers": "candidate policy exposure case evaluation and route transition reporting"
+        },
+        {
+          "file": "tests/test_policy_review.py",
+          "mode": "integration",
+          "covers": "policy proposal approval/denial metadata and reviewer rules"
+        },
+        {
+          "file": "tests/test_policy_revision.py",
+          "mode": "integration",
+          "covers": "revision digest, lineage, metadata, rollback provenance"
+        },
+        {
+          "file": "tests/test_policy_corpus.py",
+          "mode": "integration",
+          "covers": "policy exposure corpus row schema and detector-signal conversion"
+        }
+      ]
+    },
+    {
+      "id": "runtime-posture-binding",
+      "boundary_type": "cli_sdk_policy_runtime",
+      "production_surfaces": [
+        "director_class_ai/cli/guard.py",
+        "director_class_ai/sdk/middleware.py",
+        "director_class_ai/policy/governance.py"
+      ],
+      "required_behaviour": "Runtime guard and SDK review use approved policy posture, reject missing or drifted runtime state, and preserve capability/origin rules across CLI and SDK boundaries.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_runtime_posture_binding.py",
+          "mode": "integration",
+          "covers": "guard policy resolution and SDK runtime posture binding through real governance store"
+        }
+      ]
+    },
+    {
+      "id": "meta-classifier-and-fusion-policy",
+      "boundary_type": "model_serialization_policy",
+      "production_surfaces": [
+        "director_class_ai/core/meta_classifier.py",
+        "director_class_ai/core/fusion.py",
+        "director_class_ai/core/ensemble.py"
+      ],
+      "required_behaviour": "Signal fusion and optional meta-classifier keep default fail-closed policy, serialise deterministic models, handle Rust fallback safely, and route action/content/integrity signals consistently.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_meta_classifier.py",
+          "mode": "integration",
+          "covers": "feature extraction, fit, serialization, fusion adapter, optional Rust fallback"
+        },
+        {
+          "file": "tests/test_signal_fusion.py",
+          "mode": "integration",
+          "covers": "fail-closed fusion routes for content/integrity/action signals"
+        },
+        {
+          "file": "tests/test_ensemble.py",
+          "mode": "integration",
+          "covers": "tiered ensemble execution and short-circuit semantics"
+        },
+        {
+          "file": "tests/test_calibration.py",
+          "mode": "integration",
+          "covers": "calibration policy applied to detector signals"
+        }
+      ]
+    }
+  ]
+}

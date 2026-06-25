@@ -207,7 +207,6 @@ def _safe_shell_arithmetic(expr: str) -> int | None:
 
 def _arithmetic_expansions(command: str) -> list[str]:
     """Reveal bounded ``$((...))`` expansions as decimal shell output."""
-
     changed = False
 
     def repl(match: re.Match[str]) -> str:
@@ -276,7 +275,7 @@ def _decode_binary_payloads(raw: bytes) -> list[str]:
 
 
 def _decode_hex_runs(command: str) -> list[str]:
-    """Decode runs of ``\\xHH`` escapes into their text."""
+    r"""Decode runs of ``\xHH`` escapes into their text."""
     decoded: list[str] = []
     for run in _HEX_RUN.findall(command):
         pairs = run.split("\\x")[1:]
@@ -291,9 +290,9 @@ def _decode_hex_runs(command: str) -> list[str]:
 
 
 def _decode_hex_inplace(command: str) -> list[str]:
-    """Substitute each ``\\xHH`` run with its text *in place*, keeping the rest.
+    r"""Substitute each ``\xHH`` run with its text in place, keeping the rest.
 
-    Reveals ANSI-C forms like ``$'\\x72\\x6d' -rf /`` where the hidden verb is
+    Reveals ANSI-C forms like ``$'\x72\x6d' -rf /`` where the hidden verb is
     embedded among literal arguments (extracting the run alone would lose them).
     """
 
@@ -321,7 +320,7 @@ def _decode_octal_run(run: str) -> str | None:
 
 
 def _decode_octal_runs(command: str) -> list[str]:
-    """Decode runs of ``\\ooo`` escapes into their text."""
+    r"""Decode runs of ``\ooo`` escapes into their text."""
     decoded: list[str] = []
     for run in _OCTAL_RUN.findall(command):
         text = _decode_octal_run(run)

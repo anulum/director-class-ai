@@ -112,7 +112,7 @@ class FusionPolicy:
     def user_authorised_destructive(
         self, objectors: Sequence[DetectorSignal], provenance: str
     ) -> bool:
-        """True when a destructive action is the user's own request, taint-free.
+        """Return whether a destructive action is the user's own request, taint-free.
 
         The action plane blocks destructive commands by default. But when the
         request is *explicitly user-originated* (``provenance == "user"``) and none

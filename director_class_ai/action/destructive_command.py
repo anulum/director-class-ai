@@ -407,7 +407,7 @@ _CRITICAL_TARGETS = frozenset(
 
 
 def _is_recursive_flag(token: str) -> bool:
-    """True for ``-r`` / ``-rf`` clusters and ``--recursive`` (not ``--force``)."""
+    """Return whether a token enables recursive removal."""
     if token == "--recursive":
         return True
     if token.startswith("--"):

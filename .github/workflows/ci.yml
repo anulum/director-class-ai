@@ -57,6 +57,9 @@ jobs:
       - run: ruff check director_class_ai/ tests/ benchmarks/ tools/
       - run: ruff format --check director_class_ai/ tests/ benchmarks/ tools/
       - run: python tools/check_docstrings.py
+      - run: python tools/check_test_quality.py
+      - run: python tools/check_test_boundary_evidence.py
+      - run: python tools/check_godfiles.py
 
   types:
     name: Types (mypy --strict)

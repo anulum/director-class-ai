@@ -266,7 +266,7 @@ event = package.to_json()
 ## Local verification
 
 ```bash
-python -m pytest                       # tests + 100% coverage gate
+# Run focused tests for touched modules locally; CI owns the full suite.
 ruff check director_class_ai tests benchmarks tools
 ruff format --check director_class_ai tests benchmarks tools
 mypy --strict director_class_ai

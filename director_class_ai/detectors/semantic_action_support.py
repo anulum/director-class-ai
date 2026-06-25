@@ -54,7 +54,7 @@ class SupportScorer(Protocol):
 
 
 class SemanticActionSupportDetector:
-    """Tier-1 action-plane detector: is the action entailed by the task?"""
+    """Tier-1 action-plane detector for task/action entailment."""
 
     name = "semantic_action_support"
     plane = Plane.ACTION

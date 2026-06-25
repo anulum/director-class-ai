@@ -6,7 +6,7 @@
 # Contact: www.anulum.li | protoscience@anulum.li
 # Director-Class AI — blast-radius detector (action plane, tier 0)
 
-"""Estimate how far an action reaches and how reversible it is.
+r"""Estimate how far an action reaches and how reversible it is.
 
 Where the destructive-command detector matches *known* catastrophic patterns,
 this scores the *general* risk dimensions of any action, so a dangerous command

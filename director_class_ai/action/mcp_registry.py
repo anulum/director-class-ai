@@ -61,6 +61,7 @@ class MCPToolRegistration:
     registry_signature: str = ""
 
     def __post_init__(self) -> None:
+        """Normalise allowed transports after dataclass initialisation."""
         object.__setattr__(
             self,
             "allowed_transports",

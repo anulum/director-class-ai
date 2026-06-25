@@ -39,7 +39,8 @@ make bench-evidence
 python demos/action_checkpoint.py
 ```
 
-`make preflight` covers SPDX, repository readiness, Phase 4 intake, lint,
-formatting, strict typing, and the full pytest coverage gate. Benchmark evidence
-remains local regression evidence unless it is run with isolation and reviewed
-external artefacts.
+`make preflight` covers SPDX, test quality, boundary evidence, godfile limits,
+repository readiness, Phase 4 intake, lint, formatting, and strict typing. Run
+focused tests for touched modules locally; GitHub Actions owns the full pytest
+coverage gate. Benchmark evidence remains local regression evidence unless it is
+run with isolation and reviewed external artefacts.

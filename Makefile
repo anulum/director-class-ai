@@ -2,13 +2,13 @@
 # Director-Class AI — developer task runner
 .DEFAULT_GOAL := help
 PY ?= python
-.PHONY: help test lint fmt types sast spdx docs build bench bench-evidence import-external redteam repository-readiness phase4-intake preflight
+.PHONY: help test lint fmt types sast spdx test-quality test-boundaries godfiles docs build bench bench-evidence import-external redteam repository-readiness phase4-intake preflight
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n",$$1,$$2}'
 
-test: ## Run tests with the 100% coverage gate
+test: ## Run the CI-owned full test suite with the coverage gate
 	$(PY) -m pytest
 
 lint: ## Check style (ruff check + format --check)
@@ -28,6 +28,15 @@ sast: ## SAST scan (bandit + semgrep via uvx)
 
 spdx: ## Verify SPDX headers
 	$(PY) tools/check_spdx.py
+
+test-quality: ## Reject bucket/import-only fake tests
+	$(PY) tools/check_test_quality.py
+
+test-boundaries: ## Validate boundary-crossing integration/e2e evidence
+	$(PY) tools/check_test_boundary_evidence.py
+
+godfiles: ## Reject oversized mixed-responsibility Python files
+	$(PY) tools/check_godfiles.py
 
 docs: ## Validate public docs, demos, and notebook entry points
 	$(PY) tools/check_documentation_surface.py
@@ -56,5 +65,5 @@ repository-readiness: ## Validate repository-readiness gates (license, Makefile,
 phase4-intake: ## Validate phase-4 task intake
 	$(PY) tools/check_phase4_task_intake.py
 
-preflight: spdx docs lint types test repository-readiness phase4-intake ## Full local gate before commit
+preflight: spdx test-quality test-boundaries godfiles docs lint types repository-readiness phase4-intake ## Local gate without full-suite tests
 	@echo "preflight OK"

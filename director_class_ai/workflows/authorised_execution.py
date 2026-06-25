@@ -57,7 +57,6 @@ def run_authorised_shell_workflow(
     executor: Callable[[str], tuple[str, int]],
 ) -> AuthorisedShellWorkflowReport:
     """Run one authorised destructive command through the full approval path."""
-
     queue = ApprovalQueue(queue_path)
     governor = Governor(_action_ensemble(), approval=queue.request_approval)
     shell = ShellEffectorAdapter(governor, execute=executor)

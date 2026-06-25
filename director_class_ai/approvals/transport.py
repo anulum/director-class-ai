@@ -148,6 +148,7 @@ class ApprovalServiceConfig:
     max_body_bytes: int = 65_536
 
     def __post_init__(self) -> None:
+        """Reject service configurations without an operator key."""
         if not self.operator_key:
             raise ValueError("operator_key is required")
 
