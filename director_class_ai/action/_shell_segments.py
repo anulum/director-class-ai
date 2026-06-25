@@ -87,8 +87,7 @@ def strip_print_segments(command: str) -> str:
         segment
         for segment in shell_segments(command)
         if not (
-            starts_with_print_command(segment)
-            and not _has_unquoted_redirection(segment)
+            starts_with_print_command(segment) and not _has_unquoted_redirection(segment)
         )
     )
 
