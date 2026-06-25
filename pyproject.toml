@@ -17,8 +17,9 @@ keywords = [
     "agent-governance",
     "hallucination-detection",
 ]
-# Proprietary commercial product. "Private :: Do Not Upload" makes PyPI reject an
-# accidental publish; the licence terms live in LICENSE (declared via license-files).
+# Source-available under the Business Source License 1.1 (see LICENSE; converts to
+# Apache-2.0 on the Change Date). "Private :: Do Not Upload" keeps the package out
+# of public PyPI — distribution is via the repository, not the index.
 classifiers = [
     "Private :: Do Not Upload",
     "Development Status :: 3 - Alpha",
@@ -31,8 +32,10 @@ classifiers = [
 dependencies = []
 
 [project.scripts]
+director-class-approve = "director_class_ai.cli.approve:main"
 director-class-guard = "director_class_ai.cli.guard:main"
 director-class-mcp-gateway = "director_class_ai.gateway.mcp_cli:main"
+director-class-policy = "director_class_ai.cli.policy:main"
 director-class-siem-export = "director_class_ai.audit.export_cli:main"
 
 [project.optional-dependencies]

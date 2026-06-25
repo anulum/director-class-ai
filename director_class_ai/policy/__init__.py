@@ -1,5 +1,5 @@
-# SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial
-# Director-Class AI — commercial product (licence pending); not the Apache base.
+# SPDX-License-Identifier: BUSL-1.1
+# Director-Class AI — commercial product (BUSL-1.1); not the Apache base.
 # © Concepts 1996–2026 Miroslav Šotek. All rights reserved.
 # © Code 2020–2026 Miroslav Šotek. All rights reserved.
 # ORCID: 0009-0009-3560-0851
@@ -26,6 +26,8 @@ from .capability_profiles import (
     load_capability_profile,
 )
 from .drift import PolicyDriftEvent, PolicyDriftMonitor
+from .exposure import ExposureCase, ExposureReport, OutcomeChange, PostureExposure
+from .governance import PolicyGovernance
 from .history import PolicyHistory
 from .loader import load_profile, load_profile_file
 from .profile import Profile
@@ -49,14 +51,19 @@ __all__ = [
     "CapabilityPolicyDecision",
     "CapabilityPolicyDetector",
     "CapabilitySurfaceProfile",
+    "ExposureCase",
+    "ExposureReport",
     "OriginRule",
+    "OutcomeChange",
     "PolicyChangeProposal",
     "PolicyChangeReview",
     "PolicyDriftEvent",
     "PolicyDriftMonitor",
     "PolicyFieldChange",
+    "PolicyGovernance",
     "PolicyHistory",
     "PolicyRevision",
+    "PostureExposure",
     "Profile",
     "diff_profiles",
     "load_capability_profile",

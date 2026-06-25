@@ -1,5 +1,15 @@
 # Director-Class AI
 
+<p align="center">
+  <a href="https://github.com/anulum/director-class-ai/actions/workflows/ci.yml"><img src="https://github.com/anulum/director-class-ai/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/anulum/director-class-ai/actions/workflows/pre-commit.yml"><img src="https://github.com/anulum/director-class-ai/actions/workflows/pre-commit.yml/badge.svg" alt="Pre-commit"></a>
+  <a href="https://github.com/anulum/director-class-ai/actions/workflows/codeql.yml"><img src="https://github.com/anulum/director-class-ai/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/anulum/director-class-ai"><img src="https://api.securityscorecards.dev/projects/github.com/anulum/director-class-ai/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://codecov.io/gh/anulum/director-class-ai"><img src="https://codecov.io/gh/anulum/director-class-ai/branch/main/graph/badge.svg" alt="Coverage"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-BUSL--1.1-blue.svg" alt="License: BUSL-1.1"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+"></a>
+</p>
+
 **Runtime action-control and evidence layer for autonomous AI agents.** A
 separate commercial product from the Apache-licensed `director-ai` base:
 Director-Class AI sits between an autonomous agent and its effectors. It reviews
@@ -102,12 +112,40 @@ director-class-mcp-gateway --host 0.0.0.0 --operator-key-env DIRECTOR_CLASS_MCP_
 
 For command-line workflows, `director-class-guard` reviews shell, database,
 cloud, Kubernetes, HTTP, and custom commands before optional execution. It is
-dry-run by default.
+dry-run by default, and on every run it appends a privacy-preserving entry to a
+tamper-evident hash-chained audit log (`runtime/audit.jsonl`) and routes any
+human-required escalation through a durable, digest-scoped approval queue
+(`runtime/approvals.json`). Both paths are configurable with `--audit-log` and
+`--approval-store`.
+
+The posture in force is the approved head of a Guardrail-as-Code ledger
+(`--policy-store`, default `runtime/policy.json`): a posture change approved
+through `director-class-policy` governs the thresholds this review fuses with, so
+an approved relaxation or tightening takes effect at the boundary. With no ledger
+or no approved head, the guard keeps its fail-closed defaults.
 
 ```bash
 director-class-guard --surface kubernetes -- kubectl get pods
 director-class-guard --surface shell --execute -- printf guard-ok
 ```
+
+An escalated action is not permitted on its own. The first review opens a pending
+ticket bound to the action's request digest; a human approves it out of band with
+`director-class-approve`, after which a single later `--execute` run is permitted
+exactly once (the approval is single-use):
+
+```bash
+# 1. review escalates and prints a request_digest; the action is not permitted
+director-class-guard --surface database -- "DROP TABLE audit_2019"
+# 2. a different human approves that digest
+director-class-approve pending
+director-class-approve approve --digest <request_digest> --approver alice
+# 3. one execution is now permitted; a second review is blocked again
+director-class-guard --surface database --execute -- "DROP TABLE audit_2019"
+```
+
+A hard block (an injected, tainted, or exfiltration action) is never routed to
+approval — it stays blocked regardless of who asked.
 
 ## External benchmark artefacts
 
@@ -156,8 +194,13 @@ complete.
 
 ## Licence
 
-Proprietary commercial — see `LICENSE`. Source visibility is **not** a grant of
-rights; production use requires a commercial agreement (protoscience@anulum.li).
+Source-available under the **Business Source License 1.1** — see `LICENSE`. You
+may read, modify, and self-host the Licensed Work for your own internal
+operations, including in production. You may **not** offer it to third parties as
+a hosted or managed service, or build a competing product on its governance,
+action-control, kill-switch, or audit functionality, without a commercial licence
+(protoscience@anulum.li). On the Change Date (2030-06-20) the licence converts to
+Apache-2.0.
 
 ## SIEM/SOC export
 
@@ -174,10 +217,19 @@ director-class-siem-export runtime/audit.jsonl
 
 ## Operator approvals
 
-The approval transport package exposes the existing digest-scoped queue through
-an operator-console adapter, signed webhook events, and a loopback JSON service.
-Responses contain ticket digests, status, timestamps, expiry, and approver
-digests only; raw actions and command output are not returned.
+`director-class-approve` resolves the escalation tickets the command guard opens,
+operating on the same durable queue:
+
+```bash
+director-class-approve pending
+director-class-approve approve --digest <request_digest> --approver alice
+director-class-approve deny --digest <request_digest> --approver alice
+```
+
+The approval transport package additionally exposes the digest-scoped queue
+through an operator-console adapter, signed webhook events, and a loopback JSON
+service. Responses contain ticket digests, status, timestamps, expiry, and
+approver digests only; raw actions and command output are not returned.
 
 ```python
 from director_class_ai.approvals import (

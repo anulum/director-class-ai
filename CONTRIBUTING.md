@@ -1,7 +1,8 @@
-<!-- SPDX-License-Identifier: LicenseRef-Director-Class-AI-Commercial -->
+<!-- SPDX-License-Identifier: BUSL-1.1 -->
 # Contributing — Director-Class AI (internal)
 
-Proprietary product (see `LICENSE`); internal contribution guide.
+Source-available under the Business Source License 1.1 (see `LICENSE`); internal
+contribution guide.
 
 ## Standard
 
@@ -26,5 +27,5 @@ Every change keeps the repo green to the GOTM standard:
 
 ## Records
 
-Design and decisions live in `docs/internal/` (ARCHITECTURE, PLAN, ADVERSARIAL,
-AUDIT_INDEX). Append audit findings to `docs/internal/AUDIT_INDEX.md`.
+Public design notes live under `docs/`. Architecture, roadmap, audit, and
+positioning records are maintained privately by the maintainers.

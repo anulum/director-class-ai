@@ -1,0 +1,24 @@
+{
+  "title": "Director-Class AI — Runtime Action-Control and Evidence Layer for Autonomous AI Agents",
+  "version": "0.1.0",
+  "description": "A runtime action-control and evidence layer for autonomous AI agents. Director-Class AI sits between an agent and its effectors, reviewing high-impact shell, SQL, infrastructure, API, and MCP tool actions before dispatch; uncertain or high-risk actions escalate to a human approval gate and emit tamper-evident, hash-chained audit and evidence records. A parallel detector ensemble governs three planes at once — content (is the output grounded?), integrity (was the input manipulated?), and action (is the effect safe to execute?). Includes a Guardrail-as-Code policy lifecycle: content-addressed posture revisions, an append-only history with rollback, an approval-gated review, an A/B posture exposure, a drift monitor, and an operator CLI.",
+  "creators": [
+    {
+      "name": "Šotek, Miroslav",
+      "affiliation": "ANULUM (Switzerland & Liechtenstein)",
+      "orcid": "0009-0009-3560-0851"
+    }
+  ],
+  "upload_type": "software",
+  "access_right": "open",
+  "license": "BUSL-1.1",
+  "keywords": [
+    "ai-safety",
+    "runtime-action-control",
+    "agent-governance",
+    "guardrails",
+    "mcp",
+    "audit-evidence",
+    "kill-switch"
+  ]
+}
