@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import subprocess
 import sys
@@ -22,8 +23,9 @@ from typing import Literal
 from ..approvals import ApprovalQueue
 from ..audit import AuditChainSink
 from ..core.fusion import FusionPolicy
-from ..policy import PolicyGovernance
+from ..policy import resolve_runtime_posture
 from ..sdk import ToolExecutionResult, ToolReviewMiddleware, ToolReviewRequest
+from .guard_events import runtime_posture_block_event
 
 __all__ = ["CommandGuardOptions", "build_command_request", "main", "run_guard"]
 
@@ -37,11 +39,18 @@ DEFAULT_POLICY_STORE = "runtime/policy.json"
 def _resolve_runtime_policy(policy_store: str) -> FusionPolicy | None:
     """Return the approved-head fusion policy from a governance ledger.
 
-    The guard enforces the posture an operator has actually approved: when the
-    ledger has an approved head its fusion policy governs this decision; with no
-    ledger or no approved posture the ensemble keeps its fail-closed defaults.
+    With no ledger or no approved posture, the ensemble keeps its fail-closed
+    defaults.
     """
-    return PolicyGovernance.load(policy_store).active_fusion_policy()
+    return resolve_runtime_posture(
+        policy_store,
+        detected_at=_now(),
+    ).fusion_policy
+
+
+def _now() -> str:
+    """Return the current UTC time as an ISO-8601 timestamp."""
+    return datetime.datetime.now(datetime.UTC).isoformat()
 
 
 @dataclass(frozen=True)
@@ -58,6 +67,8 @@ class CommandGuardOptions:
     audit_log: str = DEFAULT_AUDIT_LOG
     approval_store: str = DEFAULT_APPROVAL_STORE
     policy_store: str = DEFAULT_POLICY_STORE
+    live_profile: str = ""
+    require_policy_store: bool = False
 
     @classmethod
     def from_argv(cls, argv: Sequence[str] | None = None) -> CommandGuardOptions:
@@ -77,6 +88,8 @@ class CommandGuardOptions:
             audit_log=args.audit_log,
             approval_store=args.approval_store,
             policy_store=args.policy_store,
+            live_profile=args.live_profile,
+            require_policy_store=args.require_policy_store,
         )
 
 
@@ -109,8 +122,23 @@ def run_guard(options: CommandGuardOptions) -> dict[str, object]:
     request = build_command_request(options)
     Path(options.audit_log).parent.mkdir(parents=True, exist_ok=True)
     Path(options.approval_store).parent.mkdir(parents=True, exist_ok=True)
+    posture = resolve_runtime_posture(
+        options.policy_store,
+        live_profile=options.live_profile or None,
+        require_approved=options.require_policy_store,
+        detected_at=_now(),
+    )
+    if posture.blocked:
+        return runtime_posture_block_event(
+            surface=options.surface,
+            execute=options.execute,
+            audit_log=options.audit_log,
+            approval_store=options.approval_store,
+            request=request,
+            posture=posture,
+        )
     middleware = ToolReviewMiddleware.default(
-        policy=_resolve_runtime_policy(options.policy_store),
+        policy=posture.fusion_policy,
         executor=_execute_command,
         approval=ApprovalQueue(options.approval_store).request_approval,
         audit_sink=AuditChainSink(Path(options.audit_log)),
@@ -202,6 +230,16 @@ def _parser() -> argparse.ArgumentParser:
             "Guardrail-as-Code ledger whose approved head posture governs this "
             f"review. Default: {DEFAULT_POLICY_STORE} (safe defaults if absent)."
         ),
+    )
+    parser.add_argument(
+        "--live-profile",
+        default="",
+        help="TOML posture the runtime is actually using; blocks if it drifts.",
+    )
+    parser.add_argument(
+        "--require-policy-store",
+        action="store_true",
+        help="Block when the Guardrail-as-Code ledger has no approved head.",
     )
     parser.add_argument(
         "command",

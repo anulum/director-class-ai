@@ -38,6 +38,7 @@ from .revision import (
     diff_profiles,
     profile_digest,
 )
+from .runtime_posture import RuntimePostureResolution, resolve_runtime_posture
 
 __all__ = [
     "ACTION_SURFACES",
@@ -65,9 +66,11 @@ __all__ = [
     "PolicyRevision",
     "PostureExposure",
     "Profile",
+    "RuntimePostureResolution",
     "diff_profiles",
     "load_capability_profile",
     "load_profile",
     "load_profile_file",
     "profile_digest",
+    "resolve_runtime_posture",
 ]

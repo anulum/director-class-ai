@@ -18,21 +18,52 @@ from director_class_ai.approvals import ApprovalQueue
 from director_class_ai.audit import verify_chain
 from director_class_ai.cli.guard import (
     CommandGuardOptions,
+    CommandSurface,
     build_command_request,
     main,
     run_guard,
 )
+from director_class_ai.policy import PolicyGovernance, Profile
 
 _PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
 
 
-def _opts(tmp_path: Path, **kwargs: object) -> CommandGuardOptions:
+def _opts(
+    tmp_path: Path,
+    *,
+    surface: CommandSurface = "shell",
+    command: tuple[str, ...] = ("echo", "ok"),
+    provenance: str = "user",
+    query: str = "",
+    context: str = "",
+    tenant_id: str = "",
+    execute: bool = False,
+    audit_log: str | None = None,
+    approval_store: str | None = None,
+    policy_store: str | None = None,
+    live_profile: str = "",
+    require_policy_store: bool = False,
+) -> CommandGuardOptions:
     """Build guard options whose runtime state lives under tmp."""
     return CommandGuardOptions(
-        audit_log=str(tmp_path / "audit.jsonl"),
-        approval_store=str(tmp_path / "approvals.json"),
-        policy_store=str(tmp_path / "policy.json"),
-        **kwargs,  # type: ignore[arg-type]
+        surface=surface,
+        command=command,
+        provenance=provenance,
+        query=query,
+        context=context,
+        tenant_id=tenant_id,
+        execute=execute,
+        audit_log=audit_log if audit_log is not None else str(tmp_path / "audit.jsonl"),
+        approval_store=(
+            approval_store
+            if approval_store is not None
+            else str(tmp_path / "approvals.json")
+        ),
+        policy_store=(
+            policy_store if policy_store is not None else str(tmp_path / "policy.json")
+        ),
+        live_profile=live_profile,
+        require_policy_store=require_policy_store,
     )
 
 
@@ -48,6 +79,33 @@ def _main_args(tmp_path: Path, *argv: str) -> tuple[str, ...]:
     )
 
 
+def _profile_toml(path: Path, *, threshold: float) -> Path:
+    """Write a runtime policy profile fixture."""
+    path.write_text(
+        f'name = "staging"\naction_block_threshold = {threshold}\n'
+        "uncertainty_margin = 0.0\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def _approved_policy_store(path: Path, *, threshold: float) -> None:
+    """Write a reviewed Guardrail-as-Code ledger fixture."""
+    governance = PolicyGovernance.empty()
+    proposal = governance.propose(
+        Profile(
+            name="staging",
+            action_block_threshold=threshold,
+            uncertainty_margin=0.0,
+        ),
+        proposer="alice",
+        created_at="t0",
+        reason="baseline",
+    )
+    governance.approve(proposal.digest, reviewer="bob", decided_at="t1")
+    governance.save(path)
+
+
 def test_command_guard_options_parse_defaults() -> None:
     options = CommandGuardOptions.from_argv(("--", "echo", "ok"))
 
@@ -58,6 +116,8 @@ def test_command_guard_options_parse_defaults() -> None:
     assert options.audit_log == "runtime/audit.jsonl"
     assert options.approval_store == "runtime/approvals.json"
     assert options.policy_store == "runtime/policy.json"
+    assert options.live_profile == ""
+    assert options.require_policy_store is False
 
 
 def test_command_guard_options_parse_without_separator() -> None:
@@ -91,6 +151,21 @@ def test_command_guard_options_parse_audit_and_approval_paths() -> None:
     assert options.audit_log == "/tmp/a.jsonl"
     assert options.approval_store == "/tmp/q.json"
     assert options.policy_store == "/tmp/p.json"
+
+
+def test_command_guard_options_parse_runtime_posture_guards() -> None:
+    options = CommandGuardOptions.from_argv(
+        (
+            "--require-policy-store",
+            "--live-profile",
+            "/tmp/live.toml",
+            "--",
+            "noop",
+        )
+    )
+
+    assert options.require_policy_store is True
+    assert options.live_profile == "/tmp/live.toml"
 
 
 def test_build_command_request_uses_existing_sdk_contract() -> None:
@@ -173,6 +248,46 @@ def test_every_decision_is_recorded_to_the_audit_chain(tmp_path: Path) -> None:
     verification = verify_chain(audit_log)
     assert verification.ok
     assert len(audit_log.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_required_policy_store_blocks_without_approved_head(tmp_path: Path) -> None:
+    event = run_guard(
+        _opts(
+            tmp_path,
+            surface="shell",
+            command=("echo", "ok"),
+            require_policy_store=True,
+        )
+    )
+
+    assert event["route"] == "block"
+    assert event["permitted"] is False
+    assert event["executed"] is False
+    assert event["firing"] == ("policy_head_missing",)
+    assert verify_chain(str(event["audit_log"])).ok
+
+
+def test_drifted_live_profile_blocks_before_review(tmp_path: Path) -> None:
+    policy_store = tmp_path / "policy.json"
+    live_profile = _profile_toml(tmp_path / "live.toml", threshold=0.9)
+    _approved_policy_store(policy_store, threshold=0.3)
+
+    event = run_guard(
+        _opts(
+            tmp_path,
+            surface="shell",
+            command=("echo", "ok"),
+            policy_store=str(policy_store),
+            live_profile=str(live_profile),
+        )
+    )
+
+    assert event["route"] == "block"
+    assert event["permitted"] is False
+    assert event["executed"] is False
+    assert event["firing"] == ("policy_runtime_drift",)
+    assert event["policy_drift"]["changes"] == ("action_block_threshold",)
+    assert verify_chain(str(event["audit_log"])).ok
 
 
 def test_escalated_action_opens_a_pending_ticket(tmp_path: Path) -> None:

@@ -531,8 +531,10 @@
       "boundary_type": "cli_sdk_policy_runtime",
       "production_surfaces": [
         "director_class_ai/cli/guard.py",
+        "director_class_ai/cli/guard_events.py",
         "director_class_ai/sdk/middleware.py",
-        "director_class_ai/policy/governance.py"
+        "director_class_ai/policy/governance.py",
+        "director_class_ai/policy/runtime_posture.py"
       ],
       "required_behaviour": "Runtime guard and SDK review use approved policy posture, reject missing or drifted runtime state, and preserve capability/origin rules across CLI and SDK boundaries.",
       "evidence_tests": [
@@ -540,6 +542,11 @@
           "file": "tests/test_runtime_posture_binding.py",
           "mode": "integration",
           "covers": "guard policy resolution and SDK runtime posture binding through real governance store"
+        },
+        {
+          "file": "tests/test_cli_guard.py",
+          "mode": "integration",
+          "covers": "strict guard rejection of missing approved heads and drifted live runtime profiles through real audit paths"
         }
       ]
     },

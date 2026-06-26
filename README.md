@@ -128,6 +128,9 @@ The posture in force is the approved head of a Guardrail-as-Code ledger
 through `director-class-policy` governs the thresholds this review fuses with, so
 an approved relaxation or tightening takes effect at the boundary. With no ledger
 or no approved head, the guard keeps its fail-closed defaults.
+For strict deployments, `--require-policy-store` blocks when that ledger has no
+approved head, and `--live-profile <profile.toml>` blocks when the runtime's
+live posture has drifted from the approved head before any command is reviewed.
 Rollback is reviewed through the same ledger: `director-class-policy rollback`
 opens a pending proposal, and a different reviewer must approve that proposal
 before the prior posture becomes the approved head again.

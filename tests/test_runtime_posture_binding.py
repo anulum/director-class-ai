@@ -67,9 +67,20 @@ def _route(policy: FusionPolicy | None) -> str:
     return "allow" if decision.permitted else "block"
 
 
-def _approved_ledger(path: Path, **profile_kwargs: object) -> Profile:
+def _approved_ledger(
+    path: Path,
+    *,
+    action_block_threshold: float = 0.3,
+    uncertainty_margin: float = 0.05,
+    capability_profile: str = "deny_all_actions",
+) -> Profile:
     governance = PolicyGovernance.load(str(path))
-    profile = Profile(name="staging", **profile_kwargs)  # type: ignore[arg-type]
+    profile = Profile(
+        name="staging",
+        action_block_threshold=action_block_threshold,
+        uncertainty_margin=uncertainty_margin,
+        capability_profile=capability_profile,
+    )
     proposal = governance.propose(
         profile, proposer="alice", created_at="t0", reason="set posture"
     )
