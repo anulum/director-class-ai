@@ -561,7 +561,8 @@ fn bounded(value: i64) -> Option<i64> {
 fn first_shell_word(text: &str) -> Option<String> {
     let mut current = String::new();
     let mut quote: Option<char> = None;
-    for ch in text.trim().chars() {
+    let mut chars = text.trim().chars().peekable();
+    while let Some(ch) = chars.next() {
         if quote == Some(ch) {
             quote = None;
             continue;
@@ -570,12 +571,24 @@ fn first_shell_word(text: &str) -> Option<String> {
             quote = Some(ch);
             continue;
         }
+        if quote != Some('\'') && ch == '\\' {
+            if let Some(escaped) = chars.next() {
+                current.push(escaped);
+                continue;
+            }
+        }
         if quote.is_none() && ch.is_whitespace() {
             break;
         }
         current.push(ch);
     }
     (!current.is_empty()).then_some(current)
+}
+
+fn is_simple_command_word(text: &str) -> bool {
+    SIMPLE_COMMAND_WORD
+        .find(text)
+        .is_some_and(|matched| matched.start() == 0 && matched.end() == text.len())
 }
 
 fn xargs_reconstructions(command: &str) -> Vec<String> {
@@ -593,7 +606,7 @@ fn xargs_reconstructions(command: &str) -> Vec<String> {
     else {
         return Vec::new();
     };
-    if !SIMPLE_COMMAND_WORD.is_match(&verb) {
+    if !is_simple_command_word(&verb) {
         return Vec::new();
     }
     let args = captures.name("args").map_or("", |m| m.as_str()).trim();
@@ -626,7 +639,7 @@ fn xargs_arithmetic_printf_reconstructions(command: &str) -> Vec<String> {
     let Some(text) = printable_text(&octets) else {
         return Vec::new();
     };
-    if !SIMPLE_COMMAND_WORD.is_match(&text) {
+    if !is_simple_command_word(&text) {
         return Vec::new();
     }
     let args = captures.name("args").map_or("", |m| m.as_str()).trim();

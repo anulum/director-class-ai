@@ -214,7 +214,9 @@ primitives. The Python APIs remain stable: they attempt the Rust implementation,
 compare the result with the Python reference implementation, and fall back to
 Python if parity fails or the extension is unavailable. Source-tree development
 therefore stays pure Python, while packaged deployments can exercise the
-compiled path.
+compiled path. CI builds the extension with `maturin develop`, runs `cargo test`
+and Clippy, and runs Rust/Python differential property tests before the full
+pytest suite with `_rust` present.
 
 ## Claim boundaries
 

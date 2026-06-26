@@ -517,6 +517,26 @@
       ]
     },
     {
+      "id": "rust-fast-path-parity",
+      "boundary_type": "compiled_extension_reference_parity",
+      "production_surfaces": [
+        "src/lib.rs",
+        "director_class_ai/action/_normalize.py",
+        "director_class_ai/action/destructive_command.py",
+        "director_class_ai/action/mcp_inspector.py",
+        "director_class_ai/audit/chain.py",
+        "director_class_ai/core/meta_classifier.py"
+      ],
+      "required_behaviour": "The optional PyO3 extension builds in CI and matches the Python reference implementations for command expansion, destructive matching, MCP structural scanning, audit entry hashes, and meta-classifier primitives before the full suite runs with _rust present.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_rust_differential.py",
+          "mode": "integration",
+          "covers": "Hypothesis Rust-vs-Python differential tests over compiled _rust primitives and production Python reference implementations"
+        }
+      ]
+    },
+    {
       "id": "policy-profile-and-capability-surfaces",
       "boundary_type": "configuration_policy_adapter",
       "production_surfaces": [

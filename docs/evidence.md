@@ -14,7 +14,9 @@ The local gate stack covers:
 - SPDX and public docstring checks;
 - repository readiness and Phase 4 task-intake validation;
 - full pytest coverage gate;
-- Rust formatting and Clippy for the PyO3 extension;
+- Rust formatting, `cargo test`, Clippy, `maturin develop`, Rust/Python
+  differential property tests, and the full pytest suite with the PyO3 extension
+  present;
 - sdist and wheel build.
 
 ## Action-Plane Benchmark

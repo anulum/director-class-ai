@@ -26,6 +26,8 @@
     "Test & Coverage",
     "Lint & Format",
     "Types (mypy --strict)",
+    "Director-AI Detector Contract",
+    "Rust Build & Differential Parity",
     "SPDX header guard",
     "SAST (Bandit + Semgrep)",
     "Fuzz (Hypothesis)",
