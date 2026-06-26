@@ -98,6 +98,28 @@ class TestApprovalQueue:
         ApprovalQueue(p).approve(_digest(), approver="alice")  # fresh instance
         assert ApprovalQueue(p).request_approval(None, _req()) is True
 
+    def test_failed_atomic_replace_preserves_existing_queue(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        p = tmp_path / "q.json"
+        q = ApprovalQueue(p)
+        q.request_approval(None, _req("maybe A"))
+        before = p.read_text(encoding="utf-8")
+
+        def _fail_replace(_source: object, _target: object) -> None:
+            raise OSError("simulated crash during queue replacement")
+
+        monkeypatch.setattr("director_class_ai.core.durability.os.replace", _fail_replace)
+        with pytest.raises(OSError, match="simulated crash"):
+            q.request_approval(None, _req("maybe B"))
+
+        assert p.read_text(encoding="utf-8") == before
+        reloaded = ApprovalQueue(p)
+        ticket = reloaded.get(_digest("maybe A"))
+        assert ticket is not None
+        assert ticket.status == "pending"
+        assert reloaded.get(_digest("maybe B")) is None
+
     def test_get_returns_ticket(self, tmp_path) -> None:
         q = ApprovalQueue(tmp_path / "q.json")
         q.request_approval(None, _req())

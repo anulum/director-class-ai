@@ -29,14 +29,20 @@
       "boundary_type": "cli_storage",
       "production_surfaces": [
         "director_class_ai/cli/approve.py",
-        "director_class_ai/approvals/queue.py"
+        "director_class_ai/approvals/queue.py",
+        "director_class_ai/core/durability.py"
       ],
-      "required_behaviour": "Operator approval CLI lists, shows, approves, denies, and rejects invalid ticket state through the durable approval store.",
+      "required_behaviour": "Operator approval CLI lists, shows, approves, denies, rejects invalid ticket state, and preserves an existing queue when a durable replacement fails.",
       "evidence_tests": [
         {
           "file": "tests/test_cli_approve.py",
           "mode": "integration",
           "covers": "CLI main paths over ApprovalQueue JSON store including unknown/already-decided digests"
+        },
+        {
+          "file": "tests/test_approval_queue.py",
+          "mode": "integration",
+          "covers": "ApprovalQueue JSON store persistence, single-use approval semantics, and atomic-replacement failure preservation"
         }
       ]
     },
