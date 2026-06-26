@@ -22,7 +22,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from ..action import (
     MCP_CALL_KEY,
@@ -35,11 +35,27 @@ from ..action import (
     OriginTaintDetector,
     serialise_call,
 )
-from ..core import Decision, Detector, EvaluationRequest, Governor, ParallelEnsembleScorer
+from ..core import (
+    Decision,
+    Detector,
+    EvaluationRequest,
+    FusionPolicy,
+    Governor,
+    ParallelEnsembleScorer,
+)
 from ..core.governor import ApprovalHook, AuditSink
 from ..core.signal import DetectorSignal, Locus, Plane, Severity
-from ..policy import CAPABILITY_CONTEXT_KEY, CapabilityContext, CapabilityPolicy
+from ..policy import (
+    CAPABILITY_CONTEXT_KEY,
+    CapabilityContext,
+    CapabilityPolicy,
+)
 from ..policy.capability import CapabilityPolicyDetector
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from ..policy import CapabilityGrant
 
 __all__ = [
     "MCPDiscoveryDecision",
@@ -890,6 +906,7 @@ class MCPGateway:
         *,
         allow_dynamic_discovery: bool = False,
         require_signed_registrations: bool = False,
+        fusion_policy: FusionPolicy | None = None,
         capability_policy: CapabilityPolicy | None = None,
         approval: ApprovalHook | None = None,
         audit_sink: AuditSink | None = None,
@@ -909,7 +926,7 @@ class MCPGateway:
         ]
         if capability_policy is not None:
             detectors.append(CapabilityPolicyDetector(capability_policy))
-        ensemble = ParallelEnsembleScorer(detectors)
+        ensemble = ParallelEnsembleScorer(detectors, policy=fusion_policy)
         call_governor = Governor(
             ensemble=ensemble,
             approval=approval,
@@ -926,6 +943,32 @@ class MCPGateway:
             call_governor,
             capability_policy=capability_policy,
             response_governor=response_governor,
+        )
+
+    @classmethod
+    def from_policy_store(
+        cls,
+        registrations: Sequence[MCPToolRegistration],
+        policy_store: str | Path,
+        *,
+        capability_grants: Sequence[CapabilityGrant] = (),
+        allow_dynamic_discovery: bool = False,
+        require_signed_registrations: bool = False,
+        approval: ApprovalHook | None = None,
+        audit_sink: AuditSink | None = None,
+    ) -> MCPGateway:
+        """Create an MCP gateway from a persisted Guardrail-as-Code ledger."""
+        from .policy_binding import gateway_from_policy_store
+
+        return gateway_from_policy_store(
+            cls,
+            registrations,
+            policy_store,
+            capability_grants=capability_grants,
+            allow_dynamic_discovery=allow_dynamic_discovery,
+            require_signed_registrations=require_signed_registrations,
+            approval=approval,
+            audit_sink=audit_sink,
         )
 
     def review_discovery(self, request: MCPDiscoveryRequest) -> MCPDiscoveryDecision:

@@ -14,6 +14,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Mapping
 from contextlib import AbstractContextManager
+from pathlib import Path
 
 from director_class_ai.gateway import (
     MCP_AUTH_HEADER,
@@ -27,6 +28,8 @@ from director_class_ai.policy import (
     CapabilityGrant,
     CapabilityPolicy,
     OriginRule,
+    PolicyGovernance,
+    Profile,
 )
 
 
@@ -113,6 +116,33 @@ def _capability_policy() -> CapabilityPolicy:
         ),
         origin_rules=(OriginRule("user", tool="fs/read_file", action="read"),),
     )
+
+
+def _capability_grant() -> CapabilityGrant:
+    return CapabilityGrant(
+        grant_id="grant-read",
+        subject="agent-a",
+        tenant="tenant-a",
+        session="session-a",
+        source_origin="user",
+        tool="fs/read_file",
+        resource="workspace:README.md",
+        action="read",
+        max_blast_radius=BlastRadius.LOW,
+        expires_at=20,
+    )
+
+
+def _approved_policy_store(path: Path) -> None:
+    governance = PolicyGovernance.empty()
+    proposal = governance.propose(
+        Profile(name="staging", capability_profile="local_operator_actions"),
+        proposer="alice",
+        created_at="t0",
+        reason="service runtime policy",
+    )
+    governance.approve(proposal.digest, reviewer="bob", decided_at="t1")
+    governance.save(path)
 
 
 def test_service_health_reports_registry_count() -> None:
@@ -270,6 +300,38 @@ def test_service_review_accepts_capability_context_and_redacts_policy() -> None:
         "capability and origin policy matched"
     )
     assert "workspace:README.md" not in repr(review.body)
+
+
+def test_service_binds_gateway_to_approved_policy_store(tmp_path: Path) -> None:
+    store = tmp_path / "policy.json"
+    _approved_policy_store(store)
+    service = MCPGatewayService(
+        policy_store=store,
+        capability_grants=(_capability_grant(),),
+    )
+    descriptor = _remote_descriptor()
+
+    discovery = _discover(service)
+    review = service.handle(
+        "POST",
+        "/v1/mcp/review",
+        {
+            "server": "fs",
+            "tool": "read_file",
+            "arguments": {"path": "README.md"},
+            "server_identity": descriptor["server_identity"],
+            "tool_schema": _tool_schema(descriptor),
+            "argument_schema": descriptor["argument_schema"],
+            "remote_auth": _remote_auth(),
+            "capability_context": _capability_context(),
+            "provenance": "user",
+        },
+    )
+
+    assert discovery["permitted"] is True
+    assert review.status == 200
+    assert review.body["route"] == "allow"
+    assert review.body["policy"]["decision"]["matched_grant_ids"] == ("grant-read",)
 
 
 def test_service_review_blocks_when_capability_context_is_missing() -> None:

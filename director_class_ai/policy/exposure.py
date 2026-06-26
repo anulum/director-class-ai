@@ -23,11 +23,16 @@ can be replayed offline for any two postures.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 from ..core.fusion import Verdict, fuse
-from ..core.signal import DetectorSignal
+from ..core.signal import DetectorSignal, EvaluationRequest
+from .capability import (
+    CAPABILITY_CONTEXT_KEY,
+    CapabilityGrant,
+    CapabilityPolicyDetector,
+)
 from .profile import Profile
 
 __all__ = [
@@ -69,11 +74,18 @@ class ExposureCase:
     provenance : str
         The request's action provenance (``"user"`` gates authorised-destructive
         routing); empty keeps the case fail-closed.
+    capability_context : mapping, optional
+        Runtime capability facts to replay through the posture's capability
+        profile. Empty keeps the case on fusion-only replay.
+    capability_grants : tuple of CapabilityGrant
+        Runtime grants available for this case when capability replay is active.
     """
 
     label: str
     signals: tuple[DetectorSignal, ...]
     provenance: str = ""
+    capability_context: Mapping[str, object] = field(default_factory=dict)
+    capability_grants: tuple[CapabilityGrant, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -138,6 +150,8 @@ class PostureExposure:
 
     def __init__(self, baseline: Profile, candidate: Profile) -> None:
         """Compare ``candidate`` against the currently approved ``baseline``."""
+        self._baseline_profile = baseline
+        self._candidate_profile = candidate
         self._baseline = baseline.to_fusion_policy()
         self._candidate = candidate.to_fusion_policy()
 
@@ -158,12 +172,34 @@ class PostureExposure:
             OutcomeChange(
                 label=case.label,
                 baseline=_outcome(
-                    fuse(case.signals, self._baseline, provenance=case.provenance)
+                    fuse(
+                        _signals_for(self._baseline_profile, case),
+                        self._baseline,
+                        provenance=case.provenance,
+                    )
                 ),
                 candidate=_outcome(
-                    fuse(case.signals, self._candidate, provenance=case.provenance)
+                    fuse(
+                        _signals_for(self._candidate_profile, case),
+                        self._candidate,
+                        provenance=case.provenance,
+                    )
                 ),
             )
             for case in cases
         )
         return ExposureReport(outcomes=outcomes)
+
+
+def _signals_for(profile: Profile, case: ExposureCase) -> tuple[DetectorSignal, ...]:
+    """Return fusion signals plus the profile's capability-policy signal."""
+    if not case.capability_context:
+        return case.signals
+    policy = profile.to_capability_policy(case.capability_grants)
+    signal = CapabilityPolicyDetector(policy).evaluate(
+        EvaluationRequest(
+            action_provenance=case.provenance,
+            metadata={CAPABILITY_CONTEXT_KEY: dict(case.capability_context)},
+        )
+    )
+    return case.signals if signal is None else (*case.signals, signal)

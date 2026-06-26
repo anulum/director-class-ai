@@ -24,6 +24,8 @@ from .mcp_service import (
 
 __all__ = ["MCPGatewayServerOptions", "build_gateway_server", "main"]
 
+DEFAULT_POLICY_STORE = "runtime/policy.json"
+
 
 @dataclass(frozen=True)
 class MCPGatewayServerOptions:
@@ -36,6 +38,7 @@ class MCPGatewayServerOptions:
     max_body_bytes: int = 1_048_576
     operator_key: str = ""
     operator_key_env: str = ""
+    policy_store: str = DEFAULT_POLICY_STORE
 
     @classmethod
     def from_argv(
@@ -53,6 +56,7 @@ class MCPGatewayServerOptions:
             max_body_bytes=args.max_body_bytes,
             operator_key=os.environ.get(operator_key_env, "") if operator_key_env else "",
             operator_key_env=operator_key_env,
+            policy_store=args.policy_store,
         )
 
 
@@ -66,7 +70,8 @@ def build_gateway_server(options: MCPGatewayServerOptions) -> MCPGatewayHTTPServ
             require_signed_registrations=options.require_signed_registrations,
             max_body_bytes=options.max_body_bytes,
             operator_key=options.operator_key,
-        )
+        ),
+        policy_store=options.policy_store,
     )
     return MCPGatewayHTTPServer((options.host, options.port), service)
 
@@ -122,6 +127,14 @@ def _parser() -> argparse.ArgumentParser:
         help=(
             "Environment variable containing the operator key required for MCP "
             "gateway requests. Required when binding outside loopback."
+        ),
+    )
+    parser.add_argument(
+        "--policy-store",
+        default=DEFAULT_POLICY_STORE,
+        help=(
+            "Guardrail-as-Code ledger whose approved head posture governs MCP "
+            f"reviews. Default: {DEFAULT_POLICY_STORE}."
         ),
     )
     return parser

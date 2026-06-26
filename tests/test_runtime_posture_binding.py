@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from director_class_ai.action import MCPToolRegistration
 from director_class_ai.cli.guard import (
     CommandGuardOptions,
     _resolve_runtime_policy,
@@ -24,7 +25,14 @@ from director_class_ai.cli.guard import (
 )
 from director_class_ai.core.fusion import FusionPolicy
 from director_class_ai.core.signal import DetectorSignal, Locus, Plane, Severity
-from director_class_ai.policy import PolicyGovernance, Profile
+from director_class_ai.gateway import MCPGateway, MCPGatewayRequest
+from director_class_ai.policy import (
+    BlastRadius,
+    CapabilityContext,
+    CapabilityGrant,
+    PolicyGovernance,
+    Profile,
+)
 from director_class_ai.sdk import ToolReviewMiddleware, ToolReviewRequest
 
 
@@ -70,6 +78,52 @@ def _approved_ledger(path: Path, **profile_kwargs: object) -> Profile:
     return profile
 
 
+def _registration() -> MCPToolRegistration:
+    return MCPToolRegistration(
+        server="fs",
+        tool="read_file",
+        server_identity={"name": "fs", "transport": "stdio"},
+        tool_schema={"description": "Read one workspace file", "mode": "read"},
+        argument_schema={"properties": {"path": {"type": "string"}}},
+    )
+
+
+def _capability_grant() -> CapabilityGrant:
+    return CapabilityGrant(
+        grant_id="read-workspace",
+        subject="agent-a",
+        tenant="tenant-a",
+        session="session-a",
+        source_origin="user",
+        tool="fs/read_file",
+        resource="workspace:README.md",
+        action="read",
+        max_blast_radius=BlastRadius.LOW,
+    )
+
+
+def _mcp_request() -> MCPGatewayRequest:
+    return MCPGatewayRequest.from_parts(
+        "fs",
+        "read_file",
+        {"path": "README.md"},
+        server_identity={"name": "fs", "transport": "stdio"},
+        tool_schema={"description": "Read one workspace file", "mode": "read"},
+        argument_schema={"properties": {"path": {"type": "string"}}},
+        capability_context={
+            "subject": "agent-a",
+            "tenant": "tenant-a",
+            "session": "session-a",
+            "source_origin": "user",
+            "tool": "fs/read_file",
+            "resource": "workspace:README.md",
+            "action": "read",
+            "blast_radius": "low",
+        },
+        provenance="user",
+    )
+
+
 class TestMiddlewarePolicyBinding:
     def test_policy_governs_the_decision(self) -> None:
         strict = FusionPolicy(action_block_threshold=0.3, uncertainty_margin=0.0)
@@ -93,6 +147,19 @@ class TestGovernanceToPolicyBridge:
         )
         active = PolicyGovernance.load(str(store)).active_fusion_policy()
         assert active == profile.to_fusion_policy()
+
+    def test_approved_head_yields_its_capability_policy(self, tmp_path: Path) -> None:
+        store = tmp_path / "policy.json"
+        _approved_ledger(store, capability_profile="local_operator_actions")
+        governance = PolicyGovernance.load(str(store))
+
+        active = governance.active_capability_policy(grants=(_capability_grant(),))
+
+        assert active is not None
+        decision = active.evaluate(
+            CapabilityContext.from_mapping(_mcp_request().capability_context)
+        )
+        assert decision.permitted is True
 
 
 class TestGuardPolicyResolution:
@@ -118,3 +185,24 @@ class TestGuardPolicyResolution:
         )
         assert _resolve_runtime_policy(str(store)) is not None
         assert event["permitted"] is True
+
+
+class TestMCPGatewayPolicyBinding:
+    def test_gateway_factory_uses_approved_capability_head(self, tmp_path: Path) -> None:
+        store = tmp_path / "policy.json"
+        _approved_ledger(store, capability_profile="local_operator_actions")
+
+        without_ledger = MCPGateway.from_registry(
+            [_registration()],
+            capability_policy=Profile(name="default").to_capability_policy(
+                (_capability_grant(),)
+            ),
+        ).review(_mcp_request())
+        with_ledger = MCPGateway.from_policy_store(
+            [_registration()],
+            store,
+            capability_grants=(_capability_grant(),),
+        ).review(_mcp_request())
+
+        assert without_ledger.route == "block"
+        assert with_ledger.route == "allow"

@@ -31,6 +31,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from ..core.fusion import FusionPolicy
+from .capability import CapabilityGrant, CapabilityPolicy
 from .drift import PolicyDriftEvent, PolicyDriftMonitor
 from .exposure import ExposureCase, ExposureReport, PostureExposure
 from .history import PolicyHistory
@@ -97,6 +98,29 @@ class PolicyGovernance:
         """
         head = self.head
         return head.profile.to_fusion_policy() if head is not None else None
+
+    def active_capability_policy(
+        self,
+        *,
+        grants: Sequence[CapabilityGrant] = (),
+    ) -> CapabilityPolicy | None:
+        """Return the approved head posture as a runtime capability policy.
+
+        Parameters
+        ----------
+        grants : sequence of CapabilityGrant, optional
+            Runtime grants supplied by the deployment. The Guardrail-as-Code
+            ledger chooses the origin/capability envelope, while deployments
+            provide the current subject/resource grants.
+
+        Returns
+        -------
+        CapabilityPolicy or None
+            The compiled capability policy for the approved head, or ``None``
+            when no posture has been approved yet.
+        """
+        head = self.head
+        return head.profile.to_capability_policy(tuple(grants)) if head else None
 
     def propose(
         self, profile: Profile, *, proposer: str, created_at: str, reason: str

@@ -93,7 +93,12 @@ assert decision.route == "allow"
 ## MCP gateway service
 
 The package also exposes a local loopback MCP review service. It reviews
-discovery, tool calls, and tool responses, but it never dispatches tools.
+discovery, tool calls, and tool responses, but it never dispatches tools. The
+service reads the approved head of the same Guardrail-as-Code ledger
+(`--policy-store`, default `runtime/policy.json`) before MCP review, so an
+approved posture supplies the live fusion thresholds and capability envelope for
+gateway decisions. With no ledger or no approved head, the gateway keeps its
+fail-closed defaults.
 
 ```bash
 director-class-mcp-gateway --host 127.0.0.1 --port 8765

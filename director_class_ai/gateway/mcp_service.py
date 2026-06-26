@@ -32,11 +32,12 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Literal
 
 from ..action import MCPToolCall, MCPToolRegistration
 from ..core.governor import ApprovalHook, AuditSink
-from ..policy import CapabilityPolicy
+from ..policy import CapabilityGrant, CapabilityPolicy
 from .mcp import (
     MCPDiscoveryRequest,
     MCPGateway,
@@ -101,12 +102,18 @@ class MCPGatewayService:
         *,
         config: MCPGatewayServiceConfig | None = None,
         capability_policy: CapabilityPolicy | None = None,
+        policy_store: str | Path | None = None,
+        capability_grants: Sequence[CapabilityGrant] = (),
         approval: ApprovalHook | None = None,
         audit_sink: AuditSink | None = None,
     ) -> None:
+        if capability_policy is not None and policy_store is not None:
+            raise ValueError("pass either capability_policy or policy_store, not both")
         self._config = config or MCPGatewayServiceConfig()
         self._registrations = tuple(registrations)
         self._capability_policy = capability_policy
+        self._policy_store = Path(policy_store) if policy_store is not None else None
+        self._capability_grants = tuple(capability_grants)
         self._approval = approval
         self._audit_sink = audit_sink
         self._gateway = self._build_gateway()
@@ -149,6 +156,16 @@ class MCPGatewayService:
         return _error(HTTPStatus.NOT_FOUND, "unknown_endpoint")
 
     def _build_gateway(self) -> MCPGateway:
+        if self._policy_store is not None:
+            return MCPGateway.from_policy_store(
+                self._registrations,
+                self._policy_store,
+                capability_grants=self._capability_grants,
+                allow_dynamic_discovery=self._config.allow_dynamic_discovery,
+                require_signed_registrations=self._config.require_signed_registrations,
+                approval=self._approval,
+                audit_sink=self._audit_sink,
+            )
         return MCPGateway.from_registry(
             self._registrations,
             allow_dynamic_discovery=self._config.allow_dynamic_discovery,
@@ -182,6 +199,7 @@ class MCPGatewayService:
         )
 
     def _handle_review(self, payload: Mapping[str, object]) -> MCPGatewayServiceResponse:
+        self._refresh_gateway_if_policy_bound()
         request = MCPGatewayRequest.from_parts(
             _string(payload.get("server")),
             _string(payload.get("tool")),
@@ -208,6 +226,7 @@ class MCPGatewayService:
     def _handle_response(
         self, payload: Mapping[str, object]
     ) -> MCPGatewayServiceResponse:
+        self._refresh_gateway_if_policy_bound()
         request = MCPResponseRequest(
             call=_call(_mapping(payload.get("call"))),
             output=payload.get("output", ""),
@@ -222,6 +241,10 @@ class MCPGatewayService:
             HTTPStatus.OK if decision.permitted else HTTPStatus.FORBIDDEN,
             decision.to_audit_event(),
         )
+
+    def _refresh_gateway_if_policy_bound(self) -> None:
+        if self._policy_store is not None:
+            self._gateway = self._build_gateway()
 
 
 class MCPGatewayHTTPServer(ThreadingHTTPServer):

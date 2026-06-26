@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from director_class_ai.core.signal import DetectorSignal, Locus, Plane, Severity
 from director_class_ai.policy import (
+    BlastRadius,
+    CapabilityGrant,
     ExposureCase,
     PostureExposure,
     Profile,
@@ -84,3 +86,46 @@ class TestPostureExposure:
         assert report.outcomes == ()
         assert report.changed_count == 0
         assert report.transitions == {}
+
+    def test_capability_profile_changes_are_replayed(self) -> None:
+        grant = CapabilityGrant(
+            grant_id="read-workspace",
+            subject="agent-a",
+            tenant="tenant-a",
+            session="session-a",
+            source_origin="user",
+            tool="fs/read_file",
+            resource="workspace:README.md",
+            action="read",
+            max_blast_radius=BlastRadius.LOW,
+        )
+        case = ExposureCase(
+            label="workspace-read",
+            signals=(),
+            capability_context={
+                "subject": "agent-a",
+                "tenant": "tenant-a",
+                "session": "session-a",
+                "source_origin": "user",
+                "tool": "fs/read_file",
+                "resource": "workspace:README.md",
+                "action": "read",
+                "blast_radius": "low",
+            },
+            capability_grants=(grant,),
+        )
+        baseline = Profile(
+            name="staging",
+            uncertainty_margin=0.0,
+            capability_profile="deny_all_actions",
+        )
+        candidate = Profile(
+            name="staging",
+            uncertainty_margin=0.0,
+            capability_profile="local_operator_actions",
+        )
+
+        report = PostureExposure(baseline, candidate).expose([case])
+
+        assert report.changed_count == 1
+        assert report.transitions == {"block->allow": 1}

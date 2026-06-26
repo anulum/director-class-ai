@@ -29,6 +29,7 @@ def test_gateway_server_options_parse_defaults() -> None:
     assert options.max_body_bytes == 1_048_576
     assert options.operator_key == ""
     assert options.operator_key_env == ""
+    assert options.policy_store == "runtime/policy.json"
 
 
 def test_gateway_server_options_parse_runtime_flags(
@@ -48,6 +49,8 @@ def test_gateway_server_options_parse_runtime_flags(
             "4096",
             "--operator-key-env",
             "DIRECTOR_CLASS_MCP_KEY",
+            "--policy-store",
+            "/tmp/policy.json",
         )
     )
 
@@ -58,6 +61,7 @@ def test_gateway_server_options_parse_runtime_flags(
     assert options.max_body_bytes == 4096
     assert options.operator_key == "operator-key"
     assert options.operator_key_env == "DIRECTOR_CLASS_MCP_KEY"
+    assert options.policy_store == "/tmp/policy.json"
 
 
 def test_build_gateway_server_binds_loopback_and_serves_health() -> None:
