@@ -379,6 +379,31 @@
       ]
     },
     {
+      "id": "repository-local-gates",
+      "boundary_type": "cli_validation_file_format",
+      "production_surfaces": [
+        "tools/check_repository_readiness.py",
+        "tools/check_phase4_task_intake.py",
+        "validation/repository_readiness.json",
+        "validation/phase4_task_intake.json",
+        "Makefile",
+        "pyproject.toml"
+      ],
+      "required_behaviour": "Clean-checkout local gates validate tracked repository readiness and Phase 4 intake JSON inputs, fail closed on stale CI/local-gate metadata, and enforce the documented 100% coverage gate without relying on ignored internal files.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_repository_readiness.py",
+          "mode": "integration",
+          "covers": "repository-readiness CLI default, tracked spec path, BUSL/private package metadata, required remote blockers, CI job names, Makefile local gates, and 100% coverage-gate enforcement"
+        },
+        {
+          "file": "tests/test_phase4_task_intake.py",
+          "mode": "integration",
+          "covers": "Phase 4 intake CLI default, tracked ledger path, required task metadata, blocked-task disclosure, external-claim boundary, and duplicate-id rejection"
+        }
+      ]
+    },
+    {
       "id": "package-and-console-scripts",
       "boundary_type": "packaging_entry_points",
       "production_surfaces": [

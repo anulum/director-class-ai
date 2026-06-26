@@ -1,0 +1,52 @@
+{
+  "schema_version": "director-class-ai.repository-readiness.v1",
+  "updated_at": "2026-06-26",
+  "package_name": "director-class-ai",
+  "module_name": "director_class_ai",
+  "remote_url": "https://github.com/anulum/director-class-ai.git",
+  "branch": "main",
+  "licence_surface": {
+    "file": "LICENSE",
+    "type": "BUSL-1.1 source-available commercial",
+    "source_visibility_grants_rights": false,
+    "pypi_upload_guard": "Private :: Do Not Upload"
+  },
+  "console_scripts": [
+    "director-class-guard",
+    "director-class-mcp-gateway",
+    "director-class-siem-export"
+  ],
+  "workflow_files": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/pre-commit.yml",
+    ".github/workflows/codeql.yml",
+    ".github/workflows/scorecard.yml"
+  ],
+  "required_ci_jobs": [
+    "Test & Coverage",
+    "Lint & Format",
+    "Types (mypy --strict)",
+    "SPDX header guard",
+    "SAST (Bandit + Semgrep)",
+    "Fuzz (Hypothesis)",
+    "SBOM Generation",
+    "Build & Wheel Smoke"
+  ],
+  "required_local_gates": [
+    "spdx",
+    "test-quality",
+    "test-boundaries",
+    "godfiles",
+    "repository-readiness",
+    "phase4-intake",
+    "lint",
+    "types"
+  ],
+  "remote_ci_status": "blocked_until_push",
+  "branch_protection_status": "blocked_until_repo_settings",
+  "open_remote_blockers": [
+    "Remote CI cannot be observed until the CEO authorises pushing the ahead local commits.",
+    "Branch protection and required checks must be configured in GitHub repository settings after remote CI check names exist.",
+    "Historical filter-repo rewriting is not performed from this working checkout without explicit approval because it changes repository history."
+  ]
+}

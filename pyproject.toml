@@ -74,7 +74,7 @@ convention = "numpy"
 "benchmarks/__init__.py" = ["D"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=director_class_ai --cov-report=term-missing --cov-fail-under=97 --strict-markers"
+addopts = "--cov=director_class_ai --cov-report=term-missing --cov-fail-under=100 --strict-markers"
 testpaths = ["tests"]
 
 [tool.coverage.run]
@@ -82,7 +82,7 @@ branch = true
 source = ["director_class_ai"]
 
 [tool.coverage.report]
-fail_under = 97
+fail_under = 100
 show_missing = true
 exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "\\.\\.\\.", "raise NotImplementedError"]
 

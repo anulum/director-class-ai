@@ -1,0 +1,226 @@
+{
+  "schema_version": "director-class-ai.phase4-task-intake.v1",
+  "updated_at": "2026-06-26",
+  "policy": {
+    "purpose": "Executable intake guard for Phase 4 roadmap work.",
+    "required_fields": [
+      "buyer_user_value",
+      "threat_model",
+      "required_evidence",
+      "affected_surfaces",
+      "benchmark_impact",
+      "claim_boundary"
+    ],
+    "rule": "A Phase 4 task cannot move to ready, in_progress, or done without complete intake metadata."
+  },
+  "tasks": [
+    {
+      "id": "P4-GATE-001",
+      "plan_anchor": "Phase 4 / Realistic high-impact execution order / Acceptance",
+      "status": "done",
+      "buyer_user_value": "Keeps Phase 4 execution focused on buyer-relevant runtime action control instead of low-yield detector or positioning drift.",
+      "threat_model": "Unscoped roadmap work can add unwired detectors, unsupported benchmark claims, or public copy that outruns evidence.",
+      "required_evidence": [
+        "machine-readable intake ledger",
+        "validator wired into Makefile",
+        "focused validator regression tests",
+        "internal PLAN and AUDIT updates"
+      ],
+      "affected_surfaces": [
+        "validation/phase4_task_intake.json",
+        "tools/check_phase4_task_intake.py",
+        "tests/test_phase4_task_intake.py",
+        "Makefile"
+      ],
+      "benchmark_impact": "none",
+      "claim_boundary": "Internal execution governance only; this does not create benchmark or deployment claims.",
+      "implementation_readiness": "executed",
+      "open_blockers": []
+    },
+    {
+      "id": "P4-BENCH-EXT-001",
+      "plan_anchor": "Phase 4 / External benchmark evidence pack",
+      "status": "blocked",
+      "buyer_user_value": "Supplies defensible comparison evidence for procurement and security review once licence-reviewed third-party artefacts are locally available.",
+      "threat_model": "Benchmark overclaiming, copied upstream examples, mixed authored/external metrics, and unreviewed third-party data import.",
+      "required_evidence": [
+        "licence-reviewed local JSONL exports",
+        "SOURCE_LEDGER import_allowed=true for each populated surface",
+        "partition validator pass",
+        "isolated benchmark evidence with host-load context",
+        "Markdown and JSON evidence reports with external metrics separated"
+      ],
+      "affected_surfaces": [
+        "benchmarks/external_sources/",
+        "benchmarks/action_plane.py",
+        "benchmarks/action_evidence.py",
+        "benchmarks/results/action_plane_evidence.json",
+        "benchmarks/results/action_plane_evidence.md",
+        "README.md"
+      ],
+      "benchmark_impact": "external_required",
+      "claim_boundary": "No public external or comparative benchmark claim until reviewed external artefacts are loaded and an isolated run is recorded.",
+      "implementation_readiness": "blocked_on_external_inputs",
+      "open_blockers": [
+        "No licence-reviewed local external benchmark JSONL artefacts are present in benchmarks/external_sources/.",
+        "Current evidence remains local regression evidence with external n=0."
+      ]
+    },
+    {
+      "id": "P4-GAC-001",
+      "plan_anchor": "Phase 4 / Guardrail-as-Code policy lifecycle",
+      "status": "done",
+      "buyer_user_value": "Lets operators treat the governance posture as reviewed, content-addressed policy: every deployment profile change has a stable digest, a parent lineage for rollback, and a structured field-level diff, and a running profile can be checked for drift against the approved revision before it governs live actions.",
+      "threat_model": "Silent or unreviewed policy edits relax thresholds, audit, approval, or the capability envelope without a trace; a deployed profile drifts away from the approved one; a relaxed posture cannot be reverted because no prior revision is recorded.",
+      "required_evidence": [
+        "content-addressed PolicyRevision with sha256 over canonical profile payload matching the audit-chain digest convention",
+        "structured field-level diff between two revisions",
+        "drift detection between an approved revision and a live profile",
+        "100% line and branch coverage with multi-angle regression tests",
+        "mypy --strict clean and ruff clean"
+      ],
+      "affected_surfaces": [
+        "director_class_ai/policy/revision.py",
+        "director_class_ai/policy/__init__.py",
+        "tests/test_policy_revision.py",
+        "validation/phase4_task_intake.json"
+      ],
+      "benchmark_impact": "none",
+      "claim_boundary": "Internal governance primitive only: revision/diff/drift over deployment profiles. No public benchmark, accuracy, or deployment claim; PR-review, A/B, and rollback orchestration are later increments.",
+      "implementation_readiness": "executed",
+      "open_blockers": []
+    },
+    {
+      "id": "P4-GAC-002",
+      "plan_anchor": "Phase 4 / Guardrail-as-Code policy lifecycle / Increment 2",
+      "status": "done",
+      "buyer_user_value": "Gives operators an append-only history of governance-posture changes with a tamper-evident parent lineage and audit-preserving rollback, so a relaxed posture can be reverted without erasing the record of who relaxed it and why.",
+      "threat_model": "Policy history is forked, reordered, or silently rewritten; a rollback erases the relaxation it reverts; a tampered parent digest hides an unauthorised posture change.",
+      "required_evidence": [
+        "PolicyHistory.append rejects orphaned first revisions and parent digests that do not match the current head",
+        "rollback appends the restored posture rather than deleting history",
+        "lookup by content address",
+        "100% line and branch coverage with multi-angle regression tests",
+        "mypy --strict clean and ruff clean"
+      ],
+      "affected_surfaces": [
+        "director_class_ai/policy/history.py",
+        "director_class_ai/policy/__init__.py",
+        "tests/test_policy_history.py",
+        "validation/phase4_task_intake.json"
+      ],
+      "benchmark_impact": "none",
+      "claim_boundary": "Internal governance primitive only: append-only revision history and rollback over deployment profiles. No public benchmark, accuracy, or deployment claim; review workflow, A/B, and drift alarms are increment 3.",
+      "implementation_readiness": "executed",
+      "open_blockers": []
+    },
+    {
+      "id": "P4-GAC-003",
+      "plan_anchor": "Phase 4 / Guardrail-as-Code policy lifecycle / Increment 3a",
+      "status": "done",
+      "buyer_user_value": "Makes a governance-posture change a reviewed, approval-bound event: a proposed posture only takes effect after a second identity approves it, so no operator can silently relax thresholds, audit, approval, or the capability envelope, and every change records who proposed it, who reviewed it, and when.",
+      "threat_model": "An operator self-approves a relaxation; a change is committed against a base that moved since review; a no-op or duplicate proposal clutters the queue; a denied change is treated as applied.",
+      "required_evidence": [
+        "PolicyChangeReview gates commits behind propose + approve",
+        "self-approval rejected",
+        "stale proposals rejected when the head moved since propose",
+        "no-op and duplicate-pending proposals rejected",
+        "denial does not commit to the history",
+        "100% line and branch coverage with multi-angle regression tests",
+        "mypy --strict clean and ruff clean"
+      ],
+      "affected_surfaces": [
+        "director_class_ai/policy/review.py",
+        "director_class_ai/policy/__init__.py",
+        "tests/test_policy_review.py",
+        "validation/phase4_task_intake.json"
+      ],
+      "benchmark_impact": "none",
+      "claim_boundary": "Internal governance primitive only: approval-gated review over deployment-profile changes. No public benchmark, accuracy, or deployment claim; A/B exposure and audit-sink drift alarms are increment 3b.",
+      "implementation_readiness": "executed",
+      "open_blockers": []
+    },
+    {
+      "id": "P4-GAC-004",
+      "plan_anchor": "Phase 4 / Guardrail-as-Code policy lifecycle / Increment 3b",
+      "status": "done",
+      "buyer_user_value": "Detects when the posture a deployment is actually running has drifted from the approved revision through an out-of-band edit, and records the divergence to the operator's audit trail, so an unauthorised relaxation is caught and evidenced instead of silently governing live actions.",
+      "threat_model": "A live profile is edited out of band to relax thresholds, audit, approval, or the capability envelope without going through review; the drift governs actions undetected and unrecorded.",
+      "required_evidence": [
+        "PolicyDriftMonitor.check returns and emits a PolicyDriftEvent only when the live profile diverges from the approved revision",
+        "event carries approved and live content addresses, drifted fields, and detection time",
+        "sink is pluggable so it wires to a tamper-evident audit trail",
+        "100% line and branch coverage with multi-angle regression tests",
+        "mypy --strict clean and ruff clean"
+      ],
+      "affected_surfaces": [
+        "director_class_ai/policy/drift.py",
+        "director_class_ai/policy/revision.py",
+        "director_class_ai/policy/__init__.py",
+        "tests/test_policy_drift.py",
+        "validation/phase4_task_intake.json"
+      ],
+      "benchmark_impact": "none",
+      "claim_boundary": "Internal governance primitive only: drift detection over deployment profiles with a pluggable event sink. No public benchmark, accuracy, or deployment claim; A/B posture exposure is increment 3c.",
+      "implementation_readiness": "executed",
+      "open_blockers": []
+    },
+    {
+      "id": "P4-GAC-005",
+      "plan_anchor": "Phase 4 / Guardrail-as-Code policy lifecycle / Increment 3c",
+      "status": "done",
+      "buyer_user_value": "Lets an operator see, before approving a posture change, exactly how the candidate posture would have decided a representative request set versus the approved one.",
+      "threat_model": "A posture change is approved without understanding its decision impact: a relaxed candidate silently turns blocks into allows on dangerous actions, or an over-tightened one floods human approval and gets bypassed.",
+      "required_evidence": [
+        "PostureExposure replays the same detector signals under the baseline and candidate fusion policies",
+        "report exposes per-case outcome changes and transition counts",
+        "capability-policy changes are replayed, not only detector-threshold changes",
+        "100% line and branch coverage with multi-angle regression tests",
+        "mypy --strict clean and ruff clean"
+      ],
+      "affected_surfaces": [
+        "director_class_ai/policy/exposure.py",
+        "director_class_ai/policy/corpus.py",
+        "director_class_ai/policy/__init__.py",
+        "tests/test_policy_exposure.py",
+        "validation/phase4_task_intake.json"
+      ],
+      "benchmark_impact": "none",
+      "claim_boundary": "Internal governance primitive only: A/B decision-delta of two deployment postures over a supplied case set. No public benchmark, accuracy, or deployment claim.",
+      "implementation_readiness": "executed",
+      "open_blockers": []
+    },
+    {
+      "id": "P4-GAC-006",
+      "plan_anchor": "Phase 4 / Guardrail-as-Code policy lifecycle / Operator wiring",
+      "status": "done",
+      "buyer_user_value": "Turns the Guardrail-as-Code primitives into one operator command set: an operator proposes a candidate posture, A/B-replays a case corpus, has a second reviewer approve or deny it, and checks a live deployment for drift.",
+      "threat_model": "The lifecycle existed only as in-memory library primitives, so it could not actually gate a deployment or survive across invocations.",
+      "required_evidence": [
+        "PolicyGovernance orchestrates propose, expose, approve, deny, rollback, and drift over an approval-gated review",
+        "store.py serialises the revision lineage and proposals to JSON and rejects tampered ledgers on load",
+        "corpus.py loads an A/B exposure case corpus from JSON",
+        "director-class-policy CLI exposes the lifecycle and leaves the ledger untouched on errors",
+        "100% line and branch coverage on new modules; mypy --strict and ruff clean"
+      ],
+      "affected_surfaces": [
+        "director_class_ai/policy/governance.py",
+        "director_class_ai/policy/store.py",
+        "director_class_ai/policy/corpus.py",
+        "director_class_ai/policy/review.py",
+        "director_class_ai/policy/__init__.py",
+        "director_class_ai/cli/policy.py",
+        "pyproject.toml",
+        "tests/test_policy_governance.py",
+        "tests/test_policy_store.py",
+        "tests/test_policy_corpus.py",
+        "tests/test_cli_policy.py",
+        "tests/test_policy_review.py"
+      ],
+      "benchmark_impact": "none",
+      "claim_boundary": "Internal governance workflow and CLI over the policy primitives; deterministic, no model or network dependency. No public benchmark or accuracy claim.",
+      "implementation_readiness": "executed",
+      "open_blockers": []
+    }
+  ]
+}
