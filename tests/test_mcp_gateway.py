@@ -112,6 +112,17 @@ def test_registered_safe_read_is_allowed() -> None:
     assert event["tainted_argument_keys"] == ()
 
 
+def test_underpopulated_registration_blocks_gateway_review() -> None:
+    decision = MCPGateway.from_registry(
+        [MCPToolRegistration(server="fs", tool="read_file").signed()],
+        require_signed_registrations=True,
+    ).review(_safe_request())
+
+    assert decision.route == "block"
+    assert decision.permitted is False
+    assert decision.firing == ("mcp_underpopulated_registration",)
+
+
 def test_capability_policy_allows_signed_call_with_redacted_audit() -> None:
     request = MCPGatewayRequest.from_parts(
         "fs",

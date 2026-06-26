@@ -99,6 +99,22 @@ class MCPToolRegistration:
         return hmac.compare_digest(self.registry_signature, self.fingerprint)
 
     @property
+    def population_issues(self) -> tuple[str, ...]:
+        """Return manifest fields that are too empty to enforce trust."""
+        issues: list[str] = []
+        if not self.server.strip():
+            issues.append("server")
+        if not self.tool.strip():
+            issues.append("tool")
+        if not self.server_identity:
+            issues.append("server_identity")
+        if not self.tool_schema:
+            issues.append("tool_schema")
+        if not self.argument_schema:
+            issues.append("argument_schema")
+        return tuple(issues)
+
+    @property
     def key(self) -> tuple[str, str]:
         """Return the lookup key used by the trust registry."""
         return (self.server, self.tool)
@@ -182,6 +198,14 @@ class MCPTrustRegistry:
                 f"MCP tool {call.server}/{call.tool} is not in the trust registry",
             )
 
+        population_issues = registration.population_issues
+        if population_issues:
+            return _signal(
+                "mcp_underpopulated_registration",
+                Severity.HIGH,
+                f"MCP tool {call.server}/{call.tool} registration missing "
+                f"required manifest fields: {', '.join(population_issues)}",
+            )
         if self._require_signed_registrations and not registration.registry_signature:
             return _signal(
                 "mcp_unsigned_registration",

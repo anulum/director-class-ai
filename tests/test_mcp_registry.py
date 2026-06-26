@@ -116,6 +116,36 @@ def test_registration_signature_mismatch_is_denied() -> None:
     assert sig.signal_type == "mcp_registration_signature_mismatch"
 
 
+def test_underpopulated_registration_is_denied() -> None:
+    registry = MCPTrustRegistry([MCPToolRegistration(server="fs", tool="read_file")])
+    sig = registry.evaluate(
+        EvaluationRequest(
+            metadata={MCP_CALL_KEY: MCPToolCall("fs", "read_file", {"path": "README.md"})}
+        )
+    )
+
+    assert sig is not None
+    assert sig.signal_type == "mcp_underpopulated_registration"
+    assert "server_identity" in sig.rationale
+    assert "tool_schema" in sig.rationale
+    assert "argument_schema" in sig.rationale
+
+
+def test_signed_underpopulated_registration_is_denied() -> None:
+    registry = MCPTrustRegistry(
+        [MCPToolRegistration(server="fs", tool="read_file").signed()],
+        require_signed_registrations=True,
+    )
+    sig = registry.evaluate(
+        EvaluationRequest(
+            metadata={MCP_CALL_KEY: MCPToolCall("fs", "read_file", {"path": "README.md"})}
+        )
+    )
+
+    assert sig is not None
+    assert sig.signal_type == "mcp_underpopulated_registration"
+
+
 def test_transport_mismatch_is_denied() -> None:
     registry = MCPTrustRegistry([_registration().signed()])
     sig = registry.evaluate(

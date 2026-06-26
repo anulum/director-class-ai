@@ -111,12 +111,12 @@
         "director_class_ai/policy/capability.py",
         "director_class_ai/policy/governance.py"
       ],
-      "required_behaviour": "In-process MCP gateway reviews discovery, signed registrations, tool calls, remote auth, capability policy, approved policy-store heads, and tool responses without executing tools or leaking raw argument values.",
+      "required_behaviour": "In-process MCP gateway reviews discovery, signed registrations, populated registration manifests, tool calls, remote auth, capability policy, approved policy-store heads, and tool responses without executing tools or leaking raw argument values.",
       "evidence_tests": [
         {
           "file": "tests/test_mcp_gateway.py",
           "mode": "integration",
-          "covers": "discovery, signed call review, remote auth fail-closed, capability policy, response review, redacted audit events"
+          "covers": "discovery, signed call review, under-populated registration hard blocks, remote auth fail-closed, capability policy, response review, redacted audit events"
         },
         {
           "file": "tests/test_runtime_posture_binding.py",
@@ -131,7 +131,7 @@
         {
           "file": "tests/test_mcp_registry.py",
           "mode": "integration",
-          "covers": "registration signatures, schema drift, lookalike names, dynamic discovery policy"
+          "covers": "registration signatures, under-populated manifest rejection, schema drift, lookalike names, dynamic discovery policy"
         }
       ]
     },

@@ -154,6 +154,9 @@ director-class-guard --surface database --execute -- "DROP TABLE audit_2019"
 
 A hard block (an injected, tainted, or exfiltration action) is never routed to
 approval — it stays blocked regardless of who asked.
+MCP trust-registry integrity findings are hard blocks too: unknown, lookalike,
+unsigned, signature-mismatched, under-populated, schema-drifted, or
+transport-mismatched tool registrations cannot be softened by user approval.
 
 ## External benchmark artefacts
 

@@ -81,6 +81,14 @@ class FusionPolicy:
             | {"capability_context_missing", "capability_missing"}
             | {"capability_origin_denied"}
             | {
+                "mcp_underpopulated_registration",
+                "mcp_unsigned_registration",
+                "mcp_registration_signature_mismatch",
+                "mcp_schema_drift",
+                "mcp_lookalike_tool",
+                "mcp_transport_mismatch",
+            }
+            | {
                 "browser_prompt_injection",
                 "browser_malicious_iframe",
                 "browser_popup_hijack",
