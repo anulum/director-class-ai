@@ -154,7 +154,7 @@ def test_blocked_tool_never_executes() -> None:
 
     decision = ToolReviewMiddleware.default(executor=spy).run(request)
 
-    assert decision.route == "human"
+    assert decision.route == "block"
     assert decision.permitted is False
     assert decision.executed is False
     assert "destructive_command" in decision.firing

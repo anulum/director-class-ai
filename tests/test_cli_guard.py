@@ -220,7 +220,7 @@ def test_dry_run_allows_safe_command_without_execution(tmp_path: Path) -> None:
 def test_blocked_command_returns_redacted_event(tmp_path: Path) -> None:
     event = run_guard(_opts(tmp_path, surface="shell", command=("rm", "-rf", "/")))
 
-    assert event["route"] == "human"
+    assert event["route"] == "block"
     assert event["permitted"] is False
     assert event["executed"] is False
     assert "destructive_command" in event["firing"]
@@ -364,7 +364,9 @@ def test_drifted_live_profile_blocks_before_review(tmp_path: Path) -> None:
 
 
 def test_escalated_action_opens_a_pending_ticket(tmp_path: Path) -> None:
-    event = run_guard(_opts(tmp_path, surface="shell", command=("rm", "-rf", "/")))
+    event = run_guard(
+        _opts(tmp_path, surface="shell", command=("chmod", "-R", "777", "/srv"))
+    )
 
     queue = ApprovalQueue(str(event["approval_store"]))
     digest = str(event["request_digest"])
@@ -375,16 +377,17 @@ def test_escalated_action_opens_a_pending_ticket(tmp_path: Path) -> None:
 
 
 def test_human_approval_permits_the_action_exactly_once(tmp_path: Path) -> None:
-    first = run_guard(_opts(tmp_path, surface="shell", command=("rm", "-rf", "/")))
+    command = ("chmod", "-R", "777", "/srv")
+    first = run_guard(_opts(tmp_path, surface="shell", command=command))
     assert first["permitted"] is False
 
     queue = ApprovalQueue(str(first["approval_store"]))
     queue.approve(str(first["request_digest"]), "operator@example.com")
 
-    second = run_guard(_opts(tmp_path, surface="shell", command=("rm", "-rf", "/")))
+    second = run_guard(_opts(tmp_path, surface="shell", command=command))
     assert second["permitted"] is True  # the approved digest is consumed once
 
-    third = run_guard(_opts(tmp_path, surface="shell", command=("rm", "-rf", "/")))
+    third = run_guard(_opts(tmp_path, surface="shell", command=command))
     assert third["permitted"] is False  # single-use: a fresh review is blocked again
 
 

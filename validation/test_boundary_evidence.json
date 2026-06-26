@@ -15,12 +15,12 @@
         "director_class_ai/audit/chain.py",
         "director_class_ai/approvals/queue.py"
       ],
-      "required_behaviour": "Command review CLI parses real options, writes redacted audit records, opens approval tickets, respects dry-run/execute modes, and preserves single-use approval semantics.",
+      "required_behaviour": "Command review CLI parses real options, writes redacted audit records, opens approval tickets for recoverable escalations, hard-blocks irreversible never-soften actions before approval, respects dry-run/execute modes, and preserves single-use approval semantics.",
       "evidence_tests": [
         {
           "file": "tests/test_cli_guard.py",
           "mode": "integration",
-          "covers": "run_guard/main paths, audit JSONL persistence, approval-store persistence, execution gating, console-script declaration"
+          "covers": "run_guard/main paths, audit JSONL persistence, approval-store persistence, never-soften blocking, approval execution gating, console-script declaration"
         }
       ]
     },
@@ -32,7 +32,7 @@
         "director_class_ai/approvals/queue.py",
         "director_class_ai/core/durability.py"
       ],
-      "required_behaviour": "Operator approval CLI lists, shows, approves, denies, rejects invalid ticket state, and preserves an existing queue when a durable replacement fails.",
+      "required_behaviour": "Operator approval CLI lists, shows, approves, denies, exposes approval counts, rejects invalid ticket state, and preserves an existing queue when a durable replacement fails.",
       "evidence_tests": [
         {
           "file": "tests/test_cli_approve.py",
@@ -42,7 +42,7 @@
         {
           "file": "tests/test_approval_queue.py",
           "mode": "integration",
-          "covers": "ApprovalQueue JSON store persistence, single-use approval semantics, and atomic-replacement failure preservation"
+          "covers": "ApprovalQueue JSON store persistence, single-use approval semantics, dual-human critical-ticket approval, and atomic-replacement failure preservation"
         }
       ]
     },
@@ -97,7 +97,7 @@
         "director_class_ai/approvals/transport.py",
         "director_class_ai/approvals/queue.py"
       ],
-      "required_behaviour": "Approval HTTP service protects endpoints, handles pending/approve/deny requests over real loopback HTTP, emits webhook events, and rejects malformed bodies or invalid operator keys.",
+      "required_behaviour": "Approval HTTP service protects endpoints, handles pending/approve/deny requests over real loopback HTTP, exposes redacted approval counts and approver digests, emits webhook events, and rejects malformed bodies or invalid operator keys.",
       "evidence_tests": [
         {
           "file": "tests/test_approval_transport.py",
@@ -182,7 +182,7 @@
         "director_class_ai/sdk/middleware.py",
         "director_class_ai/core/governor.py"
       ],
-      "required_behaviour": "SDK middleware renders tool actions deterministically, reviews without default execution, executes permitted calls exactly once, blocks untrusted mutations, routes approval through a durable digest-scoped queue when configured, and emits digest-only audit events to the hash-chained audit sink when configured.",
+      "required_behaviour": "SDK middleware renders tool actions deterministically, reviews without default execution, executes permitted calls exactly once, blocks untrusted mutations and irreversible never-soften actions, routes recoverable approval through a durable digest-scoped queue when configured, and emits digest-only audit events to the hash-chained audit sink when configured.",
       "evidence_tests": [
         {
           "file": "tests/test_sdk_middleware.py",

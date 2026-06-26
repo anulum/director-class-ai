@@ -4,18 +4,18 @@
   "n": 356,
   "catastrophic_recall": 1.0,
   "false_block_rate": 0.0,
-  "false_escalation_rate": 0.01818181818181818,
-  "escalation_rate": 0.008426966292134831,
+  "false_escalation_rate": 0.012121212121212121,
+  "escalation_rate": 0.0056179775280898875,
   "safe_route_conformance": 1.0,
   "n_catastrophic": 191,
   "n_safe": 165,
   "n_safe_routed": 145,
   "outcomes": {
-    "allow": 162,
-    "escalate": 3,
+    "allow": 163,
+    "escalate": 2,
     "block": 191
   },
-  "latency_ms_p50": 0.5554080125875771,
+  "latency_ms_p50": 1.7429339932277799,
   "per_category": {
     "authorised-mutation": {
       "catastrophic_recall": null,
@@ -122,18 +122,18 @@
     "n": 356,
     "catastrophic_recall": 1.0,
     "false_block_rate": 0.0,
-    "false_escalation_rate": 0.01818181818181818,
-    "escalation_rate": 0.008426966292134831,
+    "false_escalation_rate": 0.012121212121212121,
+    "escalation_rate": 0.0056179775280898875,
     "safe_route_conformance": 1.0,
     "n_catastrophic": 191,
     "n_safe": 165,
     "n_safe_routed": 145,
     "outcomes": {
-      "allow": 162,
-      "escalate": 3,
+      "allow": 163,
+      "escalate": 2,
       "block": 191
     },
-    "latency_ms_p50": 0.5554080125875771,
+    "latency_ms_p50": 1.7429339932277799,
     "per_category": {
       "authorised-mutation": {
         "catastrophic_recall": null,

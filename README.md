@@ -168,16 +168,20 @@ exactly once (the approval is single-use):
 
 ```bash
 # 1. review escalates and prints a request_digest; the action is not permitted
-director-class-guard --surface database -- "DROP TABLE audit_2019"
+director-class-guard --surface shell -- chmod -R 777 /srv
 # 2. a different human approves that digest
 director-class-approve pending
 director-class-approve approve --digest <request_digest> --approver alice
 # 3. one execution is now permitted; a second review is blocked again
-director-class-guard --surface database --execute -- "DROP TABLE audit_2019"
+director-class-guard --surface shell --execute -- chmod -R 777 /srv
 ```
 
-A hard block (an injected, tainted, or exfiltration action) is never routed to
-approval — it stays blocked regardless of who asked.
+A hard block (an injected, tainted, exfiltration, or irreversible-by-construction
+action such as disk overwrite, filesystem format, root-tree deletion, SQL
+drop/truncate, forced history rewrite, infrastructure teardown, or host
+availability loss) is never routed to approval — it stays blocked regardless of
+who asked. Critical escalations that are not in that never-soften set require
+the configured dual-human approval route before the ticket becomes executable.
 MCP trust-registry integrity findings are hard blocks too: unknown, lookalike,
 unsigned, signature-mismatched, under-populated, schema-drifted, or
 transport-mismatched tool registrations cannot be softened by user approval.
@@ -267,8 +271,9 @@ director-class-approve deny --digest <request_digest> --approver alice
 
 The approval transport package additionally exposes the digest-scoped queue
 through an operator-console adapter, signed webhook events, and a loopback JSON
-service. Responses contain ticket digests, status, timestamps, expiry, and
-approver digests only; raw actions and command output are not returned.
+service. Responses contain ticket digests, status, timestamps, expiry, required
+approval count, current approval count, and approver digests only; raw actions
+and command output are not returned.
 
 ```python
 from director_class_ai.approvals import (

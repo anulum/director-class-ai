@@ -53,6 +53,30 @@ class TestApprovalQueue:
         # single use: the same approval cannot permit a second execution
         assert q.request_approval(None, _req()) is False
 
+    def test_critical_verdict_requires_two_distinct_approvers(self, tmp_path) -> None:
+        q = ApprovalQueue(tmp_path / "q.json")
+        verdict = Verdict(False, 0.97, True, firing=(_sig(Severity.CRITICAL),))
+        assert q.request_approval(verdict, _req()) is False
+
+        first = q.approve(_digest(), approver="alice")
+        assert first.status == "pending"
+        assert first.required_approvals == 2
+        assert q.request_approval(verdict, _req()) is False
+
+        second = q.approve(_digest(), approver="bob")
+        assert second.status == "approved"
+        assert second.approvers == ("alice", "bob")
+        assert q.request_approval(verdict, _req()) is True
+
+    def test_same_approver_cannot_satisfy_dual_approval(self, tmp_path) -> None:
+        q = ApprovalQueue(tmp_path / "q.json")
+        verdict = Verdict(False, 0.97, True, firing=(_sig(Severity.CRITICAL),))
+        q.request_approval(verdict, _req())
+        q.approve(_digest(), approver="alice")
+
+        with pytest.raises(ValueError, match="already approved"):
+            q.approve(_digest(), approver="alice")
+
     def test_repeated_request_keeps_single_pending(self, tmp_path) -> None:
         q = ApprovalQueue(tmp_path / "q.json")
         assert q.request_approval(None, _req()) is False

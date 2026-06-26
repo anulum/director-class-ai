@@ -39,6 +39,8 @@ def _ticket_view(ticket: ApprovalTicket) -> dict[str, object]:
         "digest": ticket.digest,
         "status": ticket.status,
         "approver": ticket.approver,
+        "required_approvals": ticket.required_approvals,
+        "approval_count": len(ticket.approvers),
         "created_at": ticket.created_at,
         "decided_at": ticket.decided_at,
         "expires_at": ticket.expires_at,

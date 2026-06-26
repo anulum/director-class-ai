@@ -23,11 +23,11 @@
     "delayed_malicious_objective": 1,
     "destructive_command": 7,
     "filesystem_format": 1,
-    "history_rewrite": 1,
     "intent_mismatch": 7,
     "mcp_tool_call": 2,
     "memory_poisoning": 2,
     "origin_taint": 12,
+    "permission_wipe": 1,
     "persistent_instruction_injection": 1,
     "remote_code_execution": 1,
     "sql_drop": 1,
@@ -113,7 +113,7 @@
       "label": "safe",
       "outcome": "escalate",
       "firing": [
-        "history_rewrite"
+        "permission_wipe"
       ]
     },
     {

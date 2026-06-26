@@ -114,7 +114,7 @@ class TestAuthorisedDestructiveRouting:
     fired. Every other path keeps the fail-closed hard block.
     """
 
-    def _destructive(self, *, sev=Severity.HIGH, stype="history_rewrite"):
+    def _destructive(self, *, sev=Severity.HIGH, stype="permission_wipe"):
         return sig(Plane.ACTION, 0.9, sev=sev, locus=Locus.ACTION, stype=stype)
 
     def test_user_authorised_destructive_escalates_not_blocks(self) -> None:
@@ -128,8 +128,39 @@ class TestAuthorisedDestructiveRouting:
             [self._destructive(sev=Severity.CRITICAL, stype="sql_drop")],
             provenance="user",
         )
-        assert v.allow is True
-        assert v.requires_human is True
+        assert v.allow is False
+        assert v.requires_human is False
+        assert "never-soften" in v.rationale
+
+    @pytest.mark.parametrize(
+        "signal_type",
+        [
+            "disk_overwrite",
+            "filesystem_format",
+            "fork_bomb",
+            "infra_teardown",
+            "sql_drop",
+            "sql_truncate",
+            "datastore_drop",
+            "datastore_flush",
+            "bucket_deletion",
+            "destructive_command",
+            "privilege_escalation",
+            "history_rewrite",
+            "availability_loss",
+            "process_kill",
+        ],
+    )
+    def test_irreversible_signal_types_never_soften_to_user_approval(
+        self,
+        signal_type: str,
+    ) -> None:
+        v = fuse(
+            [self._destructive(sev=Severity.CRITICAL, stype=signal_type)],
+            provenance="user",
+        )
+        assert v.allow is False
+        assert v.requires_human is False
 
     def test_unknown_provenance_still_hard_blocks(self) -> None:
         # The default empty provenance must stay fail-closed (no silent softening).
@@ -203,9 +234,9 @@ class TestAuthorisedDestructiveRouting:
         assert v.allow is True and v.requires_human is True
 
     def test_taint_set_is_policy_tunable(self) -> None:
-        # Treat history_rewrite as taint-class via policy → it can no longer be
+        # Treat permission_wipe as taint-class via policy → it can no longer be
         # authorised, so it hard-blocks even from the user.
-        policy = FusionPolicy(taint_signal_types=frozenset({"history_rewrite"}))
+        policy = FusionPolicy(taint_signal_types=frozenset({"permission_wipe"}))
         v = fuse([self._destructive()], policy, provenance="user")
         assert v.allow is False
 

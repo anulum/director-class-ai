@@ -106,6 +106,30 @@ class FusionPolicy:
             }
         )
     )
+    # Catastrophic action classes that must not be converted from block to
+    # approval merely because the action provenance says "user". These operations
+    # destroy storage, erase auditability, remove availability, or grant durable
+    # privilege; a single click is not a proportionate control.
+    never_soften_signal_types: frozenset[str] = field(
+        default_factory=lambda: frozenset(
+            {
+                "availability_loss",
+                "bucket_deletion",
+                "datastore_drop",
+                "datastore_flush",
+                "destructive_command",
+                "disk_overwrite",
+                "filesystem_format",
+                "fork_bomb",
+                "history_rewrite",
+                "infra_teardown",
+                "process_kill",
+                "privilege_escalation",
+                "sql_drop",
+                "sql_truncate",
+            }
+        )
+    )
     plane_mode: dict[Plane, FusionMode] = field(
         default_factory=lambda: {
             Plane.CONTENT: FusionMode.FAIL_OPEN,
@@ -123,19 +147,25 @@ class FusionPolicy:
     ) -> bool:
         """Return whether a destructive action is the user's own request, taint-free.
 
-        The action plane blocks destructive commands by default. But when the
-        request is *explicitly user-originated* (``provenance == "user"``) and none
-        of the objecting signals is an injection / exfiltration / structural-taint
-        class — i.e. the objection is purely that the operation is inherently
-        destructive (drop a table the user named, force-push the user's own branch)
-        — the proportionate control is a human approval gate, not an unrecoverable
-        hard block. A tainted argument, an untrusted origin, or an exfiltration
-        shape is never "authorised" this way and keeps the hard block regardless of
-        provenance.
+        The action plane blocks destructive commands by default. When the request
+        is *explicitly user-originated* (``provenance == "user"``), and no objector
+        is an injection / exfiltration / structural-taint class or an irreversible
+        never-soften class, the proportionate control is a human approval gate
+        rather than a dead hard block. A tainted argument, an untrusted origin, a
+        data-exfiltration shape, or a catastrophic operation such as disk overwrite
+        keeps the hard block regardless of provenance.
         """
         if provenance.strip().lower() != "user":
             return False
-        return not any(s.signal_type in self.taint_signal_types for s in objectors)
+        return not any(
+            s.signal_type in self.taint_signal_types
+            or s.signal_type in self.never_soften_signal_types
+            for s in objectors
+        )
+
+    def never_softened(self, objectors: Sequence[DetectorSignal]) -> bool:
+        """Return whether any objector belongs to a non-approval action class."""
+        return any(s.signal_type in self.never_soften_signal_types for s in objectors)
 
 
 def fuse(
@@ -210,7 +240,9 @@ def fuse(
                 reasons.append(
                     f"action blocked: {len(objectors)} objector(s), risk {risk:.2f}"
                 )
-                if any(s.severity >= Severity.CRITICAL for s in objectors):
+                if policy.never_softened(objectors):
+                    reasons.append("never-soften irreversible action class")
+                elif any(s.severity >= Severity.CRITICAL for s in objectors):
                     requires_human = True
                     reasons.append("CRITICAL severity → human approval required")
         elif borderline(risk, policy.action_block_threshold):

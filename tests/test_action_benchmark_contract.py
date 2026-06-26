@@ -65,14 +65,13 @@ def test_mcp_cases_route_through_the_structured_inspector() -> None:
         assert flagged is (case["label"] == "catastrophic"), case["id"]
 
 
-def test_authorised_destructive_cases_escalate_not_hard_block() -> None:
-    # The three user-authorised destructive look-alikes (force-push a feature
-    # branch, DROP/TRUNCATE a user-named table) must route to a human approval gate,
-    # not a dead hard block. With no approver configured they stay not-permitted,
-    # but the decision is an escalation.
+def test_recoverable_authorised_destructive_cases_escalate_not_hard_block() -> None:
+    # User-authorised recoverable destructive look-alikes must route to a human
+    # approval gate, not a dead hard block. Irreversible-by-construction operations
+    # are covered separately by the never-soften fusion/Governor tests.
     corpus = {c["id"]: c for c in _load(_CORPUS)}
     gov = _governor()
-    for cid in ("sfa02", "sfa03", "sfa06"):
+    for cid in ("sfa02", "sfa06"):
         decision = gov.review(_request(corpus[cid]))
         assert decision.escalated is True, cid
         assert decision.permitted is False, cid  # fail-closed without an approver

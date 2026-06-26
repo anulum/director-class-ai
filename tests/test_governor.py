@@ -111,6 +111,12 @@ def _action_governor(**kw) -> Governor:
     return Governor(ensemble=ensemble, **kw)
 
 
+_USER_PERMISSION_CHANGE = EvaluationRequest(
+    action="chmod -R 777 /srv",
+    query="make /srv writable for the migration window",
+    action_provenance="user",
+)
+
 _USER_DROP = EvaluationRequest(
     action="DROP TABLE staging_import;",
     query="drop the staging_import table",
@@ -119,18 +125,30 @@ _USER_DROP = EvaluationRequest(
 
 
 def test_user_authorised_destructive_escalates_not_hard_blocks() -> None:
-    d = _action_governor().review(_USER_DROP)
+    d = _action_governor().review(_USER_PERMISSION_CHANGE)
     # No approver: fail-closed, so still not permitted — but escalated, not a dead
     # hard block. The audit record carries the human-review flag.
     assert d.escalated is True
     assert d.permitted is False
     assert d.record.requires_human is True
-    assert "sql_drop" in d.record.firing
+    assert "permission_wipe" in d.record.firing
 
 
 def test_user_authorised_destructive_proceeds_once_approved() -> None:
-    d = _action_governor(approval=lambda _v, _r: True).review(_USER_DROP)
+    d = _action_governor(approval=lambda _v, _r: True).review(_USER_PERMISSION_CHANGE)
     assert d.escalated is True and d.permitted is True
+
+
+def test_irreversible_user_destructive_hard_blocks_without_approval() -> None:
+    consulted = []
+    d = _action_governor(approval=lambda _v, _r: consulted.append(1) or True).review(
+        _USER_DROP
+    )
+    assert d.escalated is False
+    assert d.permitted is False
+    assert d.record.requires_human is False
+    assert "sql_drop" in d.record.firing
+    assert not consulted
 
 
 def test_injected_destructive_hard_blocks_never_escalates() -> None:

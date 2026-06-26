@@ -36,6 +36,9 @@ class ApprovalPolicy:
             Severity.MEDIUM: "human",
         }
     )
+    route_required_approvals: dict[str, int] = field(
+        default_factory=lambda: {"dual_human": 2, "human": 1, "auto": 1}
+    )
     default_route: str = "auto"
 
     def route(self, verdict: Verdict) -> str:
@@ -44,3 +47,10 @@ class ApprovalPolicy:
             return self.default_route
         peak = max(s.severity for s in verdict.firing)
         return self.routes.get(peak, self.default_route)
+
+    def required_approvals(self, verdict: object) -> int:
+        """Return how many distinct operators must approve this verdict."""
+        if not isinstance(verdict, Verdict):
+            return self.route_required_approvals.get(self.default_route, 1)
+        route = self.route(verdict)
+        return max(1, self.route_required_approvals.get(route, 1))

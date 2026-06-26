@@ -305,6 +305,9 @@ def _ticket_view(ticket: ApprovalTicket) -> Mapping[str, object]:
         "created_at": ticket.created_at,
         "decided_at": ticket.decided_at,
         "expires_at": ticket.expires_at,
+        "required_approvals": ticket.required_approvals,
+        "approval_count": len(ticket.approvers),
+        "approver_digests": [_approver_digest(approver) for approver in ticket.approvers],
         "approver_digest": _approver_digest(ticket.approver),
     }
 
