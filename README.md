@@ -51,6 +51,14 @@ make preflight
 make bench-evidence
 ```
 
+Content and integrity adapters that reuse Director-AI primitives are installed
+explicitly with the bounded detector extra:
+
+```bash
+python -m pip install -e ".[detectors]"
+python -m pytest tests/test_director_ai_contract.py -q --no-cov
+```
+
 Detailed operator docs live in `docs/`:
 
 - `docs/index.md` — documentation index and runtime surface map.

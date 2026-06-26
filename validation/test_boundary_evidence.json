@@ -505,6 +505,11 @@
           "covers": "support-scorer contract and action/task divergence signals"
         },
         {
+          "file": "tests/test_director_ai_contract.py",
+          "mode": "integration",
+          "covers": "bounded director-ai detector extra, installed optional dependency version, lazy internal import targets, and model-free real factory execution"
+        },
+        {
           "file": "tests/test_llm_judge.py",
           "mode": "integration",
           "covers": "judge spec, panel construction, optional model-backed detector boundary"
