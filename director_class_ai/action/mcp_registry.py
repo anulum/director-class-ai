@@ -14,6 +14,7 @@ import hashlib
 import hmac
 import json
 import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 
@@ -33,7 +34,78 @@ def _fingerprint(*parts: object) -> str:
 
 
 def _normalise_name(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "", value.lower())
+    folded = unicodedata.normalize("NFKC", value).casefold()
+    skeleton = "".join(_CONFUSABLES.get(character, character) for character in folded)
+    return re.sub(r"[^a-z0-9]+", "", skeleton)
+
+
+_CONFUSABLES = {
+    "а": "a",
+    "ɑ": "a",
+    "Α": "a",
+    "α": "a",
+    "В": "b",
+    "в": "b",
+    "ϲ": "c",
+    "с": "c",
+    "С": "c",
+    "ԁ": "d",
+    "е": "e",
+    "Е": "e",
+    "Ε": "e",
+    "ε": "e",
+    "і": "i",
+    "І": "i",
+    "ӏ": "l",
+    "ⅼ": "l",
+    "Ι": "i",
+    "ı": "i",
+    "ο": "o",
+    "О": "o",
+    "о": "o",
+    "Ο": "o",
+    "р": "p",
+    "Р": "p",
+    "ѕ": "s",
+    "Տ": "s",
+    "Τ": "t",
+    "τ": "t",
+    "υ": "u",
+    "Ү": "y",
+    "у": "y",
+    "Υ": "y",
+    "Χ": "x",
+    "х": "x",
+    "Ζ": "z",
+}
+
+
+def _edit_distance_at_most_one(left: str, right: str) -> bool:
+    if left == right:
+        return True
+    if abs(len(left) - len(right)) > 1:
+        return False
+    if len(left) == len(right):
+        differences = [
+            index
+            for index, pair in enumerate(zip(left, right, strict=True))
+            if pair[0] != pair[1]
+        ]
+        if len(differences) == 1:
+            return True
+        if len(differences) == 2:
+            first, second = differences
+            return (
+                second == first + 1
+                and left[first] == right[second]
+                and left[second] == right[first]
+            )
+        return False
+    shorter, longer = (left, right) if len(left) < len(right) else (right, left)
+    index = 0
+    while index < len(shorter) and shorter[index] == longer[index]:
+        index += 1
+    return shorter[index:] == longer[index + 1 :]
 
 
 def _normalise_transports(values: Sequence[str]) -> tuple[str, ...]:
@@ -43,6 +115,74 @@ def _normalise_transports(values: Sequence[str]) -> tuple[str, ...]:
 def _mapping_value(mapping: Mapping[str, object], key: str) -> Mapping[str, object]:
     value = mapping.get(key)
     return value if isinstance(value, Mapping) else {}
+
+
+def _string_sequence(value: object) -> tuple[str, ...]:
+    if not isinstance(value, Sequence) or isinstance(value, str):
+        return ()
+    return tuple(item for item in value if isinstance(item, str))
+
+
+def _property_schema(
+    schema: Mapping[str, object],
+    name: str,
+) -> Mapping[str, object]:
+    properties = _mapping_value(schema, "properties")
+    value = properties.get(name)
+    return value if isinstance(value, Mapping) else {}
+
+
+def _schema_types(schema: Mapping[str, object]) -> tuple[str, ...]:
+    value = schema.get("type")
+    if isinstance(value, str):
+        return (value,)
+    return _string_sequence(value)
+
+
+def _matches_schema_type(value: object, schema_type: str) -> bool:
+    if schema_type == "string":
+        return isinstance(value, str)
+    if schema_type == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if schema_type == "number":
+        return (isinstance(value, int | float)) and not isinstance(value, bool)
+    if schema_type == "boolean":
+        return isinstance(value, bool)
+    if schema_type == "object":
+        return isinstance(value, Mapping)
+    if schema_type == "array":
+        return isinstance(value, Sequence) and not isinstance(value, str)
+    if schema_type == "null":
+        return value is None
+    return False
+
+
+def _argument_schema_violation(
+    arguments: Mapping[str, object],
+    schema: Mapping[str, object],
+) -> str:
+    required = _string_sequence(schema.get("required"))
+    for name in required:
+        if name not in arguments:
+            return f"missing required argument {name!r}"
+
+    properties = _mapping_value(schema, "properties")
+    if schema.get("additionalProperties") is False:
+        for name in sorted(arguments):
+            if name not in properties:
+                return f"unexpected argument {name!r}"
+
+    for name, value in arguments.items():
+        property_schema = _property_schema(schema, name)
+        if not property_schema:
+            continue
+        allowed = _schema_types(property_schema)
+        if allowed and not any(_matches_schema_type(value, kind) for kind in allowed):
+            return f"argument {name!r} must be {' or '.join(allowed)}"
+        enum = property_schema.get("enum")
+        if isinstance(enum, Sequence) and not isinstance(enum, str) and value not in enum:
+            return f"argument {name!r} must match one of the registered enum values"
+    return ""
 
 
 @dataclass(frozen=True)
@@ -234,12 +374,26 @@ class MCPTrustRegistry:
                 f"MCP tool {call.server}/{call.tool} identity or schema "
                 "fingerprint drift",
             )
+        schema_violation = _argument_schema_violation(
+            call.arguments,
+            registration.argument_schema,
+        )
+        if schema_violation:
+            return _signal(
+                "mcp_argument_schema_violation",
+                Severity.HIGH,
+                f"MCP tool {call.server}/{call.tool} argument schema violation: "
+                f"{schema_violation}",
+            )
         return None
 
     def _lookalike(self, call: MCPToolCall) -> MCPToolRegistration | None:
         tool_norm = _normalise_name(call.tool)
-        for registration in self._by_server.get(call.server, []):
-            if _normalise_name(registration.tool) == tool_norm:
+        for registration in self._registrations.values():
+            registered_norm = _normalise_name(registration.tool)
+            if registered_norm == tool_norm:
+                return registration
+            if _edit_distance_at_most_one(registered_norm, tool_norm):
                 return registration
         return None
 

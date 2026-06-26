@@ -217,6 +217,82 @@ def test_lookalike_tool_is_detected() -> None:
     assert "read_file" in sig.rationale
 
 
+def test_cross_server_confusable_lookalike_tool_is_detected() -> None:
+    registry = MCPTrustRegistry([_registration()])
+    sig = registry.evaluate(
+        EvaluationRequest(
+            metadata={MCP_CALL_KEY: _call(server="remote-fs", tool="read_f\u0456le")}
+        )
+    )
+
+    assert sig is not None
+    assert sig.signal_type == "mcp_lookalike_tool"
+    assert "fs/read_file" in sig.rationale
+
+
+def test_cross_server_edit_distance_lookalike_tool_is_detected() -> None:
+    registry = MCPTrustRegistry([_registration()])
+    sig = registry.evaluate(
+        EvaluationRequest(
+            metadata={MCP_CALL_KEY: _call(server="remote-fs", tool="read_fiel")}
+        )
+    )
+
+    assert sig is not None
+    assert sig.signal_type == "mcp_lookalike_tool"
+
+
+def test_missing_required_argument_is_denied() -> None:
+    registry = MCPTrustRegistry([_registration()])
+    sig = registry.evaluate(
+        EvaluationRequest(metadata={MCP_CALL_KEY: _call(arguments={})})
+    )
+
+    assert sig is not None
+    assert sig.signal_type == "mcp_argument_schema_violation"
+    assert "missing required argument 'path'" in sig.rationale
+
+
+def test_wrong_argument_type_is_denied() -> None:
+    registry = MCPTrustRegistry([_registration()])
+    sig = registry.evaluate(
+        EvaluationRequest(metadata={MCP_CALL_KEY: _call(arguments={"path": 7})})
+    )
+
+    assert sig is not None
+    assert sig.signal_type == "mcp_argument_schema_violation"
+    assert "argument 'path' must be string" in sig.rationale
+
+
+def test_unexpected_argument_is_denied_when_schema_is_closed() -> None:
+    registration = MCPToolRegistration(
+        server="fs",
+        tool="read_file",
+        server_identity={"name": "local-fs", "transport": "stdio"},
+        tool_schema={"description": "read a project file", "mode": "read"},
+        argument_schema={
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+    )
+    registry = MCPTrustRegistry([registration])
+    sig = registry.evaluate(
+        EvaluationRequest(
+            metadata={
+                MCP_CALL_KEY: _call(
+                    arguments={"path": "README.md", "payload": "rm -rf /"},
+                    argument_schema=registration.argument_schema,
+                )
+            }
+        )
+    )
+
+    assert sig is not None
+    assert sig.signal_type == "mcp_argument_schema_violation"
+    assert "unexpected argument 'payload'" in sig.rationale
+
+
 def test_schema_drift_is_detected() -> None:
     registry = MCPTrustRegistry([_registration()])
     sig = registry.evaluate(

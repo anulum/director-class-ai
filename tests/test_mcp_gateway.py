@@ -279,6 +279,46 @@ def test_lookalike_tool_blocks_before_structural_findings() -> None:
     assert decision.firing == ("mcp_lookalike_tool",)
 
 
+def test_cross_server_lookalike_tool_blocks_gateway_review() -> None:
+    request = MCPGatewayRequest.from_parts(
+        "remote-fs",
+        "read_f\u0456le",
+        {"path": "README.md"},
+        server_identity={"name": "remote-fs", "transport": "stdio"},
+        tool_schema={"description": "Read one workspace file", "mode": "read"},
+        argument_schema={"properties": {"path": {"type": "string"}}},
+    )
+    decision = MCPGateway.from_registry([_registration()]).review(request)
+
+    assert decision.route == "block"
+    assert decision.firing == ("mcp_lookalike_tool",)
+
+
+def test_argument_schema_violation_blocks_gateway_review() -> None:
+    registration = MCPToolRegistration(
+        server="fs",
+        tool="read_file",
+        server_identity={"name": "fs", "transport": "stdio"},
+        tool_schema={"description": "Read one workspace file", "mode": "read"},
+        argument_schema={
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+        },
+    )
+    request = MCPGatewayRequest.from_parts(
+        "fs",
+        "read_file",
+        {},
+        server_identity={"name": "fs", "transport": "stdio"},
+        tool_schema={"description": "Read one workspace file", "mode": "read"},
+        argument_schema=registration.argument_schema,
+    )
+    decision = MCPGateway.from_registry([registration]).review(request)
+
+    assert decision.route == "block"
+    assert decision.firing == ("mcp_argument_schema_violation",)
+
+
 def test_dynamic_discovery_allows_unknown_tool_but_keeps_structural_checks() -> None:
     gateway = MCPGateway.from_registry([], allow_dynamic_discovery=True)
     request = MCPGatewayRequest.from_parts(

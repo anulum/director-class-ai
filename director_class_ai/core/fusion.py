@@ -87,6 +87,7 @@ class FusionPolicy:
                 "mcp_schema_drift",
                 "mcp_lookalike_tool",
                 "mcp_transport_mismatch",
+                "mcp_argument_schema_violation",
             }
             | {
                 "browser_prompt_injection",
