@@ -23,18 +23,24 @@ Corpus shape::
             {"detector": "shell_guard", "plane": "action", "score": 0.5,
              "locus": "action", "signal_type": "destructive_command",
              "severity": "high"}
-        ]}
+        ],
+         "capability_context": {"subject": "agent", "tool": "fs/read_file", ...},
+         "capability_grants": [
+             {"grant_id": "read-workspace", "tool": "fs/read_file",
+              "max_blast_radius": "low"}
+         ]}
     ]}
 """
 
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ..core.signal import DetectorSignal, Locus, Plane, Severity
+from .capability import BlastRadius, CapabilityGrant
 from .exposure import ExposureCase
 
 __all__ = ["case_from_mapping", "load_cases", "signal_from_mapping"]
@@ -70,6 +76,11 @@ def case_from_mapping(data: Mapping[str, Any]) -> ExposureCase:
         label=data["label"],
         signals=tuple(signal_from_mapping(s) for s in data["signals"]),
         provenance=data.get("provenance", ""),
+        capability_context=_mapping(data.get("capability_context")),
+        capability_grants=tuple(
+            _grant_from_mapping(grant)
+            for grant in _mapping_sequence(data.get("capability_grants", ()))
+        ),
     )
 
 
@@ -89,3 +100,48 @@ def load_cases(path: str | Path) -> tuple[ExposureCase, ...]:
     with Path(path).open("rb") as fh:
         payload: dict[str, Any] = json.load(fh)
     return tuple(case_from_mapping(case) for case in payload["cases"])
+
+
+def _grant_from_mapping(data: Mapping[str, Any]) -> CapabilityGrant:
+    """Build one capability grant from a corpus mapping."""
+    return CapabilityGrant(
+        grant_id=str(data["grant_id"]),
+        subject=str(data.get("subject", "*")),
+        tenant=str(data.get("tenant", "*")),
+        session=str(data.get("session", "*")),
+        source_origin=str(data.get("source_origin", "*")),
+        tool=str(data.get("tool", "*")),
+        resource=str(data.get("resource", "*")),
+        action=str(data.get("action", "*")),
+        max_blast_radius=_blast_radius(data.get("max_blast_radius", "low")),
+        expires_at=_integer(data.get("expires_at", 0)),
+        approval_required=bool(data.get("approval_required", False)),
+    )
+
+
+def _blast_radius(value: object) -> BlastRadius:
+    """Parse a JSON blast-radius value."""
+    if isinstance(value, BlastRadius):
+        return value
+    if isinstance(value, int) and not isinstance(value, bool):
+        return BlastRadius(value)
+    return BlastRadius[str(value or "low").upper()]
+
+
+def _integer(value: object) -> int:
+    """Parse an integer JSON field without accepting booleans."""
+    return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+
+def _mapping(value: object) -> Mapping[str, object]:
+    """Return ``value`` when it is a JSON object, otherwise an empty mapping."""
+    return cast(Mapping[str, object], value) if isinstance(value, Mapping) else {}
+
+
+def _mapping_sequence(value: object) -> tuple[Mapping[str, Any], ...]:
+    """Return the mapping items from a JSON array-like value."""
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        return ()
+    return tuple(
+        cast(Mapping[str, Any], item) for item in value if isinstance(item, Mapping)
+    )

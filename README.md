@@ -131,6 +131,9 @@ or no approved head, the guard keeps its fail-closed defaults.
 Rollback is reviewed through the same ledger: `director-class-policy rollback`
 opens a pending proposal, and a different reviewer must approve that proposal
 before the prior posture becomes the approved head again.
+`director-class-policy expose` replays both detector-signal thresholds and the
+capability/origin envelope when corpus rows include `capability_context` and
+`capability_grants`, so capability-only posture changes appear in the A/B delta.
 
 ```bash
 director-class-guard --surface kubernetes -- kubectl get pods

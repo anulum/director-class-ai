@@ -48,12 +48,12 @@
         "director_class_ai/policy/store.py",
         "director_class_ai/policy/governance.py"
       ],
-      "required_behaviour": "Policy CLI reads profile TOML and case JSON, persists governance JSON, exposes candidate changes, detects drift, approves, denies, and opens rollback proposals that require second-reviewer approval before the head changes.",
+      "required_behaviour": "Policy CLI reads profile TOML and case JSON, persists governance JSON, exposes candidate threshold and capability/origin changes, detects drift, approves, denies, and opens rollback proposals that require second-reviewer approval before the head changes.",
       "evidence_tests": [
         {
           "file": "tests/test_cli_policy.py",
           "mode": "integration",
-          "covers": "status/propose/approve/deny/expose/drift and approval-gated rollback CLI flows with real temp files"
+          "covers": "status/propose/approve/deny/expose/drift, capability-aware exposure, and approval-gated rollback CLI flows with real temp files"
         }
       ]
     },
@@ -216,7 +216,7 @@
         "director_class_ai/policy/governance.py",
         "director_class_ai/policy/drift.py"
       ],
-      "required_behaviour": "Policy governance state serialises/deserialises profiles, proposals, revisions, append-only lineage, approval-gated rollback proposals, exposure, and drift detection without accepting tampered lineage.",
+      "required_behaviour": "Policy governance state serialises/deserialises profiles, proposals, revisions, append-only lineage, approval-gated rollback proposals, threshold and capability-aware exposure, and drift detection without accepting tampered lineage.",
       "evidence_tests": [
         {
           "file": "tests/test_policy_store.py",
@@ -522,7 +522,7 @@
         {
           "file": "tests/test_policy_corpus.py",
           "mode": "integration",
-          "covers": "policy exposure corpus row schema and detector-signal conversion"
+          "covers": "policy exposure corpus row schema, detector-signal conversion, capability context, and capability grants"
         }
       ]
     },

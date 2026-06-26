@@ -70,6 +70,46 @@ def test_case_from_mapping_with_provenance() -> None:
     assert len(case.signals) == 1
 
 
+def test_case_from_mapping_with_capability_context_and_grants() -> None:
+    case = case_from_mapping(
+        {
+            "label": "workspace-read",
+            "provenance": "user",
+            "signals": [],
+            "capability_context": {
+                "subject": "agent-a",
+                "tenant": "tenant-a",
+                "session": "session-a",
+                "source_origin": "user",
+                "tool": "fs/read_file",
+                "resource": "workspace:README.md",
+                "action": "read",
+                "blast_radius": "low",
+                "now": 10,
+            },
+            "capability_grants": [
+                {
+                    "grant_id": "read-workspace",
+                    "subject": "agent-a",
+                    "tenant": "tenant-a",
+                    "session": "session-a",
+                    "source_origin": "user",
+                    "tool": "fs/read_file",
+                    "resource": "workspace:README.md",
+                    "action": "read",
+                    "max_blast_radius": "low",
+                    "expires_at": 20,
+                }
+            ],
+        }
+    )
+
+    assert case.capability_context["resource"] == "workspace:README.md"
+    assert len(case.capability_grants) == 1
+    assert case.capability_grants[0].grant_id == "read-workspace"
+    assert case.capability_grants[0].max_blast_radius.name == "LOW"
+
+
 def test_case_from_mapping_defaults_provenance_empty() -> None:
     case = case_from_mapping({"label": "row-2", "signals": []})
     assert case.provenance == ""

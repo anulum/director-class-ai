@@ -16,10 +16,13 @@ import pytest
 from director_class_ai.cli.policy import main
 
 
-def _profile_toml(path: Path, *, threshold: float) -> Path:
+def _profile_toml(
+    path: Path, *, threshold: float, capability_profile: str = "deny_all_actions"
+) -> Path:
     path.write_text(
         f'name = "staging"\naction_block_threshold = {threshold}\n'
-        "uncertainty_margin = 0.0\n",
+        "uncertainty_margin = 0.0\n"
+        f'capability_profile = "{capability_profile}"\n',
         encoding="utf-8",
     )
     return path
@@ -40,6 +43,49 @@ def _cases_json(path: Path) -> Path:
                                 "locus": "action",
                                 "signal_type": "destructive_command",
                                 "severity": "high",
+                            }
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _capability_cases_json(path: Path) -> Path:
+    path.write_text(
+        json.dumps(
+            {
+                "cases": [
+                    {
+                        "label": "workspace-read",
+                        "provenance": "user",
+                        "signals": [],
+                        "capability_context": {
+                            "subject": "agent-a",
+                            "tenant": "tenant-a",
+                            "session": "session-a",
+                            "source_origin": "user",
+                            "tool": "fs/read_file",
+                            "resource": "workspace:README.md",
+                            "action": "read",
+                            "blast_radius": "low",
+                            "now": 10,
+                        },
+                        "capability_grants": [
+                            {
+                                "grant_id": "read-workspace",
+                                "subject": "agent-a",
+                                "tenant": "tenant-a",
+                                "session": "session-a",
+                                "source_origin": "user",
+                                "tool": "fs/read_file",
+                                "resource": "workspace:README.md",
+                                "action": "read",
+                                "max_blast_radius": "low",
+                                "expires_at": 20,
                             }
                         ],
                     }
@@ -225,6 +271,36 @@ def test_expose_reports_transitions(
     assert rc == 0
     assert report["transitions"] == {"block->allow": 1}
     assert report["changed_count"] == 1
+
+
+def test_expose_replays_capability_context_and_grants(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    store = tmp_path / "gov.json"
+    _approved_baseline(store, tmp_path / "p.toml", capsys)
+    candidate = _profile_toml(
+        tmp_path / "cand.toml",
+        threshold=0.3,
+        capability_profile="local_operator_actions",
+    )
+    cases = _capability_cases_json(tmp_path / "cases.json")
+
+    rc, report = _run(
+        [
+            "expose",
+            "--store",
+            str(store),
+            "--candidate",
+            str(candidate),
+            "--cases",
+            str(cases),
+        ],
+        capsys,
+    )
+
+    assert rc == 0
+    assert report["transitions"] == {"block->allow": 1}
+    assert report["changed"] == ["workspace-read"]
 
 
 def test_rollback_requires_second_reviewer_approval(
