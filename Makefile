@@ -2,7 +2,7 @@
 # Director-Class AI — developer task runner
 .DEFAULT_GOAL := help
 PY ?= python
-.PHONY: help test lint fmt types sast spdx test-quality test-boundaries godfiles docs build bench bench-evidence import-external redteam repository-readiness phase4-intake preflight
+.PHONY: help test lint fmt types sast spdx test-quality test-boundaries godfiles docs build bench bench-evidence import-external redteam repository-readiness phase4-intake claim-boundaries preflight
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -40,6 +40,7 @@ godfiles: ## Reject oversized mixed-responsibility Python files
 
 docs: ## Validate public docs, demos, and notebook entry points
 	$(PY) tools/check_documentation_surface.py
+	$(PY) tools/check_claim_boundaries.py
 	$(PY) demos/action_checkpoint.py >/tmp/director-class-action-demo.json
 
 build: ## Build sdist + wheel
@@ -64,6 +65,9 @@ repository-readiness: ## Validate repository-readiness gates (license, Makefile,
 
 phase4-intake: ## Validate phase-4 task intake
 	$(PY) tools/check_phase4_task_intake.py
+
+claim-boundaries: ## Reject public audit-integrity and court-evidence overclaims
+	$(PY) tools/check_claim_boundaries.py
 
 preflight: spdx test-quality test-boundaries godfiles docs lint types repository-readiness phase4-intake ## Local gate without full-suite tests
 	@echo "preflight OK"

@@ -60,6 +60,8 @@ jobs:
       - run: python tools/check_test_quality.py
       - run: python tools/check_test_boundary_evidence.py
       - run: python tools/check_godfiles.py
+      - run: python tools/check_documentation_surface.py
+      - run: python tools/check_claim_boundaries.py
 
   types:
     name: Types (mypy --strict)

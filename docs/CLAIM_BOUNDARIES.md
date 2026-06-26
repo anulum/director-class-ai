@@ -19,6 +19,7 @@ Allowed claim language:
 
 Benchmark boundary: Use local functional benchmark evidence only; do not claim benchmark advantage until isolated host-load-controlled runs and external artefacts exist.
 Certification boundary: Control mappings support review and procurement discussion; they do not assert certification or regulatory approval.
+Audit-integrity boundary: The audit chain is tamper-evident against a trusted recorded head; it does not assert counsel-reviewed evidence status or independently anchored integrity.
 Prompt-injection boundary: Prompt-injection detection is a signal in the action-control path, not the product category and not a guarantee of full prevention.
 
 ## Demo copy
@@ -31,4 +32,5 @@ This demo shows a governed action checkpoint: the proposed tool call is reviewed
 - Do not claim benchmark advantage until isolated runs and external artefacts exist.
 - Do not claim a production-ready kill-switch until deployment hardening and remote protection gates close.
 - Do not claim certification readiness from bounded control mappings.
+- Do not claim counsel-reviewed evidence status, self-validating audit integrity, or unmodifiable audit records until signed or externally anchored heads exist.
 - Do not claim 100% prompt-injection prevention.

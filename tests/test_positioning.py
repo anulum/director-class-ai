@@ -36,13 +36,16 @@ def test_canonical_claim_language_defines_action_control_category() -> None:
 def test_blocked_claim_detection_finds_forbidden_positioning() -> None:
     reasons = rejected_claim_reasons(
         "Director-Class AI is a generic prompt filter with benchmark advantage "
-        "and production-ready kill-switch claims."
+        "and production-ready kill-switch claims. It asserts counsel-reviewed "
+        "evidence status and self-validating audit integrity."
     )
 
-    assert len(reasons) == 3
+    assert len(reasons) == 5
     assert any("effector-bound action governance" in reason for reason in reasons)
     assert any("external artefacts" in reason for reason in reasons)
     assert any("deployment hardening" in reason for reason in reasons)
+    assert any("counsel-reviewed" in reason for reason in reasons)
+    assert any("independent integrity proof" in reason for reason in reasons)
 
 
 def test_readme_uses_bounded_public_category() -> None:
@@ -62,6 +65,7 @@ def test_public_claim_document_matches_canonical_language() -> None:
 
     assert language.public_markdown() in claim_doc
     assert language.demo_summary in claim_doc
+    assert language.audit_integrity_boundary in claim_doc
 
 
 def test_investor_markdown_renders_bounded_category() -> None:

@@ -48,6 +48,7 @@ class ClaimLanguage:
     blocked_claims: tuple[BlockedClaim, ...]
     benchmark_boundary: str
     certification_boundary: str
+    audit_integrity_boundary: str
     prompt_injection_boundary: str
 
     def public_markdown(self) -> str:
@@ -63,6 +64,7 @@ class ClaimLanguage:
                 "",
                 f"Benchmark boundary: {self.benchmark_boundary}",
                 f"Certification boundary: {self.certification_boundary}",
+                f"Audit-integrity boundary: {self.audit_integrity_boundary}",
                 f"Prompt-injection boundary: {self.prompt_injection_boundary}",
             )
         )
@@ -142,6 +144,20 @@ def canonical_claim_language() -> ClaimLanguage:
                 reason="compliance mappings are bounded evidence, not certification.",
             ),
             BlockedClaim(
+                pattern="counsel-reviewed evidence status",
+                reason=(
+                    "the audit chain is not counsel-reviewed or externally anchored "
+                    "evidence."
+                ),
+            ),
+            BlockedClaim(
+                pattern="self-validating audit integrity",
+                reason=(
+                    "the current chain detects mutation against a trusted recorded "
+                    "head; it is not an independent integrity proof."
+                ),
+            ),
+            BlockedClaim(
                 pattern="100% prompt-injection prevention",
                 reason=(
                     "prompt-injection checks are one signal, not a complete "
@@ -157,6 +173,11 @@ def canonical_claim_language() -> ClaimLanguage:
         certification_boundary=(
             "Control mappings support review and procurement discussion; they do not "
             "assert certification or regulatory approval."
+        ),
+        audit_integrity_boundary=(
+            "The audit chain is tamper-evident against a trusted recorded head; it "
+            "does not assert counsel-reviewed evidence status or independently "
+            "anchored integrity."
         ),
         prompt_injection_boundary=(
             "Prompt-injection detection is a signal in the action-control path, not "

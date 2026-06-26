@@ -8,13 +8,14 @@
 
 """A durable, tamper-evident audit trail for governance decisions.
 
-The Governor's in-memory trail does not survive a restart and cannot prove its
-own integrity — unacceptable for a regulated or mission-critical buyer. This sink
-appends each decision as one JSON line whose ``entry_hash`` covers the previous
-entry's hash, so any mutation, reordering, or deletion breaks the chain and is
-located by :func:`verify_chain`. A small ``.head`` sidecar records the latest
-``(seq, entry_hash)`` so even truncation of the tail — which a bare chain cannot
-see, a valid prefix being indistinguishable from the whole — is caught.
+The Governor's in-memory trail does not survive a restart. This sink appends
+each decision as one JSON line whose ``entry_hash`` covers the previous entry's
+hash, so any mutation, reordering, or deletion breaks the chain and is located by
+:func:`verify_chain`. A small ``.head`` sidecar records the latest ``(seq,
+entry_hash)`` so even truncation of the tail — which a bare chain cannot see, a
+valid prefix being indistinguishable from the whole — is caught. The record is
+tamper-evident against that trusted recorded head, not a legal or independently
+anchored integrity claim.
 
 It is wired through the Governor's existing ``audit_sink`` seam; raw prompt/action
 text never enters the log (only the request digest, the verdict, and which
