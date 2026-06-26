@@ -86,7 +86,29 @@ class TestLifecycle:
         assert governance.head is not None
         assert governance.head.digest == head_before.digest
 
-    def test_rollback_restores_prior_posture(self) -> None:
+    def test_rollback_opens_pending_proposal_without_moving_head(self) -> None:
+        governance = _approved_baseline(0.3)
+        baseline = governance.head
+        assert baseline is not None
+        proposal = governance.propose(
+            _profile(0.7), proposer="alice", created_at="t2", reason="relax"
+        )
+        relaxed = governance.approve(proposal.digest, reviewer="bob", decided_at="t3")
+
+        rollback = governance.rollback(
+            baseline.digest, author="bob", created_at="t4", reason="revert"
+        )
+
+        assert rollback.status == "pending"
+        assert rollback.revision.parent == relaxed.digest
+        assert governance.head is not None
+        assert governance.head.digest == relaxed.digest
+        restored = governance.approve(rollback.digest, reviewer="carol", decided_at="t5")
+        assert restored.digest == baseline.digest
+        assert governance.head is not None
+        assert governance.head.digest == baseline.digest
+
+    def test_rollback_cannot_be_self_approved(self) -> None:
         governance = _approved_baseline(0.3)
         baseline = governance.head
         assert baseline is not None
@@ -94,11 +116,12 @@ class TestLifecycle:
             _profile(0.7), proposer="alice", created_at="t2", reason="relax"
         )
         governance.approve(proposal.digest, reviewer="bob", decided_at="t3")
-        governance.rollback(
+        rollback = governance.rollback(
             baseline.digest, author="bob", created_at="t4", reason="revert"
         )
-        assert governance.head is not None
-        assert governance.head.digest == baseline.digest
+
+        with pytest.raises(ValueError, match="cannot be approved by its proposer"):
+            governance.approve(rollback.digest, reviewer="bob", decided_at="t5")
 
 
 class TestExpose:

@@ -177,10 +177,14 @@ class PolicyGovernance:
 
     def rollback(
         self, digest: str, *, author: str, created_at: str, reason: str
-    ) -> PolicyRevision:
-        """Restore a prior posture by appending it as the new head."""
-        return self._review.history.rollback(
-            digest, author=author, created_at=created_at, reason=reason
+    ) -> PolicyChangeProposal:
+        """Open a pending proposal to restore a prior posture.
+
+        The head is not changed by this method. A different reviewer must approve
+        the returned proposal before the prior posture becomes the approved head.
+        """
+        return self._review.propose_rollback(
+            digest, proposer=author, created_at=created_at, reason=reason
         )
 
     def drift_check(

@@ -161,6 +161,52 @@ class PolicyChangeReview:
         self._proposals[revision.digest] = proposal
         return proposal
 
+    def propose_rollback(
+        self,
+        digest: str,
+        *,
+        proposer: str,
+        created_at: str,
+        reason: str,
+    ) -> PolicyChangeProposal:
+        """Open a pending proposal to restore a prior posture.
+
+        Rollback is a policy change with the same review requirements as any
+        other posture change: it is bound to the current head, it does not move
+        the head until approved, and the proposer cannot approve it.
+
+        Parameters
+        ----------
+        digest : str
+            Content address of a posture already present in history.
+        proposer : str
+            Who proposes the rollback.
+        created_at : str
+            When the rollback proposal was opened (ISO timestamp).
+        reason : str
+            Why the prior posture should be restored.
+
+        Returns
+        -------
+        PolicyChangeProposal
+            The pending rollback proposal.
+
+        Raises
+        ------
+        KeyError
+            If ``digest`` is not present in history.
+        ValueError
+            If the rollback would be a no-op or a pending rollback already exists
+            for the target posture.
+        """
+        target = self._history.get(digest)
+        return self.propose(
+            target.profile,
+            proposer=proposer,
+            created_at=created_at,
+            reason=reason,
+        )
+
     def get(self, digest: str) -> PolicyChangeProposal:
         """Return the proposal for ``digest``, or raise ``KeyError``."""
         try:

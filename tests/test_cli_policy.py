@@ -227,7 +227,9 @@ def test_expose_reports_transitions(
     assert report["changed_count"] == 1
 
 
-def test_deny_then_rollback(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_rollback_requires_second_reviewer_approval(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     store = tmp_path / "gov.json"
     baseline_digest = _approved_baseline(store, tmp_path / "p.toml", capsys)
     candidate = _profile_toml(tmp_path / "cand.toml", threshold=0.7)
@@ -247,9 +249,9 @@ def test_deny_then_rollback(tmp_path: Path, capsys: pytest.CaptureFixture[str]) 
         ],
         capsys,
     )
-    rc, denied = _run(
+    rc, relaxed = _run(
         [
-            "deny",
+            "approve",
             "--store",
             str(store),
             "--digest",
@@ -262,8 +264,9 @@ def test_deny_then_rollback(tmp_path: Path, capsys: pytest.CaptureFixture[str]) 
         capsys,
     )
     assert rc == 0
-    assert denied["status"] == "denied"
-    rc, revision = _run(
+    assert relaxed["digest"] == proposal["digest"]
+
+    rc, rollback = _run(
         [
             "rollback",
             "--store",
@@ -280,7 +283,30 @@ def test_deny_then_rollback(tmp_path: Path, capsys: pytest.CaptureFixture[str]) 
         capsys,
     )
     assert rc == 0
-    assert revision["digest"] == baseline_digest
+    assert rollback["status"] == "pending"
+    assert rollback["digest"] == baseline_digest
+
+    rc, status = _run(["status", "--store", str(store)], capsys)
+    assert rc == 0
+    assert status["head_digest"] == relaxed["digest"]
+    assert status["pending"] == 1
+
+    rc, restored = _run(
+        [
+            "approve",
+            "--store",
+            str(store),
+            "--digest",
+            rollback["digest"],
+            "--reviewer",
+            "carol",
+            "--at",
+            "t5",
+        ],
+        capsys,
+    )
+    assert rc == 0
+    assert restored["digest"] == baseline_digest
 
 
 def test_drift_detected_and_absent(

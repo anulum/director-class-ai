@@ -15,7 +15,7 @@ durable ledger (``--store``):
     expose    A/B-replay a case corpus under the approved head and a candidate
     approve   commit a pending proposal (a different reviewer)
     deny      reject a pending proposal
-    rollback  restore a prior posture as the new head
+    rollback  open a reviewed proposal to restore a prior posture
     drift     check a live posture for divergence from the approved head
     status    summarise the head, lineage length, and pending proposals
 
@@ -145,11 +145,11 @@ def _handle_deny(args: argparse.Namespace) -> int:
 
 def _handle_rollback(args: argparse.Namespace) -> int:
     governance = PolicyGovernance.load(args.store)
-    revision = governance.rollback(
+    proposal = governance.rollback(
         args.digest, author=args.author, created_at=args.at, reason=args.reason
     )
     governance.save(args.store)
-    return _emit(_revision_view(revision))
+    return _emit(_proposal_view(proposal))
 
 
 def _handle_drift(args: argparse.Namespace) -> int:
@@ -201,7 +201,7 @@ def _parser() -> argparse.ArgumentParser:
     deny.set_defaults(handler=_handle_deny)
 
     rollback = _with_at(
-        _with_store(sub.add_parser("rollback", help="restore a prior posture"))
+        _with_store(sub.add_parser("rollback", help="propose restoring a prior posture"))
     )
     rollback.add_argument("--digest", required=True, help="posture digest to restore")
     rollback.add_argument("--author", required=True, help="who authorises the rollback")
