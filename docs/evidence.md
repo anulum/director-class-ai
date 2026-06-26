@@ -19,6 +19,18 @@ The local gate stack covers:
   present;
 - sdist and wheel build.
 
+## Audit-Chain Verification
+
+The default audit chain is hash-linked and stores its latest head in a sidecar
+file. Deployments that provide `AuditChainSink(head_signing_key=...)`, the
+command guard's `--audit-head-key-env`, or the SDK's `audit_head_signing_key`
+also write a HMAC signature for that head. When an `anchor_path` or
+`--audit-anchor-log` is configured, each signed head is appended to a separate
+JSONL anchor log. `verify_chain(..., head_signing_key=..., anchor_path=...)` and
+`director-class-siem-export --head-signing-key-env ... --anchor-log ...` fail
+closed if the signature is missing, mismatched, or replayed behind the latest
+anchor.
+
 ## Action-Plane Benchmark
 
 Run:

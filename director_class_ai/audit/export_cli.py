@@ -18,6 +18,7 @@ exporter access to raw prompts, actions, responses, or command output.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -34,13 +35,22 @@ class AuditExportOptions:
 
     source: Path
     output: Path | None = None
+    head_signing_key: str | None = None
+    head_signing_key_env: str = ""
+    anchor_path: Path | None = None
 
     @classmethod
     def from_argv(cls, argv: Sequence[str] | None = None) -> AuditExportOptions:
         """Parse command-line arguments into audit-export options."""
         args = _parser().parse_args(argv)
         output = Path(args.output) if args.output else None
-        return cls(source=Path(args.source), output=output)
+        anchor_path = Path(args.anchor_log) if args.anchor_log else None
+        return cls(
+            source=Path(args.source),
+            output=output,
+            head_signing_key_env=args.head_signing_key_env,
+            anchor_path=anchor_path,
+        )
 
 
 @dataclass(frozen=True)
@@ -58,7 +68,12 @@ class AuditExportResult:
 def run_export(options: AuditExportOptions) -> AuditExportResult:
     """Verify and export an audit chain using fail-closed semantics."""
     try:
-        body = export_chain_to_siem_jsonl(options.source, out_path=options.output)
+        body = export_chain_to_siem_jsonl(
+            options.source,
+            out_path=options.output,
+            head_signing_key=_audit_head_key(options),
+            anchor_path=options.anchor_path,
+        )
     except ValueError as exc:
         return AuditExportResult(
             ok=False,
@@ -103,7 +118,31 @@ def _parser() -> argparse.ArgumentParser:
         default="",
         help="Destination SIEM/SOC JSONL path. Omit to write JSONL to stdout.",
     )
+    parser.add_argument(
+        "--head-signing-key-env",
+        default="",
+        help="Environment variable containing the HMAC key for verifying the audit head.",
+    )
+    parser.add_argument(
+        "--anchor-log",
+        default="",
+        help="Optional external anchor JSONL whose latest signed head must match.",
+    )
     return parser
+
+
+def _audit_head_key(options: AuditExportOptions) -> str | None:
+    if options.head_signing_key is not None:
+        return options.head_signing_key
+    if not options.head_signing_key_env:
+        return None
+    value = os.environ.get(options.head_signing_key_env)
+    if not value:
+        raise ValueError(
+            "audit head signing key environment variable "
+            f"{options.head_signing_key_env!r} is not set"
+        )
+    return value
 
 
 if __name__ == "__main__":  # pragma: no cover

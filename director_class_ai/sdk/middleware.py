@@ -219,6 +219,8 @@ class ToolReviewMiddleware:
         approval_store: str | Path | None = None,
         audit_sink: AuditSink | None = None,
         audit_log: str | Path | None = None,
+        audit_head_signing_key: bytes | str | None = None,
+        audit_anchor_path: str | Path | None = None,
         policy_profile: str = "",
         executor: ToolExecutor | None = None,
     ) -> ToolReviewMiddleware:
@@ -239,7 +241,16 @@ class ToolReviewMiddleware:
         if audit_log is not None:
             audit_path = Path(audit_log)
             audit_path.parent.mkdir(parents=True, exist_ok=True)
-            audit_sink = AuditChainSink(audit_path, policy_profile=policy_profile)
+            if audit_anchor_path is not None:
+                Path(audit_anchor_path).parent.mkdir(parents=True, exist_ok=True)
+            audit_sink = AuditChainSink(
+                audit_path,
+                policy_profile=policy_profile,
+                head_signing_key=audit_head_signing_key,
+                anchor_path=Path(audit_anchor_path)
+                if audit_anchor_path is not None
+                else None,
+            )
         ensemble = ParallelEnsembleScorer(
             tuple(detectors or _default_detectors()), policy=policy
         )

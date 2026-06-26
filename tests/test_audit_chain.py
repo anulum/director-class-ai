@@ -38,6 +38,18 @@ def _governor(path) -> Governor:
     return Governor(ensemble=ensemble, audit_sink=sink)
 
 
+def _signed_governor(path, *, anchor_path=None) -> Governor:
+    sink = AuditChainSink(
+        path=path,
+        policy_profile="test",
+        clock=_Clock(),
+        head_signing_key=b"test-signing-key",
+        anchor_path=anchor_path,
+    )
+    ensemble = ParallelEnsembleScorer([DestructiveCommandDetector()])
+    return Governor(ensemble=ensemble, audit_sink=sink)
+
+
 def _populate(path, n: int = 4) -> Governor:
     gov = _governor(path)
     gov.review(EvaluationRequest(action="rm -rf /"))
@@ -120,6 +132,57 @@ def test_one_entry_beyond_head_is_recoverable_crash_window(tmp_path) -> None:
 
     assert v.ok is True
     assert "recoverable" in v.reason
+
+
+def test_signed_head_blocks_tail_truncation_with_rewritten_head(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _signed_governor(p).review(EvaluationRequest(action="rm -rf /"))
+    _signed_governor(p).review(EvaluationRequest(action="ls -la"))
+    lines = p.read_text(encoding="utf-8").splitlines()
+    first = json.loads(lines[0])
+    p.write_text(lines[0] + "\n", encoding="utf-8")
+    p.with_suffix(".jsonl.head").write_text(
+        json.dumps({"seq": first["seq"], "entry_hash": first["entry_hash"]}),
+        encoding="utf-8",
+    )
+
+    unsigned = verify_chain(p)
+    signed = verify_chain(p, head_signing_key=b"test-signing-key")
+
+    assert unsigned.ok is True
+    assert signed.ok is False
+    assert "signature" in signed.reason
+
+
+def test_signed_head_anchor_blocks_replayed_signed_prefix(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    anchor = tmp_path / "external-anchor.jsonl"
+    gov = _signed_governor(p, anchor_path=anchor)
+    gov.review(EvaluationRequest(action="rm -rf /"))
+    old_head = p.with_suffix(".jsonl.head").read_text(encoding="utf-8")
+    old_signature = p.with_suffix(".jsonl.head.sig").read_text(encoding="utf-8")
+    old_log = p.read_text(encoding="utf-8")
+    gov.review(EvaluationRequest(action="ls -la"))
+    assert verify_chain(p, head_signing_key=b"test-signing-key", anchor_path=anchor).ok
+
+    p.write_text(old_log, encoding="utf-8")
+    p.with_suffix(".jsonl.head").write_text(old_head, encoding="utf-8")
+    p.with_suffix(".jsonl.head.sig").write_text(old_signature, encoding="utf-8")
+    replayed = verify_chain(p, head_signing_key=b"test-signing-key", anchor_path=anchor)
+
+    assert replayed.ok is False
+    assert "anchor" in replayed.reason
+
+
+def test_signed_verification_requires_signature_sidecar(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _signed_governor(p).review(EvaluationRequest(action="rm -rf /"))
+    p.with_suffix(".jsonl.head.sig").unlink()
+
+    verification = verify_chain(p, head_signing_key=b"test-signing-key")
+
+    assert verification.ok is False
+    assert "signature" in verification.reason
 
 
 def test_corrupt_line_detected(tmp_path) -> None:

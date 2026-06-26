@@ -151,10 +151,16 @@ def export_chain_to_siem_jsonl(
     path: str | Path,
     *,
     out_path: str | Path | None = None,
+    head_signing_key: bytes | str | None = None,
+    anchor_path: str | Path | None = None,
 ) -> str:
     """Verify a local audit chain, then export SIEM-safe JSONL events."""
     source = Path(path)
-    verification = verify_chain(source)
+    verification = verify_chain(
+        source,
+        head_signing_key=head_signing_key,
+        anchor_path=anchor_path,
+    )
     if not verification.ok:
         raise ValueError(f"audit chain verification failed: {verification.reason}")
 

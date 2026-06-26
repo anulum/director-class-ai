@@ -27,6 +27,8 @@ def runtime_posture_block_event(
     execute: bool,
     audit_log: str,
     approval_store: str,
+    audit_head_signing_key: str | None = None,
+    audit_anchor_log: str = "",
     request: ToolReviewRequest,
     posture: RuntimePostureResolution,
 ) -> dict[str, object]:
@@ -45,7 +47,11 @@ def runtime_posture_block_event(
         firing=(posture.blocking_signal,),
         request_digest=request_digest,
     )
-    AuditChainSink(Path(audit_log))(record)
+    AuditChainSink(
+        Path(audit_log),
+        head_signing_key=audit_head_signing_key,
+        anchor_path=Path(audit_anchor_log) if audit_anchor_log else None,
+    )(record)
     event: dict[str, object] = {
         "event_type": "tool_middleware_decision",
         "tool_name": request.tool_name,

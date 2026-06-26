@@ -32,5 +32,5 @@ This demo shows a governed action checkpoint: the proposed tool call is reviewed
 - Do not claim benchmark advantage until isolated runs and external artefacts exist.
 - Do not claim a production-ready kill-switch until deployment hardening and remote protection gates close.
 - Do not claim certification readiness from bounded control mappings.
-- Do not claim counsel-reviewed evidence status, self-validating audit integrity, or unmodifiable audit records until signed or externally anchored heads exist.
+- Do not claim counsel-reviewed evidence status, self-validating audit integrity, or unmodifiable audit records from signed heads or anchors; they provide replay detection, not legal status or write-once storage.
 - Do not claim 100% prompt-injection prevention.

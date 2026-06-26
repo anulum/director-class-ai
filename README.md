@@ -136,7 +136,10 @@ dry-run by default, and on every run it appends a privacy-preserving entry to a
 tamper-evident hash-chained audit log (`runtime/audit.jsonl`) and routes any
 human-required escalation through a durable, digest-scoped approval queue
 (`runtime/approvals.json`). Both paths are configurable with `--audit-log` and
-`--approval-store`.
+`--approval-store`. Deployments that need replay detection for the audit head can
+set `--audit-head-key-env <ENV>` and `--audit-anchor-log <path>`; the key is read
+from the environment, the `.head` sidecar is HMAC-signed, and each signed head is
+also appended to the configured anchor JSONL.
 
 The posture in force is the approved head of a Guardrail-as-Code ledger
 (`--policy-store`, default `runtime/policy.json`): a posture change approved
@@ -242,11 +245,13 @@ Apache-2.0.
 writes SIEM/SOC JSONL. Exported events contain decision ids, detector ids, policy
 profile, approval state, request digest, verdict booleans, risk, and chain
 metadata. Raw prompts, actions, context, responses, and command output are not in
-the export schema.
+the export schema. For signed deployments, pass `--head-signing-key-env <ENV>`
+and `--anchor-log <path>` so export fails closed unless the local head signature
+and latest anchor match.
 
 ```bash
 director-class-siem-export runtime/audit.jsonl -o runtime/siem.jsonl
-director-class-siem-export runtime/audit.jsonl
+director-class-siem-export runtime/audit.jsonl --head-signing-key-env DCA_AUDIT_HEAD_KEY --anchor-log runtime/audit-anchor.jsonl
 ```
 
 ## Operator approvals

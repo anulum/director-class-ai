@@ -29,10 +29,21 @@ class _Clock:
         return self.t
 
 
-def _populate(path: Path) -> None:
+def _populate(
+    path: Path,
+    *,
+    head_signing_key: str | None = None,
+    anchor_path: Path | None = None,
+) -> None:
     governor = Governor(
         ensemble=ParallelEnsembleScorer([DestructiveCommandDetector()]),
-        audit_sink=AuditChainSink(path=path, policy_profile="pilot", clock=_Clock()),
+        audit_sink=AuditChainSink(
+            path=path,
+            policy_profile="pilot",
+            clock=_Clock(),
+            head_signing_key=head_signing_key,
+            anchor_path=anchor_path,
+        ),
     )
     governor.review(EvaluationRequest(query="inspect", action="ls -la"))
     governor.review(EvaluationRequest(query="inspect", action="rm -rf /"))
@@ -55,6 +66,25 @@ def test_audit_export_options_parse_output_path(tmp_path: Path) -> None:
 
     assert options.source == source
     assert options.output == output
+
+
+def test_audit_export_options_parse_signed_verification(tmp_path: Path) -> None:
+    source = tmp_path / "audit.jsonl"
+    anchor = tmp_path / "anchor.jsonl"
+
+    options = AuditExportOptions.from_argv(
+        (
+            str(source),
+            "--head-signing-key-env",
+            "DCA_AUDIT_HEAD_KEY",
+            "--anchor-log",
+            str(anchor),
+        )
+    )
+
+    assert options.source == source
+    assert options.head_signing_key_env == "DCA_AUDIT_HEAD_KEY"
+    assert options.anchor_path == anchor
 
 
 def test_run_export_writes_verified_siem_jsonl(tmp_path: Path) -> None:
@@ -91,6 +121,49 @@ def test_run_export_fails_closed_on_tampered_chain(tmp_path: Path) -> None:
     assert result.event_count == 0
     assert "audit chain verification failed" in result.reason
     assert not output.exists()
+
+
+def test_run_export_verifies_signed_head_and_anchor(tmp_path: Path) -> None:
+    source = tmp_path / "audit.jsonl"
+    anchor = tmp_path / "anchor.jsonl"
+    _populate(source, head_signing_key="export-secret", anchor_path=anchor)
+
+    result = run_export(
+        AuditExportOptions(
+            source=source,
+            head_signing_key="export-secret",
+            anchor_path=anchor,
+        )
+    )
+
+    assert result.ok is True
+    assert result.event_count == 2
+
+
+def test_main_verifies_signed_head_from_env(
+    capsys,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    source = tmp_path / "audit.jsonl"
+    anchor = tmp_path / "anchor.jsonl"
+    monkeypatch.setenv("DCA_AUDIT_HEAD_KEY", "export-secret")
+    _populate(source, head_signing_key="export-secret", anchor_path=anchor)
+
+    code = main(
+        (
+            str(source),
+            "--head-signing-key-env",
+            "DCA_AUDIT_HEAD_KEY",
+            "--anchor-log",
+            str(anchor),
+        )
+    )
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert len(captured.out.splitlines()) == 2
+    assert captured.err == ""
 
 
 def test_main_writes_stdout_jsonl(capsys, tmp_path: Path) -> None:

@@ -252,6 +252,23 @@ def test_default_wires_durable_approval_and_audit_paths(tmp_path: Path) -> None:
     assert len(audit_log.read_text(encoding="utf-8").splitlines()) == 2
 
 
+def test_default_can_sign_and_anchor_audit_log(tmp_path: Path) -> None:
+    audit_log = tmp_path / "sdk-audit.jsonl"
+    anchor = tmp_path / "sdk-anchor.jsonl"
+    request = ToolReviewRequest("ops.safe", action="echo ok")
+
+    decision = ToolReviewMiddleware.default(
+        audit_log=audit_log,
+        audit_head_signing_key="sdk-secret",
+        audit_anchor_path=anchor,
+    ).review(request)
+
+    assert decision.permitted is True
+    assert audit_log.with_suffix(".jsonl.head.sig").exists()
+    assert anchor.exists()
+    assert verify_chain(audit_log, head_signing_key="sdk-secret", anchor_path=anchor).ok
+
+
 def test_default_rejects_duplicate_approval_sources(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="approval or approval_store"):
         ToolReviewMiddleware.default(

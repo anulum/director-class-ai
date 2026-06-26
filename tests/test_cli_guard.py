@@ -43,6 +43,8 @@ def _opts(
     policy_store: str | None = None,
     live_profile: str = "",
     require_policy_store: bool = False,
+    audit_head_key_env: str = "",
+    audit_anchor_log: str = "",
 ) -> CommandGuardOptions:
     """Build guard options whose runtime state lives under tmp."""
     return CommandGuardOptions(
@@ -64,6 +66,8 @@ def _opts(
         ),
         live_profile=live_profile,
         require_policy_store=require_policy_store,
+        audit_head_key_env=audit_head_key_env,
+        audit_anchor_log=audit_anchor_log,
     )
 
 
@@ -168,6 +172,22 @@ def test_command_guard_options_parse_runtime_posture_guards() -> None:
     assert options.live_profile == "/tmp/live.toml"
 
 
+def test_command_guard_options_parse_signed_audit_paths() -> None:
+    options = CommandGuardOptions.from_argv(
+        (
+            "--audit-head-key-env",
+            "DCA_AUDIT_HEAD_KEY",
+            "--audit-anchor-log",
+            "/tmp/audit-anchor.jsonl",
+            "--",
+            "noop",
+        )
+    )
+
+    assert options.audit_head_key_env == "DCA_AUDIT_HEAD_KEY"
+    assert options.audit_anchor_log == "/tmp/audit-anchor.jsonl"
+
+
 def test_build_command_request_uses_existing_sdk_contract() -> None:
     options = CommandGuardOptions(
         surface="kubernetes",
@@ -250,6 +270,33 @@ def test_every_decision_is_recorded_to_the_audit_chain(tmp_path: Path) -> None:
     assert len(audit_log.read_text(encoding="utf-8").splitlines()) == 1
 
 
+def test_command_guard_can_sign_and_anchor_audit_head(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DCA_AUDIT_HEAD_KEY", "operator-secret")
+    audit_log = tmp_path / "audit.jsonl"
+    anchor = tmp_path / "anchor.jsonl"
+
+    event = run_guard(
+        _opts(
+            tmp_path,
+            surface="shell",
+            command=("echo", "ok"),
+            audit_log=str(audit_log),
+            audit_head_key_env="DCA_AUDIT_HEAD_KEY",
+            audit_anchor_log=str(anchor),
+        )
+    )
+
+    assert event["route"] == "allow"
+    assert audit_log.with_suffix(".jsonl.head.sig").exists()
+    assert anchor.exists()
+    assert verify_chain(
+        audit_log, head_signing_key="operator-secret", anchor_path=anchor
+    ).ok
+
+
 def test_required_policy_store_blocks_without_approved_head(tmp_path: Path) -> None:
     event = run_guard(
         _opts(
@@ -265,6 +312,32 @@ def test_required_policy_store_blocks_without_approved_head(tmp_path: Path) -> N
     assert event["executed"] is False
     assert event["firing"] == ("policy_head_missing",)
     assert verify_chain(str(event["audit_log"])).ok
+
+
+def test_policy_store_block_preserves_signed_audit_head(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DCA_AUDIT_HEAD_KEY", "operator-secret")
+    audit_log = tmp_path / "audit.jsonl"
+    anchor = tmp_path / "anchor.jsonl"
+
+    event = run_guard(
+        _opts(
+            tmp_path,
+            surface="shell",
+            command=("echo", "ok"),
+            audit_log=str(audit_log),
+            require_policy_store=True,
+            audit_head_key_env="DCA_AUDIT_HEAD_KEY",
+            audit_anchor_log=str(anchor),
+        )
+    )
+
+    assert event["route"] == "block"
+    assert verify_chain(
+        audit_log, head_signing_key="operator-secret", anchor_path=anchor
+    ).ok
 
 
 def test_drifted_live_profile_blocks_before_review(tmp_path: Path) -> None:

@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import os
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -69,6 +70,8 @@ class CommandGuardOptions:
     policy_store: str = DEFAULT_POLICY_STORE
     live_profile: str = ""
     require_policy_store: bool = False
+    audit_head_key_env: str = ""
+    audit_anchor_log: str = ""
 
     @classmethod
     def from_argv(cls, argv: Sequence[str] | None = None) -> CommandGuardOptions:
@@ -90,6 +93,8 @@ class CommandGuardOptions:
             policy_store=args.policy_store,
             live_profile=args.live_profile,
             require_policy_store=args.require_policy_store,
+            audit_head_key_env=args.audit_head_key_env,
+            audit_anchor_log=args.audit_anchor_log,
         )
 
 
@@ -122,6 +127,9 @@ def run_guard(options: CommandGuardOptions) -> dict[str, object]:
     request = build_command_request(options)
     Path(options.audit_log).parent.mkdir(parents=True, exist_ok=True)
     Path(options.approval_store).parent.mkdir(parents=True, exist_ok=True)
+    if options.audit_anchor_log:
+        Path(options.audit_anchor_log).parent.mkdir(parents=True, exist_ok=True)
+    audit_head_signing_key = _audit_head_key(options.audit_head_key_env)
     posture = resolve_runtime_posture(
         options.policy_store,
         live_profile=options.live_profile or None,
@@ -134,6 +142,8 @@ def run_guard(options: CommandGuardOptions) -> dict[str, object]:
             execute=options.execute,
             audit_log=options.audit_log,
             approval_store=options.approval_store,
+            audit_head_signing_key=audit_head_signing_key,
+            audit_anchor_log=options.audit_anchor_log,
             request=request,
             posture=posture,
         )
@@ -141,7 +151,13 @@ def run_guard(options: CommandGuardOptions) -> dict[str, object]:
         policy=posture.fusion_policy,
         executor=_execute_command,
         approval=ApprovalQueue(options.approval_store).request_approval,
-        audit_sink=AuditChainSink(Path(options.audit_log)),
+        audit_sink=AuditChainSink(
+            Path(options.audit_log),
+            head_signing_key=audit_head_signing_key,
+            anchor_path=Path(options.audit_anchor_log)
+            if options.audit_anchor_log
+            else None,
+        ),
     )
     decision = middleware.run(request)
     event = decision.to_audit_event()
@@ -175,6 +191,17 @@ def _execute_command(request: ToolReviewRequest) -> ToolExecutionResult:
         check=False,
     )
     return ToolExecutionResult(completed.stdout + completed.stderr, completed.returncode)
+
+
+def _audit_head_key(env_name: str) -> str | None:
+    if not env_name:
+        return None
+    value = os.environ.get(env_name)
+    if not value:
+        raise ValueError(
+            f"audit head signing key environment variable {env_name!r} is not set"
+        )
+    return value
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -217,6 +244,16 @@ def _parser() -> argparse.ArgumentParser:
         "--audit-log",
         default=DEFAULT_AUDIT_LOG,
         help=f"Tamper-evident hash-chained audit log. Default: {DEFAULT_AUDIT_LOG}.",
+    )
+    parser.add_argument(
+        "--audit-head-key-env",
+        default="",
+        help="Environment variable containing the HMAC key for signing audit heads.",
+    )
+    parser.add_argument(
+        "--audit-anchor-log",
+        default="",
+        help="Optional append-only external anchor JSONL for signed audit heads.",
     )
     parser.add_argument(
         "--approval-store",

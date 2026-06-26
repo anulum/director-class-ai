@@ -63,6 +63,28 @@ def test_export_chain_to_siem_jsonl_verifies_and_strips_raw_action(tmp_path) -> 
     assert "rm -rf /" not in exported
 
 
+def test_export_chain_to_siem_jsonl_can_require_signed_anchor(tmp_path) -> None:
+    path = tmp_path / "audit.jsonl"
+    anchor = tmp_path / "anchor.jsonl"
+    governor = Governor(
+        ensemble=ParallelEnsembleScorer([DestructiveCommandDetector()]),
+        audit_sink=AuditChainSink(
+            path=path,
+            policy_profile="pilot",
+            clock=_Clock(),
+            head_signing_key="sink-secret",
+            anchor_path=anchor,
+        ),
+    )
+    governor.review(EvaluationRequest(query="inspect", action="ls -la"))
+
+    exported = export_chain_to_siem_jsonl(
+        path, head_signing_key="sink-secret", anchor_path=anchor
+    )
+
+    assert len(exported.splitlines()) == 1
+
+
 def test_export_can_write_jsonl_file(tmp_path) -> None:
     path = tmp_path / "audit.jsonl"
     out = tmp_path / "siem.jsonl"

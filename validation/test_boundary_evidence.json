@@ -71,22 +71,22 @@
         "director_class_ai/audit/sinks.py",
         "director_class_ai/audit/export_cli.py"
       ],
-      "required_behaviour": "Audit decisions append to hash-chained JSONL, verify across restart/tamper cases, and export redacted SIEM JSONL through API and CLI entry points.",
+      "required_behaviour": "Audit decisions append to hash-chained JSONL, optionally sign and externally anchor the head, verify across restart/tamper/replay cases, and export redacted SIEM JSONL through API and CLI entry points.",
       "evidence_tests": [
         {
           "file": "tests/test_audit_chain.py",
           "mode": "integration",
-          "covers": "append, verify, mutation/reorder/deletion/truncation/corrupt-line detection, sidecar handling, recoverable append-before-head crash window, and optional Rust verifier parity"
+          "covers": "append, verify, mutation/reorder/deletion/truncation/corrupt-line detection, sidecar handling, recoverable append-before-head crash window, signed-head replay detection, external anchor verification, and optional Rust verifier parity"
         },
         {
           "file": "tests/test_audit_sinks.py",
           "mode": "integration",
-          "covers": "verified chain to SIEM JSONL export and malformed detector-list handling"
+          "covers": "verified chain to SIEM JSONL export, signed anchor verification, and malformed detector-list handling"
         },
         {
           "file": "tests/test_audit_export_cli.py",
           "mode": "integration",
-          "covers": "CLI stdout/file export and fail-closed invalid-chain handling"
+          "covers": "CLI stdout/file export, signed-head env-key verification, and fail-closed invalid-chain handling"
         }
       ]
     },
