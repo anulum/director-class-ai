@@ -1309,6 +1309,8 @@ fn audit_verify_chain_internal(
     let mut expected_seq: i64 = 0;
     let mut last_hash = prev_hash.clone();
     let mut last_seq: i64 = -1;
+    let mut previous_hash = prev_hash.clone();
+    let mut previous_seq: i64 = -1;
 
     for (index, line) in lines.iter().enumerate() {
         if line.trim().is_empty() {
@@ -1356,6 +1358,8 @@ fn audit_verify_chain_internal(
                 "entry_hash mismatch (mutated)".to_owned(),
             );
         }
+        previous_hash.clone_from(&last_hash);
+        previous_seq = last_seq;
         prev_hash = recomputed.clone();
         last_hash = recomputed;
         last_seq = expected_seq;
@@ -1373,6 +1377,16 @@ fn audit_verify_chain_internal(
         let head_seq = head.get("seq").and_then(Value::as_i64);
         let head_hash = head.get("entry_hash").and_then(Value::as_str);
         if head_seq != Some(last_seq) || head_hash != Some(last_hash.as_str()) {
+            if last_seq == previous_seq + 1
+                && head_seq == Some(previous_seq)
+                && head_hash == Some(previous_hash.as_str())
+            {
+                return (
+                    true,
+                    None,
+                    "head sidecar behind latest entry (recoverable crash window)".to_owned(),
+                );
+            }
             return (
                 false,
                 Some(last_seq),

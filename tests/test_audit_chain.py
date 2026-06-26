@@ -104,6 +104,24 @@ def test_tail_truncation_detected_via_head(tmp_path) -> None:
     assert v.ok is False and "truncated" in v.reason
 
 
+def test_one_entry_beyond_head_is_recoverable_crash_window(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _populate(p)
+    lines = p.read_text(encoding="utf-8").splitlines()
+    previous = json.loads(lines[-2])
+    p.with_suffix(".jsonl.head").write_text(
+        json.dumps(
+            {"seq": previous["seq"], "entry_hash": previous["entry_hash"]},
+        ),
+        encoding="utf-8",
+    )
+
+    v = verify_chain(p)
+
+    assert v.ok is True
+    assert "recoverable" in v.reason
+
+
 def test_corrupt_line_detected(tmp_path) -> None:
     p = tmp_path / "audit.jsonl"
     _populate(p)

@@ -182,6 +182,8 @@ def _verify_chain_python(path: Path) -> ChainVerification:
     expected_seq = 0
     last_hash = _GENESIS
     last_seq = -1
+    previous_hash = _GENESIS
+    previous_seq = -1
     with path.open(encoding="utf-8") as fh:
         for index, line in enumerate(fh):
             if not line.strip():
@@ -198,6 +200,8 @@ def _verify_chain_python(path: Path) -> ChainVerification:
             recomputed = _entry_hash(prev_hash, entry)
             if recomputed != stored:
                 return ChainVerification(False, index, "entry_hash mismatch (mutated)")
+            previous_hash = last_hash
+            previous_seq = last_seq
             prev_hash = recomputed
             last_hash = recomputed
             last_seq = expected_seq
@@ -207,6 +211,16 @@ def _verify_chain_python(path: Path) -> ChainVerification:
     if head_path.exists():
         head = json.loads(head_path.read_text(encoding="utf-8"))
         if head.get("seq") != last_seq or head.get("entry_hash") != last_hash:
+            if (
+                last_seq == previous_seq + 1
+                and head.get("seq") == previous_seq
+                and head.get("entry_hash") == previous_hash
+            ):
+                return ChainVerification(
+                    True,
+                    None,
+                    "head sidecar behind latest entry (recoverable crash window)",
+                )
             return ChainVerification(
                 False, last_seq, "head sidecar mismatch (tail truncated)"
             )

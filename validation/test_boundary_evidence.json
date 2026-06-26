@@ -76,7 +76,7 @@
         {
           "file": "tests/test_audit_chain.py",
           "mode": "integration",
-          "covers": "append, verify, mutation/reorder/deletion/truncation/corrupt-line detection, sidecar handling"
+          "covers": "append, verify, mutation/reorder/deletion/truncation/corrupt-line detection, sidecar handling, recoverable append-before-head crash window, and optional Rust verifier parity"
         },
         {
           "file": "tests/test_audit_sinks.py",
