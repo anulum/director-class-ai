@@ -182,12 +182,12 @@
         "director_class_ai/sdk/middleware.py",
         "director_class_ai/core/governor.py"
       ],
-      "required_behaviour": "SDK middleware renders tool actions deterministically, reviews without default execution, executes permitted calls exactly once, blocks untrusted mutations, routes approval, and emits digest-only audit events.",
+      "required_behaviour": "SDK middleware renders tool actions deterministically, reviews without default execution, executes permitted calls exactly once, blocks untrusted mutations, routes approval through a durable digest-scoped queue when configured, and emits digest-only audit events to the hash-chained audit sink when configured.",
       "evidence_tests": [
         {
           "file": "tests/test_sdk_middleware.py",
           "mode": "integration",
-          "covers": "review/run paths, dry-run behaviour, executor override, approval route, redacted audit event"
+          "covers": "review/run paths, dry-run behaviour, executor override, durable approval queue route, hash-chain audit sink, redacted audit event"
         }
       ]
     },

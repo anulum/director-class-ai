@@ -23,6 +23,7 @@ import hashlib
 import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
 from ..action import (
@@ -36,6 +37,8 @@ from ..action import (
     ReversibilityDetector,
 )
 from ..action._lexicon import UNTRUSTED_ORIGINS
+from ..approvals import ApprovalQueue
+from ..audit import AuditChainSink
 from ..core import Decision, Detector, EvaluationRequest, Governor, ParallelEnsembleScorer
 from ..core.fusion import FusionPolicy
 from ..core.governor import ApprovalHook, AuditSink
@@ -213,7 +216,10 @@ class ToolReviewMiddleware:
         detectors: Sequence[Detector] | None = None,
         policy: FusionPolicy | None = None,
         approval: ApprovalHook | None = None,
+        approval_store: str | Path | None = None,
         audit_sink: AuditSink | None = None,
+        audit_log: str | Path | None = None,
+        policy_profile: str = "",
         executor: ToolExecutor | None = None,
     ) -> ToolReviewMiddleware:
         """Build middleware with the default action-plane detector ensemble.
@@ -223,6 +229,17 @@ class ToolReviewMiddleware:
         an approved posture change actually governs runtime decisions; ``None``
         keeps the fail-closed default thresholds.
         """
+        if approval is not None and approval_store is not None:
+            raise ValueError("pass either approval or approval_store, not both")
+        if audit_sink is not None and audit_log is not None:
+            raise ValueError("pass either audit_sink or audit_log, not both")
+        if approval_store is not None:
+            Path(approval_store).parent.mkdir(parents=True, exist_ok=True)
+            approval = ApprovalQueue(approval_store).request_approval
+        if audit_log is not None:
+            audit_path = Path(audit_log)
+            audit_path.parent.mkdir(parents=True, exist_ok=True)
+            audit_sink = AuditChainSink(audit_path, policy_profile=policy_profile)
         ensemble = ParallelEnsembleScorer(
             tuple(detectors or _default_detectors()), policy=policy
         )

@@ -8,6 +8,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
+from director_class_ai.approvals import ApprovalQueue
+from director_class_ai.audit import verify_chain
 from director_class_ai.core import (
     DetectorSignal,
     EvaluationRequest,
@@ -204,6 +210,62 @@ def test_approved_human_route_executes_once() -> None:
     assert decision.permitted is True
     assert decision.executed is True
     assert spy.calls == [request]
+
+
+def test_default_wires_durable_approval_and_audit_paths(tmp_path: Path) -> None:
+    spy = _ExecutorSpy()
+    audit_log = tmp_path / "sdk-audit.jsonl"
+    approval_store = tmp_path / "sdk-approvals.json"
+    request = ToolReviewRequest("ops.maybe", action="maybe risky op", dry_run=False)
+
+    first = ToolReviewMiddleware.default(
+        detectors=(_BorderlineAction(),),
+        approval_store=approval_store,
+        audit_log=audit_log,
+        policy_profile="sdk-production",
+        executor=spy,
+    ).run(request)
+
+    assert first.route == "human"
+    assert first.permitted is False
+    assert first.executed is False
+    ticket = ApprovalQueue(approval_store).get(first.request_digest)
+    assert ticket is not None
+    assert ticket.status == "pending"
+    assert verify_chain(audit_log).ok
+    first_entry = audit_log.read_text(encoding="utf-8").splitlines()[0]
+    assert '"policy_profile": "sdk-production"' in first_entry
+
+    ApprovalQueue(approval_store).approve(first.request_digest, approver="alice")
+    second = ToolReviewMiddleware.default(
+        detectors=(_BorderlineAction(),),
+        approval_store=approval_store,
+        audit_log=audit_log,
+        executor=spy,
+    ).run(request)
+
+    assert second.route == "human"
+    assert second.permitted is True
+    assert second.executed is True
+    assert spy.calls == [request]
+    assert verify_chain(audit_log).ok
+    assert len(audit_log.read_text(encoding="utf-8").splitlines()) == 2
+
+
+def test_default_rejects_duplicate_approval_sources(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="approval or approval_store"):
+        ToolReviewMiddleware.default(
+            approval=lambda _verdict, _request: True,
+            approval_store=tmp_path / "approvals.json",
+        )
+
+
+def test_default_rejects_duplicate_audit_sources(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="audit_sink or audit_log"):
+        ToolReviewMiddleware.default(
+            audit_sink=lambda _record: None,
+            audit_log=tmp_path / "audit.jsonl",
+        )
 
 
 def test_per_call_executor_overrides_constructor_executor() -> None:

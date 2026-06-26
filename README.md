@@ -64,7 +64,9 @@ Detailed operator docs live in `docs/`:
 
 Applications that dispatch tools directly can put the SDK middleware in front of
 their executor. Dry-run is the default; real execution requires both a permitting
-Governor decision and `dry_run=False`.
+Governor decision and `dry_run=False`. Production middleware should pass durable
+approval and audit paths so escalations open digest-scoped tickets and every
+decision lands in the hash-chained audit log.
 
 ```python
 from director_class_ai.sdk import (
@@ -78,7 +80,12 @@ def executor(request: ToolReviewRequest) -> ToolExecutionResult:
     return ToolExecutionResult({"status": "ok"}, exit_code=0)
 
 
-middleware = ToolReviewMiddleware.default(executor=executor)
+middleware = ToolReviewMiddleware.default(
+    approval_store="runtime/approvals.json",
+    audit_log="runtime/audit.jsonl",
+    policy_profile="sdk",
+    executor=executor,
+)
 decision = middleware.run(
     ToolReviewRequest(
         "fs.read",

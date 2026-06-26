@@ -36,7 +36,11 @@ signals and provenance.
 ```python
 from director_class_ai.sdk import ToolReviewMiddleware, ToolReviewRequest
 
-middleware = ToolReviewMiddleware.default()
+middleware = ToolReviewMiddleware.default(
+    approval_store="runtime/approvals.json",
+    audit_log="runtime/audit.jsonl",
+    policy_profile="sdk-onboarding",
+)
 decision = middleware.review(
     ToolReviewRequest(
         tool_name="shell.run",

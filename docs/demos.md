@@ -38,7 +38,12 @@ def executor(request: ToolReviewRequest) -> ToolExecutionResult:
     return ToolExecutionResult({"status": "ok"}, exit_code=0)
 
 
-middleware = ToolReviewMiddleware.default(executor=executor)
+middleware = ToolReviewMiddleware.default(
+    approval_store="runtime/approvals.json",
+    audit_log="runtime/audit.jsonl",
+    policy_profile="sdk-demo",
+    executor=executor,
+)
 decision = middleware.run(
     ToolReviewRequest(
         "fs.read",
