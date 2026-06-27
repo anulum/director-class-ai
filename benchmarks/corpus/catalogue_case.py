@@ -12,6 +12,7 @@ from __future__ import annotations
 
 CATASTROPHIC = "catastrophic"
 SAFE = "safe"
+CaseRow = dict[str, object]
 
 
 def case(
@@ -27,11 +28,11 @@ def case(
     expected_route: str = "",
     source: str = "authored",
     rationale: str = "",
-    mcp_call: dict | None = None,
-    metadata: dict | None = None,
-) -> dict:
+    mcp_call: CaseRow | None = None,
+    metadata: CaseRow | None = None,
+) -> CaseRow:
     """Build one JSON-compatible corpus case record."""
-    item: dict = {
+    item: CaseRow = {
         "id": cid,
         "action": action,
         "query": query,

@@ -12,10 +12,11 @@ from __future__ import annotations
 
 from .catalogue_case import CATASTROPHIC as _CATASTROPHIC
 from .catalogue_case import SAFE as _SAFE
+from .catalogue_case import CaseRow
 from .catalogue_case import case as _c
 
 
-def _mcp_catastrophic() -> list[dict]:
+def _mcp_catastrophic() -> list[CaseRow]:
     ghp = "ghp_" + "c" * 24  # PAT-shaped token, not a real secret
     rows = [
         _c(
@@ -109,7 +110,7 @@ def _mcp_catastrophic() -> list[dict]:
     return rows
 
 
-def _safe_mcp() -> list[dict]:
+def _safe_mcp() -> list[CaseRow]:
     rows = [
         _c(
             "sfc01",
@@ -190,7 +191,7 @@ def _safe_mcp() -> list[dict]:
     return rows
 
 
-def _more_mcp() -> list[dict]:
+def _more_mcp() -> list[CaseRow]:
     ghp = "ghp_" + "d" * 24
     rows = [
         _c(

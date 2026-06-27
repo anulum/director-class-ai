@@ -8,9 +8,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import pytest
 
 from benchmarks.corpus import build_catalogue
+from benchmarks.corpus.catalogue_case import CaseRow
 from benchmarks.corpus.generate import _validate, assemble
 
 
@@ -34,15 +37,15 @@ def test_catalogue_has_both_classes_and_attribution() -> None:
     cat = build_catalogue()
     assert {c["label"] for c in cat} == {"catastrophic", "safe"}
     # injected/MCP cases cite the threat-taxonomy alignment, never a copied source
-    aligned = [c for c in cat if "category-aligned" in c.get("source", "")]
-    assert aligned and all("copied" not in c["source"] for c in aligned)
+    aligned = [c for c in cat if "category-aligned" in _text(c, "source")]
+    assert aligned and all("copied" not in _text(c, "source") for c in aligned)
 
 
 def test_catalogue_has_causal_takeover_timelines() -> None:
     cases = [c for c in build_catalogue() if c["category"] == "causal-takeover"]
 
     assert {c["label"] for c in cases} == {"catastrophic", "safe"}
-    assert all(c.get("metadata", {}).get("causal_timeline") for c in cases)
+    assert all(_metadata(c).get("causal_timeline") for c in cases)
     assert any(c.get("provenance") in {"retrieved", "tool_output"} for c in cases)
 
 
@@ -50,10 +53,10 @@ def test_catalogue_has_binary_env_obfuscation_cases() -> None:
     cases = [c for c in build_catalogue() if c["category"] == "binary-env-obfuscated"]
 
     assert {c["label"] for c in cases} == {"catastrophic", "safe"}
-    assert any("gunzip" in c["action"] for c in cases)
-    assert any("bunzip2" in c["action"] for c in cases)
-    assert any("xz -d" in c["action"] for c in cases)
-    assert any("$X" in c["action"] for c in cases)
+    assert any("gunzip" in _text(c, "action") for c in cases)
+    assert any("bunzip2" in _text(c, "action") for c in cases)
+    assert any("xz -d" in _text(c, "action") for c in cases)
+    assert any("$X" in _text(c, "action") for c in cases)
 
 
 def test_catalogue_has_semantic_destructive_idiom_cases() -> None:
@@ -62,18 +65,20 @@ def test_catalogue_has_semantic_destructive_idiom_cases() -> None:
     ]
 
     assert {c["label"] for c in cases} == {"catastrophic", "safe"}
-    assert any("shred" in c["action"] for c in cases)
-    assert any("--remove-files" in c["action"] for c in cases)
-    assert any("wipefs -a" in c["action"] for c in cases)
-    assert any("rsync" in c["action"] and "--delete" in c["action"] for c in cases)
+    assert any("shred" in _text(c, "action") for c in cases)
+    assert any("--remove-files" in _text(c, "action") for c in cases)
+    assert any("wipefs -a" in _text(c, "action") for c in cases)
+    assert any(
+        "rsync" in _text(c, "action") and "--delete" in _text(c, "action") for c in cases
+    )
 
 
 def test_catalogue_has_unicode_obfuscation_cases() -> None:
     cases = [c for c in build_catalogue() if c["category"] == "unicode-obfuscated"]
 
     assert {c["label"] for c in cases} == {"catastrophic", "safe"}
-    assert any("\u200b" in c["action"] for c in cases)
-    assert any("ｒｍ" in c["action"] for c in cases)
+    assert any("\u200b" in _text(c, "action") for c in cases)
+    assert any("ｒｍ" in _text(c, "action") for c in cases)
 
 
 def test_catalogue_has_brace_arithmetic_obfuscation_cases() -> None:
@@ -82,11 +87,23 @@ def test_catalogue_has_brace_arithmetic_obfuscation_cases() -> None:
     ]
 
     assert {c["label"] for c in cases} == {"catastrophic", "safe"}
-    assert any("{rm,-rf,/}" in c["action"] for c in cases)
-    assert any("$((0x72))" in c["action"] for c in cases)
+    assert any("{rm,-rf,/}" in _text(c, "action") for c in cases)
+    assert any("$((0x72))" in _text(c, "action") for c in cases)
 
 
-def _row(cid: str, label: str = "safe") -> dict:
+def _text(case: CaseRow, key: str) -> str:
+    """Return a corpus field as text for string-focused assertions."""
+    return str(case.get(key, ""))
+
+
+def _metadata(case: CaseRow) -> Mapping[str, object]:
+    """Return the metadata mapping from a typed corpus row."""
+    metadata = case.get("metadata", {})
+    return metadata if isinstance(metadata, Mapping) else {}
+
+
+def _row(cid: str, label: str = "safe") -> CaseRow:
+    """Build a minimal row for schema-validator failure tests."""
     return {
         "id": cid,
         "action": "a",
