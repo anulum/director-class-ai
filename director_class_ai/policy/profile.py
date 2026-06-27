@@ -36,6 +36,9 @@ class Profile:
     integrity_threshold: float = 0.5
     action_block_threshold: float = 0.3
     uncertainty_margin: float = 0.15
+    content_uncertainty_margin: float | None = None
+    integrity_uncertainty_margin: float | None = None
+    action_uncertainty_margin: float | None = None
     require_audit: bool = False
     require_approval: bool = False
     capability_profile: str = "deny_all_actions"
@@ -47,9 +50,12 @@ class Profile:
             "integrity_threshold",
             "action_block_threshold",
             "uncertainty_margin",
+            "content_uncertainty_margin",
+            "integrity_uncertainty_margin",
+            "action_uncertainty_margin",
         ):
             value = getattr(self, attr)
-            if not 0.0 <= value <= 1.0:
+            if value is not None and not 0.0 <= value <= 1.0:
                 raise ValueError(f"{attr} must be in [0, 1], got {value}")
 
     def to_fusion_policy(self) -> FusionPolicy:
@@ -59,6 +65,9 @@ class Profile:
             integrity_threshold=self.integrity_threshold,
             action_block_threshold=self.action_block_threshold,
             uncertainty_margin=self.uncertainty_margin,
+            content_uncertainty_margin=self.content_uncertainty_margin,
+            integrity_uncertainty_margin=self.integrity_uncertainty_margin,
+            action_uncertainty_margin=self.action_uncertainty_margin,
         )
 
     def to_capability_policy(

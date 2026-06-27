@@ -624,12 +624,12 @@
         "director_class_ai/policy/review.py",
         "director_class_ai/policy/revision.py"
       ],
-      "required_behaviour": "Policy profiles and capability grants validate config, compile origin/action envelopes, expose candidate deltas, and keep review/revision workflows digest-bound.",
+      "required_behaviour": "Policy profiles and capability grants validate config, compile origin/action envelopes and per-plane uncertainty margins, expose candidate deltas, and keep review/revision workflows digest-bound.",
       "evidence_tests": [
         {
           "file": "tests/test_policy_profiles.py",
           "mode": "integration",
-          "covers": "built-in profile compilation and origin/capability envelope behaviour"
+          "covers": "built-in profile compilation, per-plane uncertainty margin validation, and origin/capability envelope behaviour"
         },
         {
           "file": "tests/test_capability_policy.py",
@@ -639,7 +639,7 @@
         {
           "file": "tests/test_policy_exposure.py",
           "mode": "integration",
-          "covers": "candidate policy exposure case evaluation and route transition reporting"
+          "covers": "candidate policy exposure case evaluation, per-plane uncertainty-margin route transitions, and route transition reporting"
         },
         {
           "file": "tests/test_policy_review.py",
@@ -649,7 +649,7 @@
         {
           "file": "tests/test_policy_revision.py",
           "mode": "integration",
-          "covers": "revision digest, lineage, metadata, rollback provenance"
+          "covers": "revision digest, per-plane uncertainty-margin diffs, lineage, metadata, rollback provenance"
         },
         {
           "file": "tests/test_policy_corpus.py",
@@ -690,7 +690,7 @@
         "director_class_ai/core/fusion.py",
         "director_class_ai/core/ensemble.py"
       ],
-      "required_behaviour": "Signal fusion and optional meta-classifier keep default fail-closed policy, serialise deterministic models, handle Rust fallback safely, and route action/content/integrity signals consistently.",
+      "required_behaviour": "Signal fusion and optional meta-classifier keep default fail-closed policy, serialise deterministic models, handle Rust fallback safely, and route action/content/integrity signals consistently with per-plane uncertainty review bands.",
       "evidence_tests": [
         {
           "file": "tests/test_meta_classifier.py",
@@ -700,7 +700,7 @@
         {
           "file": "tests/test_signal_fusion.py",
           "mode": "integration",
-          "covers": "fail-closed fusion routes for content/integrity/action signals"
+          "covers": "fail-closed fusion routes and per-plane uncertainty margins for content/integrity/action signals"
         },
         {
           "file": "tests/test_ensemble.py",

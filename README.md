@@ -161,6 +161,10 @@ The posture in force is the approved head of a Guardrail-as-Code ledger
 through `director-class-policy` governs the thresholds this review fuses with, so
 an approved relaxation or tightening takes effect at the boundary. With no ledger
 or no approved head, the guard keeps its fail-closed defaults.
+Profiles can set one legacy `uncertainty_margin` or override the content,
+integrity, and action review bands independently with
+`content_uncertainty_margin`, `integrity_uncertainty_margin`, and
+`action_uncertainty_margin`.
 For strict deployments, `--require-policy-store` blocks when that ledger has no
 approved head, and `--live-profile <profile.toml>` blocks when the runtime's
 live posture has drifted from the approved head before any command is reviewed.

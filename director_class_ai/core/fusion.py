@@ -62,11 +62,15 @@ class FusionPolicy:
     content_threshold: float = 0.5
     integrity_threshold: float = 0.5
     action_block_threshold: float = 0.3  # low: fail-closed leans to blocking
-    # A risk landing within this band of a plane's threshold is "borderline" —
-    # neither confidently safe nor confidently a problem — and is escalated to a
-    # human. A split judge panel lands here, which is exactly when a person should
-    # look. Set to 0 to disable borderline escalation.
+    # Legacy default band. Per-plane margins below inherit this value when left
+    # unset, so existing profiles keep their old posture.
     uncertainty_margin: float = 0.15
+    # A risk within a plane-specific band of that plane's threshold is
+    # "borderline" and escalates to a human. Set a plane margin to 0 to disable
+    # borderline escalation for that plane while leaving the others unchanged.
+    content_uncertainty_margin: float | None = None
+    integrity_uncertainty_margin: float | None = None
+    action_uncertainty_margin: float | None = None
     # Action signal types whose danger is injection / exfiltration / structural
     # taint rather than an inherently-destructive but potentially user-authorised
     # operation. An action carrying one of these is never downgraded from a hard
@@ -139,9 +143,43 @@ class FusionPolicy:
         }
     )
 
+    def __post_init__(self) -> None:
+        """Validate global and per-plane uncertainty margins."""
+        for attr in (
+            "uncertainty_margin",
+            "content_uncertainty_margin",
+            "integrity_uncertainty_margin",
+            "action_uncertainty_margin",
+        ):
+            value = getattr(self, attr)
+            if value is not None and not 0.0 <= value <= 1.0:
+                raise ValueError(f"{attr} must be in [0, 1], got {value}")
+
     def content_risk(self, signals: Sequence[DetectorSignal]) -> float:
         """Fuse content/integrity signals — calibrated noisy-OR by default."""
         return _noisy_or([s.weighted_score for s in signals])
+
+    def uncertainty_margin_for(self, plane: Plane) -> float:
+        """Return the review band configured for one signal plane."""
+        match plane:
+            case Plane.CONTENT:
+                return (
+                    self.uncertainty_margin
+                    if self.content_uncertainty_margin is None
+                    else self.content_uncertainty_margin
+                )
+            case Plane.INTEGRITY:
+                return (
+                    self.uncertainty_margin
+                    if self.integrity_uncertainty_margin is None
+                    else self.integrity_uncertainty_margin
+                )
+            case Plane.ACTION:
+                return (
+                    self.uncertainty_margin
+                    if self.action_uncertainty_margin is None
+                    else self.action_uncertainty_margin
+                )
 
     def user_authorised_destructive(
         self, objectors: Sequence[DetectorSignal], provenance: str
@@ -192,9 +230,9 @@ def fuse(
     requires_human = False
     allow = True
     reasons: list[str] = []
-    margin = policy.uncertainty_margin
 
-    def borderline(risk: float, threshold: float) -> bool:
+    def borderline(risk: float, threshold: float, plane: Plane) -> bool:
+        margin = policy.uncertainty_margin_for(plane)
         return margin > 0 and abs(risk - threshold) <= margin
 
     # Content + integrity: fail-open, flag only above threshold.
@@ -211,7 +249,7 @@ def fuse(
             allow = False
             firing.extend(s for s in plane_signals if s.weighted_score > 0)
             reasons.append(f"{plane.value} risk {risk:.2f} >= {threshold:.2f}")
-        elif borderline(risk, threshold):
+        elif borderline(risk, threshold, plane):
             requires_human = True
             reasons.append(f"{plane.value} risk {risk:.2f} borderline → review")
 
@@ -246,7 +284,7 @@ def fuse(
                 elif any(s.severity >= Severity.CRITICAL for s in objectors):
                     requires_human = True
                     reasons.append("CRITICAL severity → human approval required")
-        elif borderline(risk, policy.action_block_threshold):
+        elif borderline(risk, policy.action_block_threshold, Plane.ACTION):
             requires_human = True
             reasons.append(f"action risk {risk:.2f} borderline → human approval")
 

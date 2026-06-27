@@ -73,6 +73,19 @@ class TestDiffProfiles:
             ),
         )
 
+    def test_per_plane_uncertainty_margin_change_is_reported(self) -> None:
+        changes = diff_profiles(
+            _profile(action_uncertainty_margin=0.0),
+            _profile(action_uncertainty_margin=0.2),
+        )
+        assert changes == (
+            PolicyFieldChange(
+                field="action_uncertainty_margin",
+                old=0.0,
+                new=0.2,
+            ),
+        )
+
 
 class TestPolicyRevisionValidation:
     def test_valid_revision_is_accepted(self) -> None:

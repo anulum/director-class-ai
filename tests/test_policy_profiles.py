@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from director_class_ai.core import Plane
 from director_class_ai.policy import (
     ACTION_SURFACES,
     BUILTIN_CAPABILITY_PROFILES,
@@ -56,6 +57,11 @@ def test_out_of_range_threshold_fails_fast() -> None:
         load_profile({"name": "x", "action_block_threshold": 1.5})
 
 
+def test_out_of_range_per_plane_margin_fails_fast() -> None:
+    with pytest.raises(ValueError, match="content_uncertainty_margin"):
+        load_profile({"name": "x", "content_uncertainty_margin": -0.1})
+
+
 def test_strict_profile_without_requirements_fails_fast() -> None:
     with pytest.raises(ValueError, match="require_audit and require_approval"):
         load_profile({"name": "pilot", "require_audit": False})
@@ -71,6 +77,26 @@ def test_to_fusion_policy_maps_thresholds() -> None:
     policy = profile.to_fusion_policy()
     assert policy.action_block_threshold == profile.action_block_threshold
     assert policy.content_threshold == profile.content_threshold
+
+
+def test_to_fusion_policy_maps_per_plane_uncertainty_margins() -> None:
+    profile = load_profile(
+        {
+            "name": "staging",
+            "uncertainty_margin": 0.05,
+            "content_uncertainty_margin": 0.1,
+            "integrity_uncertainty_margin": 0.2,
+            "action_uncertainty_margin": 0.0,
+        }
+    )
+    policy = profile.to_fusion_policy()
+
+    assert policy.uncertainty_margin_for(Plane.CONTENT) == 0.1
+    assert policy.uncertainty_margin_for(Plane.INTEGRITY) == 0.2
+    assert policy.uncertainty_margin_for(Plane.ACTION) == 0.0
+    assert policy.content_uncertainty_margin == 0.1
+    assert policy.integrity_uncertainty_margin == 0.2
+    assert policy.action_uncertainty_margin == 0.0
 
 
 def test_capability_profiles_cover_required_action_surfaces() -> None:
@@ -143,6 +169,7 @@ def test_field_names_includes_thresholds() -> None:
         "name",
         "default_dry_run",
         "action_block_threshold",
+        "action_uncertainty_margin",
         "capability_profile",
     } <= Profile.field_names()
 

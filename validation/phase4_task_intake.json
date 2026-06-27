@@ -316,6 +316,35 @@
       "claim_boundary": "Operational SOC correlation metadata only. Tags do not assert certification, complete framework coverage, prevention, legal admissibility, or benchmark performance.",
       "implementation_readiness": "executed",
       "open_blockers": []
+    },
+    {
+      "id": "P4-PER-PLANE-UNCERTAINTY-001",
+      "plan_anchor": "Phase 4 / Per-plane uncertainty_margin",
+      "status": "done",
+      "buyer_user_value": "Lets operators tune review bands separately for content, integrity, and action planes, so a deployment can keep action execution fail-closed while making content or integrity review less noisy.",
+      "threat_model": "A single global uncertainty band can force an unsafe compromise: action-plane uncertainty may be relaxed to reduce content-review noise, or content/integrity review may be over-escalated to preserve action-plane caution.",
+      "required_evidence": [
+        "FusionPolicy validates per-plane uncertainty margins while preserving legacy uncertainty_margin fallback",
+        "Profile validates and compiles content, integrity, and action uncertainty margins",
+        "policy revision/drift/exposure surfaces treat per-plane margin changes as reviewed posture changes",
+        "focused fusion, profile, revision, and exposure integration tests over production APIs",
+        "strict mypy on touched production files and boundary evidence update"
+      ],
+      "affected_surfaces": [
+        "director_class_ai/core/fusion.py",
+        "director_class_ai/policy/profile.py",
+        "tests/test_signal_fusion.py",
+        "tests/test_policy_profiles.py",
+        "tests/test_policy_revision.py",
+        "tests/test_policy_exposure.py",
+        "README.md",
+        "validation/test_boundary_evidence.json",
+        "validation/phase4_task_intake.json"
+      ],
+      "benchmark_impact": "none",
+      "claim_boundary": "Governance posture tuning only. This does not change detector scoring, model quality, benchmark performance, certification status, or legal evidence claims.",
+      "implementation_readiness": "executed",
+      "open_blockers": []
     }
   ]
 }

@@ -282,6 +282,36 @@ class TestUncertaintyEscalation:
         v = fuse([sig(Plane.CONTENT, 0.42)], policy)
         assert v.requires_human is False
 
+    def test_content_margin_can_be_tuned_without_action_margin(self) -> None:
+        policy = FusionPolicy(
+            uncertainty_margin=0.15,
+            content_uncertainty_margin=0.0,
+            action_uncertainty_margin=0.2,
+        )
+
+        content = fuse([sig(Plane.CONTENT, 0.42)], policy)
+        action = fuse([sig(Plane.ACTION, 0.2, locus=Locus.ACTION)], policy)
+
+        assert content.requires_human is False
+        assert action.requires_human is True
+
+    def test_action_margin_can_be_tuned_without_content_margin(self) -> None:
+        policy = FusionPolicy(
+            uncertainty_margin=0.15,
+            content_uncertainty_margin=0.2,
+            action_uncertainty_margin=0.0,
+        )
+
+        content = fuse([sig(Plane.CONTENT, 0.42)], policy)
+        action = fuse([sig(Plane.ACTION, 0.2, locus=Locus.ACTION)], policy)
+
+        assert content.requires_human is True
+        assert action.requires_human is False
+
+    def test_invalid_per_plane_margin_fails_fast(self) -> None:
+        with pytest.raises(ValueError, match="action_uncertainty_margin"):
+            FusionPolicy(action_uncertainty_margin=1.2)
+
     def test_split_panel_lands_in_band(self) -> None:
         # a split panel produces a mid-range fused risk that lands in the band,
         # which is exactly when a human should review it

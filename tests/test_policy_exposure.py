@@ -18,14 +18,18 @@ from director_class_ai.policy import (
 )
 
 
-def _action(score: float) -> tuple[DetectorSignal, ...]:
+def _action(
+    score: float,
+    *,
+    signal_type: str = "destructive_command",
+) -> tuple[DetectorSignal, ...]:
     return (
         DetectorSignal(
             detector="d",
             plane=Plane.ACTION,
             score=score,
             locus=Locus.ACTION,
-            signal_type="destructive_command",
+            signal_type=signal_type,
             severity=Severity.HIGH,
         ),
     )
@@ -42,7 +46,11 @@ def _candidate() -> Profile:
 _CASES = [
     ExposureCase(label="safe", signals=_action(0.1)),
     ExposureCase(label="mid", signals=_action(0.5)),
-    ExposureCase(label="authorised", signals=_action(0.5), provenance="user"),
+    ExposureCase(
+        label="authorised",
+        signals=_action(0.5, signal_type="permission_wipe"),
+        provenance="user",
+    ),
     ExposureCase(label="danger", signals=_action(0.9)),
 ]
 
@@ -129,3 +137,23 @@ class TestPostureExposure:
 
         assert report.changed_count == 1
         assert report.transitions == {"block->allow": 1}
+
+    def test_action_uncertainty_margin_changes_are_replayed(self) -> None:
+        case = ExposureCase(label="borderline-action", signals=_action(0.2))
+        baseline = Profile(
+            name="staging",
+            action_block_threshold=0.3,
+            uncertainty_margin=0.0,
+            action_uncertainty_margin=0.0,
+        )
+        candidate = Profile(
+            name="staging",
+            action_block_threshold=0.3,
+            uncertainty_margin=0.0,
+            action_uncertainty_margin=0.15,
+        )
+
+        report = PostureExposure(baseline, candidate).expose([case])
+
+        assert report.changed_count == 1
+        assert report.transitions == {"allow->escalate": 1}
