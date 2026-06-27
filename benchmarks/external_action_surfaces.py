@@ -59,6 +59,18 @@ class ExternalSource:
     status: str
 
     def artifact_path(self, manifest_path: Path) -> Path:
+        """Resolve the local JSONL artefact path relative to a manifest file.
+
+        Parameters
+        ----------
+        manifest_path
+            Path to the Markdown manifest that declared this source.
+
+        Returns
+        -------
+        Path
+            Absolute path to the local artefact named by the manifest row.
+        """
         return (manifest_path.parent / self.local_artifact).resolve()
 
 

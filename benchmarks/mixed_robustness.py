@@ -43,6 +43,7 @@ from director_class_ai.action import (  # noqa: E402
     OriginTaintDetector,
 )
 from director_class_ai.core import (  # noqa: E402
+    Detector,
     EvaluationRequest,
     ParallelEnsembleScorer,
 )
@@ -50,6 +51,18 @@ from director_class_ai.core import (  # noqa: E402
 
 @dataclass(frozen=True)
 class Case:
+    """One labelled request used by the mixed-threat robustness benchmark.
+
+    Attributes
+    ----------
+    request
+        Evaluation request sent through a detector ensemble.
+    is_threat
+        Whether the request should be flagged by the evaluated configuration.
+    threat_type
+        Human-readable category used in benchmark interpretation.
+    """
+
     request: EvaluationRequest
     is_threat: bool
     threat_type: str
@@ -134,20 +147,21 @@ def _run(name: str, ensemble: ParallelEnsembleScorer, cases: list[Case]) -> None
 
 
 def main() -> None:
+    """Run the mixed-threat robustness benchmark from the command line."""
     ap = argparse.ArgumentParser()
     ap.add_argument(
         "--content", action="store_true", help="include content cases (needs [detectors])"
     )
     args = ap.parse_args()
 
-    action_detectors = [
+    action_detectors: list[Detector] = [
         DestructiveCommandDetector(),
         BlastRadiusDetector(),
         OriginTaintDetector(),
         IntentConsistencyDetector(),
     ]
     cases = list(ACTION_CASES)
-    content_detectors: list = []
+    content_detectors: list[Detector] = []
 
     if args.content:
         try:

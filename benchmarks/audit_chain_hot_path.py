@@ -46,6 +46,26 @@ def _record(index: int) -> AuditRecord:
 
 
 def run_audit_chain_hot_path(path: Path, *, appends: int) -> dict[str, object]:
+    """Measure append throughput for one temporary audit-chain log.
+
+    Parameters
+    ----------
+    path
+        Audit JSONL path used for the benchmark run.
+    appends
+        Number of synthetic audit records to append.
+
+    Returns
+    -------
+    dict
+        Local functional benchmark evidence including rate, log size, and chain
+        verification status.
+
+    Raises
+    ------
+    ValueError
+        If ``appends`` is not positive.
+    """
     if appends <= 0:
         raise ValueError("appends must be positive")
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -71,6 +91,18 @@ def run_audit_chain_hot_path(path: Path, *, appends: int) -> dict[str, object]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the audit-chain hot-path benchmark CLI.
+
+    Parameters
+    ----------
+    argv
+        Optional argument vector for tests or programmatic invocation.
+
+    Returns
+    -------
+    int
+        ``0`` when the generated audit chain verifies, otherwise ``1``.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--appends", type=int, default=500)
     parser.add_argument("--output", type=Path, default=_RESULT_JSON)

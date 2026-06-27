@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 from .catalogue import build_catalogue
 
@@ -26,13 +27,18 @@ _OUT = _HERE.parent / "data" / "action_corpus.jsonl"
 
 _REQUIRED = {"id", "action", "label", "category", "severity"}
 _LABELS = {"catastrophic", "safe"}
+CaseRow = dict[str, object]
 
 
-def _load_jsonl(path: Path) -> list[dict]:
-    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+def _load_jsonl(path: Path) -> list[CaseRow]:
+    return [
+        cast(CaseRow, json.loads(line))
+        for line in path.read_text().splitlines()
+        if line.strip()
+    ]
 
 
-def assemble(seed_path: Path | None = None) -> list[dict]:
+def assemble(seed_path: Path | None = None) -> list[CaseRow]:
     """Return seed ∪ catalogue as one validated, de-duplicated corpus."""
     seed = _load_jsonl(seed_path or _SEED)
     corpus = [*seed, *build_catalogue()]
@@ -40,18 +46,20 @@ def assemble(seed_path: Path | None = None) -> list[dict]:
     return corpus
 
 
-def _validate(corpus: list[dict]) -> None:
+def _validate(corpus: list[CaseRow]) -> None:
     ids: set[str] = set()
     for case in corpus:
         missing = _REQUIRED - set(case)
         if missing:
             raise ValueError(f"case {case.get('id')!r} missing fields {missing}")
-        if case["label"] not in _LABELS:
+        label = str(case["label"])
+        case_id = str(case["id"])
+        if label not in _LABELS:
             raise ValueError(f"case {case['id']!r} has bad label {case['label']!r}")
-        if case["id"] in ids:
+        if case_id in ids:
             raise ValueError(f"duplicate id {case['id']!r}")
-        ids.add(case["id"])
-    labels = {c["label"] for c in corpus}
+        ids.add(case_id)
+    labels = {str(c["label"]) for c in corpus}
     if labels != _LABELS:
         raise ValueError(f"corpus must contain both classes, has {labels}")
 
@@ -66,6 +74,7 @@ def write_corpus(out_path: Path | None = None) -> Path:
 
 
 def main() -> None:
+    """Assemble the generated corpus and print the resulting class counts."""
     corpus = assemble()
     out = write_corpus()
     catastrophic = sum(c["label"] == "catastrophic" for c in corpus)

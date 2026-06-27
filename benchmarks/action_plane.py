@@ -227,6 +227,21 @@ def evaluate(
     *,
     external_corpus: list[CaseRow] | None = None,
 ) -> MetricRow:
+    """Evaluate authored and external action-plane corpora separately.
+
+    Parameters
+    ----------
+    corpus
+        Authored action-risk corpus rows.
+    external_corpus
+        Optional locally imported external benchmark rows.
+
+    Returns
+    -------
+    dict
+        Benchmark metrics with authored headline metrics, external metrics, and
+        partition counts kept separate for claim-boundary enforcement.
+    """
     external_cases = external_corpus or []
     validate_partition_boundaries(corpus, "authored")
     validate_partition_boundaries(external_cases, "external")
@@ -275,6 +290,7 @@ def _string_mapping(value: object) -> dict[str, str]:
 
 
 def main() -> None:
+    """Run the action-plane benchmark and write the JSON result artefact."""
     corpus = _load(_CORPUS)
     external = load_external_cases(_EXTERNAL_MANIFEST)
     result = evaluate(corpus, external_corpus=external)

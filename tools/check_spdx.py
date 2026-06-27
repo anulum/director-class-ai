@@ -22,6 +22,18 @@ _ROOTS = ("director_class_ai", "tests", "benchmarks", "tools", "demos")
 
 
 def offenders(repo_root: Path) -> list[Path]:
+    """Return tracked Python files that lack the BUSL SPDX header.
+
+    Parameters
+    ----------
+    repo_root
+        Repository root containing the configured source roots.
+
+    Returns
+    -------
+    list of Path
+        Python files whose header window does not contain the required SPDX tag.
+    """
     bad: list[Path] = []
     for root in _ROOTS:
         for path in (repo_root / root).rglob("*.py"):
@@ -34,6 +46,13 @@ def offenders(repo_root: Path) -> list[Path]:
 
 
 def main() -> int:
+    """Run the SPDX header scan for this repository checkout.
+
+    Returns
+    -------
+    int
+        ``0`` when all checked files contain the required tag, otherwise ``1``.
+    """
     bad = offenders(Path(__file__).resolve().parent.parent)
     for path in bad:
         print(f"missing SPDX header: {path}")
