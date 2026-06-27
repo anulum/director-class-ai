@@ -17,6 +17,7 @@ import director_class_ai.action.destructive_command as destructive
 from director_class_ai.action import DestructiveCommandDetector
 from director_class_ai.action._normalize import expand
 from director_class_ai.core import (
+    DetectorSignal,
     EvaluationRequest,
     ParallelEnsembleScorer,
     Plane,
@@ -26,8 +27,14 @@ from director_class_ai.core import (
 DET = DestructiveCommandDetector()
 
 
-def detect(command: str):
+def detect(command: str) -> DetectorSignal | None:
     return DET.evaluate(EvaluationRequest(action=command))
+
+
+def require_signal(command: str) -> DetectorSignal:
+    signal = detect(command)
+    assert signal is not None, command
+    return signal
 
 
 CATASTROPHIC_CRITICAL = [
@@ -126,23 +133,23 @@ def test_empty_action_returns_none() -> None:
 
 def test_highest_severity_wins_on_multiple_matches() -> None:
     # contains both a force-push (HIGH) and a DROP (CRITICAL)
-    sig = detect("git push --force && psql -c 'DROP TABLE t;'")
+    sig = require_signal("git push --force && psql -c 'DROP TABLE t;'")
     assert sig.severity is Severity.CRITICAL
 
 
 def test_whitespace_and_flag_variants_normalised() -> None:
-    assert detect("rm    -rf     /").severity is Severity.CRITICAL
-    assert detect("rm -fr /").severity is Severity.CRITICAL
+    assert require_signal("rm    -rf     /").severity is Severity.CRITICAL
+    assert require_signal("rm -fr /").severity is Severity.CRITICAL
 
 
 def test_rationale_is_populated() -> None:
-    assert "force-delete" in detect("rm -rf /etc/app").rationale
+    assert "force-delete" in require_signal("rm -rf /etc/app").rationale
 
 
 class TestPathAwareRm:
     def test_root_and_home_and_wildcard_are_critical(self) -> None:
         for cmd in ("rm -rf /", "rm -rf ~", "rm -rf /*", "rm -rf .", "rm -rf /root/*"):
-            assert detect(cmd).severity is Severity.CRITICAL, cmd
+            assert require_signal(cmd).severity is Severity.CRITICAL, cmd
 
     def test_absolute_system_path_is_high(self) -> None:
         for cmd in ("rm -rf /etc", "rm -rf /var/lib/data", "rm -rf /opt/x"):
@@ -151,7 +158,7 @@ class TestPathAwareRm:
 
     def test_long_flags_in_any_order_detected_as_recursive(self) -> None:
         # the force flag is evaluated before the recursive one — both orders work
-        assert detect("rm --force --recursive /etc").severity is Severity.HIGH
+        assert require_signal("rm --force --recursive /etc").severity is Severity.HIGH
 
     def test_project_local_and_scratch_paths_clear(self) -> None:
         for cmd in (
@@ -169,21 +176,22 @@ class TestPathAwareRm:
         assert detect("rm -f one.log") is None
 
     def test_parent_traversal_is_high(self) -> None:
-        assert detect("rm -rf ../sibling").severity is Severity.HIGH
+        assert require_signal("rm -rf ../sibling").severity is Severity.HIGH
 
     def test_printed_quoted_separator_does_not_hide_later_command(self) -> None:
-        assert detect("echo 'rm -rf /'; rm -rf /etc").severity is Severity.HIGH
+        assert require_signal("echo 'rm -rf /'; rm -rf /etc").severity is Severity.HIGH
 
     def test_obfuscated_recursive_root_rm_still_critical(self) -> None:
-        assert detect("r''m -rf /").severity is Severity.CRITICAL
+        assert require_signal("r''m -rf /").severity is Severity.CRITICAL
 
 
-def test_end_to_end_blocks_and_escalates_via_ensemble() -> None:
+def test_end_to_end_hard_blocks_never_soften_command_via_ensemble() -> None:
     ens = ParallelEnsembleScorer([DET])
     v = ens.evaluate(EvaluationRequest(action="rm -rf /"))
     assert v.allow is False
-    assert v.requires_human is True
+    assert v.requires_human is False
     assert any(s.signal_type == "destructive_command" for s in v.firing)
+    assert "never-soften" in v.rationale
 
 
 def test_safe_command_allowed_via_ensemble() -> None:
@@ -214,7 +222,7 @@ class TestRustDestructiveMatcherParity:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
-            destructive.importlib,
+            importlib,
             "import_module",
             lambda _: SimpleNamespace(destructive_match="not-callable"),
         )

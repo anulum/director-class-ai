@@ -26,10 +26,10 @@ def test_authorised_destructive_shell_workflow_executes_once(tmp_path: Path) -> 
     executor = _Executor()
 
     report = run_authorised_shell_workflow(
-        command="DROP TABLE staging_import",
+        command="chmod -R 777 /srv",
         queue_path=tmp_path / "approvals.json",
         approver="miroslav",
-        query="Drop the temporary staging_import table after the migration.",
+        query="Open the shared staging directory for the migration window.",
         executor=executor,
     )
 
@@ -45,12 +45,12 @@ def test_authorised_destructive_shell_workflow_executes_once(tmp_path: Path) -> 
     assert report.approved.executed is True
     assert report.approved.exit_code == 0
     assert report.approved.output_digest
-    assert executor.calls == ["DROP TABLE staging_import"]
+    assert executor.calls == ["chmod -R 777 /srv"]
 
     assert report.replay.permitted is False
     assert report.replay.executed is False
     assert report.replay.decision.escalated is True
-    assert executor.calls == ["DROP TABLE staging_import"]
+    assert executor.calls == ["chmod -R 777 /srv"]
 
     assert report.consumed_status == "consumed"
     assert report.pending_after_replay == 1
