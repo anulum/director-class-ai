@@ -191,6 +191,22 @@ def test_command_guard_options_parse_signed_audit_paths() -> None:
     assert options.audit_anchor_log == "/tmp/audit-anchor.jsonl"
 
 
+def test_run_guard_fails_when_audit_head_key_env_is_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("DCA_AUDIT_HEAD_KEY", raising=False)
+
+    with pytest.raises(ValueError, match="environment variable"):
+        run_guard(
+            _opts(
+                tmp_path,
+                audit_head_key_env="DCA_AUDIT_HEAD_KEY",
+                command=("echo", "ok"),
+            )
+        )
+
+
 def test_command_guard_options_parse_halt_state_path() -> None:
     options = CommandGuardOptions.from_argv(
         ("--halt-state", "/tmp/halt.json", "--", "noop")

@@ -16,6 +16,8 @@ from collections.abc import Mapping
 from contextlib import AbstractContextManager
 from pathlib import Path
 
+import pytest
+
 from director_class_ai.gateway import (
     MCP_AUTH_HEADER,
     MCPGatewayHTTPServer,
@@ -180,6 +182,14 @@ def test_service_health_reports_registry_count() -> None:
     assert response.body == {"status": "ok", "registration_count": 0}
 
 
+def test_service_rejects_duplicate_policy_sources(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="either capability_policy or policy_store"):
+        MCPGatewayService(
+            capability_policy=_capability_policy(),
+            policy_store=tmp_path / "policy.json",
+        )
+
+
 def test_service_dispatch_errors_are_json_responses() -> None:
     service = MCPGatewayService()
 
@@ -269,6 +279,67 @@ def test_service_review_blocks_when_halt_sidecar_is_active(tmp_path: Path) -> No
     assert response.body["permitted"] is False
     assert response.body["findings"] == ("sidecar_halt",)
     assert response.body["halt_reason"] == "incident"
+
+
+def test_service_response_blocks_when_halt_sidecar_is_active(tmp_path: Path) -> None:
+    halt_state = tmp_path / "halt.json"
+    LocalHaltSwitch(halt_state).halt(reason="incident", actor="operator-a")
+    service = MCPGatewayService(
+        config=MCPGatewayServiceConfig(halt_state=str(halt_state))
+    )
+
+    response = service.handle(
+        "POST",
+        "/v1/mcp/response",
+        {
+            "call": {"server": "fs", "tool": "read_file", "arguments": {}},
+            "output": "safe",
+        },
+    )
+
+    assert response.status == 403
+    assert response.body["route"] == "block"
+    assert response.body["findings"] == ("sidecar_halt",)
+
+
+def test_service_response_passes_without_halt_sidecar() -> None:
+    service = MCPGatewayService()
+
+    response = service.handle(
+        "POST",
+        "/v1/mcp/response",
+        {
+            "call": {"server": "fs", "tool": "read_file", "arguments": {}},
+            "output": "safe",
+            "content_type": 7,
+            "error": "false",
+            "provenance": 9,
+            "metadata": [],
+        },
+    )
+
+    assert response.status == 200
+    assert response.body["route"] == "allow"
+
+
+def test_service_response_passes_with_inactive_halt_sidecar(tmp_path: Path) -> None:
+    halt_state = tmp_path / "halt.json"
+    LocalHaltSwitch(halt_state).resume(reason="clear", actor="operator-a")
+    service = MCPGatewayService(
+        config=MCPGatewayServiceConfig(halt_state=str(halt_state))
+    )
+
+    response = service.handle(
+        "POST",
+        "/v1/mcp/response",
+        {
+            "call": {"server": "fs", "tool": "read_file", "arguments": {}},
+            "output": "safe",
+        },
+    )
+
+    assert response.status == 200
+    assert response.body["route"] == "allow"
 
 
 def test_service_review_preserves_argument_provenance_mapping() -> None:

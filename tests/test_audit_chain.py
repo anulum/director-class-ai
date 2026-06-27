@@ -177,6 +177,34 @@ def test_signed_head_anchor_blocks_replayed_signed_prefix(tmp_path) -> None:
     assert "anchor" in replayed.reason
 
 
+def test_signed_sink_requires_key_for_anchor(tmp_path) -> None:
+    with pytest.raises(ValueError, match="anchor_path requires head_signing_key"):
+        AuditChainSink(
+            path=tmp_path / "audit.jsonl",
+            anchor_path=tmp_path / "anchor.jsonl",
+        )
+
+
+def test_signed_head_verifies_without_anchor(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _signed_governor(p).review(EvaluationRequest(action="ls -la"))
+
+    verification = verify_chain(p, head_signing_key=b"test-signing-key")
+
+    assert verification.ok is True
+
+
+def test_verify_chain_uses_python_when_rust_verifier_unavailable(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    p = tmp_path / "audit.jsonl"
+    _populate(p)
+    monkeypatch.setattr(audit_chain, "_RUST_VERIFY_CHAIN", None)
+
+    assert verify_chain(p).ok is True
+
+
 def test_signed_verification_requires_signature_sidecar(tmp_path) -> None:
     p = tmp_path / "audit.jsonl"
     _signed_governor(p).review(EvaluationRequest(action="rm -rf /"))
@@ -373,10 +401,180 @@ def test_sink_reloads_head_after_partial_sidecar_failure(tmp_path, monkeypatch) 
     assert verify_chain(p).ok is True
 
 
+def test_anchor_verification_requires_signed_head(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _populate(p)
+
+    verification = verify_chain(p, anchor_path=tmp_path / "anchor.jsonl")
+
+    assert verification.ok is False
+    assert "requires head signature" in verification.reason
+
+
+def test_signed_verification_requires_head_sidecar(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _signed_governor(p).review(EvaluationRequest(action="ls -la"))
+    p.with_suffix(".jsonl.head").unlink()
+
+    verification = verify_chain(p, head_signing_key=b"test-signing-key")
+
+    assert verification.ok is False
+    assert "head sidecar" in verification.reason
+
+
+@pytest.mark.parametrize(
+    ("head_payload", "signature_payload"),
+    [
+        ("[]", "{}"),
+        ("{bad json", "{}"),
+        ('{"seq":"bad","entry_hash":"x"}', "{}"),
+    ],
+)
+def test_signed_head_metadata_corruption_is_rejected(
+    tmp_path,
+    head_payload: str,
+    signature_payload: str,
+) -> None:
+    p = tmp_path / "audit.jsonl"
+    _signed_governor(p).review(EvaluationRequest(action="ls -la"))
+    p.with_suffix(".jsonl.head").write_text(head_payload, encoding="utf-8")
+    p.with_suffix(".jsonl.head.sig").write_text(
+        signature_payload,
+        encoding="utf-8",
+    )
+
+    verification = verify_chain(p, head_signing_key=b"test-signing-key")
+
+    assert verification.ok is False
+    assert (
+        "metadata is corrupt" in verification.reason
+        or "head sidecar is corrupt" in verification.reason
+        or "head sidecar mismatch" in verification.reason
+    )
+
+
+def test_signed_head_rejects_algorithm_and_signature_mismatch(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _signed_governor(p).review(EvaluationRequest(action="ls -la"))
+    signature_path = p.with_suffix(".jsonl.head.sig")
+    signature = json.loads(signature_path.read_text(encoding="utf-8"))
+    signature["alg"] = "none"
+    signature_path.write_text(json.dumps(signature), encoding="utf-8")
+
+    bad_algorithm = verify_chain(p, head_signing_key=b"test-signing-key")
+    signature["alg"] = "HMAC-SHA256"
+    signature["signature"] = "0" * 64
+    signature_path.write_text(json.dumps(signature), encoding="utf-8")
+    bad_signature = verify_chain(p, head_signing_key=b"test-signing-key")
+
+    assert bad_algorithm.ok is False
+    assert "algorithm" in bad_algorithm.reason
+    assert bad_signature.ok is False
+    assert "mismatch" in bad_signature.reason
+
+
+def test_signed_head_rejects_corrupt_signature_sidecar(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _signed_governor(p).review(EvaluationRequest(action="ls -la"))
+    signature_path = p.with_suffix(".jsonl.head.sig")
+
+    signature_path.write_text("[]", encoding="utf-8")
+    non_object = verify_chain(p, head_signing_key=b"test-signing-key")
+    signature_path.write_text("{bad json", encoding="utf-8")
+    corrupt_json = verify_chain(p, head_signing_key=b"test-signing-key")
+
+    assert non_object.ok is False
+    assert "metadata is corrupt" in non_object.reason
+    assert corrupt_json.ok is False
+    assert "metadata is corrupt" in corrupt_json.reason
+
+
+@pytest.mark.parametrize(
+    ("anchor_payload", "reason"),
+    [
+        ("", "empty"),
+        ("{bad json\n", "corrupt"),
+        ("[]\n", "corrupt"),
+        ('{"alg":"none","signature":"x","head":{}}\n', "algorithm"),
+        ('{"alg":"HMAC-SHA256","signature":"x","head":{}}\n', "signature"),
+        ('{"alg":"HMAC-SHA256","signature":"__REAL__","head":[]}\n', "head mismatch"),
+        (
+            '{"alg":"HMAC-SHA256","signature":"__REAL__","head":{"seq":999}}\n',
+            "head mismatch",
+        ),
+    ],
+)
+def test_anchor_log_corruption_is_rejected(
+    tmp_path,
+    anchor_payload: str,
+    reason: str,
+) -> None:
+    p = tmp_path / "audit.jsonl"
+    anchor = tmp_path / "anchor.jsonl"
+    _signed_governor(p, anchor_path=anchor).review(EvaluationRequest(action="ls -la"))
+    if anchor_payload:
+        if "__REAL__" in anchor_payload:
+            signature = json.loads(
+                p.with_suffix(".jsonl.head.sig").read_text(encoding="utf-8")
+            )["signature"]
+            anchor_payload = anchor_payload.replace("__REAL__", signature)
+        anchor.write_text(anchor_payload, encoding="utf-8")
+    else:
+        anchor.write_text("", encoding="utf-8")
+
+    verification = verify_chain(
+        p,
+        head_signing_key=b"test-signing-key",
+        anchor_path=anchor,
+    )
+
+    assert verification.ok is False
+    assert reason in verification.reason
+
+
+def test_missing_anchor_log_is_rejected(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    anchor = tmp_path / "anchor.jsonl"
+    _signed_governor(p).review(EvaluationRequest(action="ls -la"))
+
+    verification = verify_chain(
+        p,
+        head_signing_key=b"test-signing-key",
+        anchor_path=anchor,
+    )
+
+    assert verification.ok is False
+    assert "anchor log does not exist" in verification.reason
+
+
+def test_anchor_verification_uses_latest_nonblank_anchor(tmp_path) -> None:
+    p = tmp_path / "audit.jsonl"
+    anchor = tmp_path / "anchor.jsonl"
+    _signed_governor(p, anchor_path=anchor).review(EvaluationRequest(action="ls -la"))
+    anchor.write_text("\n" + anchor.read_text(encoding="utf-8"), encoding="utf-8")
+
+    verification = verify_chain(
+        p,
+        head_signing_key=b"test-signing-key",
+        anchor_path=anchor,
+    )
+
+    assert verification.ok is True
+
+
 class TestRustAuditPrimitivesParity:
     def test_loader_ignores_missing_callables(self, monkeypatch) -> None:
         module = SimpleNamespace(audit_entry_hash=object(), audit_verify_chain=object())
         monkeypatch.setattr(importlib, "import_module", lambda _: module)
+        assert audit_chain._load_rust_entry_hash() is None
+        assert audit_chain._load_rust_verify_chain() is None
+
+    def test_loaders_return_none_when_extension_is_absent(self, monkeypatch) -> None:
+        def missing_extension(_name: str) -> object:
+            raise ImportError("extension absent")
+
+        monkeypatch.setattr(importlib, "import_module", missing_extension)
+
         assert audit_chain._load_rust_entry_hash() is None
         assert audit_chain._load_rust_verify_chain() is None
 

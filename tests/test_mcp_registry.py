@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import director_class_ai.action.mcp_registry as mcp_registry
 from director_class_ai.action.mcp_inspector import MCP_CALL_KEY, MCPToolCall
 from director_class_ai.action.mcp_registry import MCPToolRegistration, MCPTrustRegistry
 from director_class_ai.core import EvaluationRequest, Severity
@@ -242,6 +243,30 @@ def test_cross_server_edit_distance_lookalike_tool_is_detected() -> None:
     assert sig.signal_type == "mcp_lookalike_tool"
 
 
+def test_exact_cross_server_tool_name_is_reported_as_lookalike() -> None:
+    registry = MCPTrustRegistry([_registration()])
+    sig = registry.evaluate(
+        EvaluationRequest(
+            metadata={MCP_CALL_KEY: _call(server="remote-fs", tool="read_file")}
+        )
+    )
+
+    assert sig is not None
+    assert sig.signal_type == "mcp_lookalike_tool"
+
+
+def test_two_difference_tool_name_is_not_a_lookalike() -> None:
+    registry = MCPTrustRegistry([_registration()])
+    sig = registry.evaluate(
+        EvaluationRequest(
+            metadata={MCP_CALL_KEY: _call(server="remote-fs", tool="write_blob")}
+        )
+    )
+
+    assert sig is not None
+    assert sig.signal_type == "mcp_unknown_tool"
+
+
 def test_dynamic_discovery_keeps_cross_server_lookalike_blocked() -> None:
     registry = MCPTrustRegistry([_registration()], allow_dynamic_discovery=True)
     sig = registry.evaluate(
@@ -252,6 +277,13 @@ def test_dynamic_discovery_keeps_cross_server_lookalike_blocked() -> None:
 
     assert sig is not None
     assert sig.signal_type == "mcp_lookalike_tool"
+
+
+def test_edit_distance_helper_covers_boundary_shapes() -> None:
+    assert mcp_registry._edit_distance_at_most_one("read", "read") is True
+    assert mcp_registry._edit_distance_at_most_one("read", "road") is True
+    assert mcp_registry._edit_distance_at_most_one("read", "wxyz") is False
+    assert mcp_registry._edit_distance_at_most_one("read", "reads") is True
 
 
 def test_missing_required_argument_is_denied() -> None:
@@ -378,6 +410,110 @@ def test_array_item_argument_schema_violation_is_denied() -> None:
     assert sig is not None
     assert sig.signal_type == "mcp_argument_schema_violation"
     assert "argument 'paths[1]' must be string" in sig.rationale
+
+
+def test_array_without_item_schema_is_accepted() -> None:
+    argument_schema = {
+        "properties": {"paths": {"type": "array"}},
+        "required": ["paths"],
+    }
+    registration = MCPToolRegistration(
+        server="fs",
+        tool="read_file",
+        server_identity={"name": "local-fs", "transport": "stdio"},
+        tool_schema={"description": "read project files", "mode": "read"},
+        argument_schema=argument_schema,
+    )
+    registry = MCPTrustRegistry([registration])
+
+    assert (
+        registry.evaluate(
+            EvaluationRequest(
+                metadata={
+                    MCP_CALL_KEY: _call(
+                        arguments={"paths": ["README.md", 7]},
+                        tool_schema=registration.tool_schema,
+                        argument_schema=argument_schema,
+                    )
+                }
+            )
+        )
+        is None
+    )
+
+
+def test_schema_helper_accepts_valid_array_items_and_unknown_types() -> None:
+    assert (
+        mcp_registry._array_schema_violation(
+            ["README.md"],
+            {"items": {"type": "string"}},
+            "paths",
+        )
+        == ""
+    )
+    assert mcp_registry._array_schema_violation(["README.md"], {}, "paths") == ""
+    assert mcp_registry._matches_schema_type("value", "unsupported") is False
+
+
+def test_scalar_json_schema_types_enum_and_const_are_enforced() -> None:
+    argument_schema = {
+        "properties": {
+            "ratio": {"type": "number"},
+            "dry_run": {"type": "boolean"},
+            "sentinel": {"type": "null"},
+            "mode": {"enum": ["read"]},
+            "version": {"const": 1},
+        },
+        "required": ["ratio", "dry_run", "sentinel", "mode", "version"],
+    }
+    registration = MCPToolRegistration(
+        server="fs",
+        tool="read_file",
+        server_identity={"name": "local-fs", "transport": "stdio"},
+        tool_schema={"description": "read a project file", "mode": "read"},
+        argument_schema=argument_schema,
+    )
+    registry = MCPTrustRegistry([registration])
+    clean = _call(
+        arguments={
+            "ratio": 0.5,
+            "dry_run": False,
+            "sentinel": None,
+            "mode": "read",
+            "version": 1,
+        },
+        argument_schema=argument_schema,
+    )
+    bad_enum = _call(
+        arguments={
+            "ratio": 0.5,
+            "dry_run": False,
+            "sentinel": None,
+            "mode": "write",
+            "version": 1,
+        },
+        argument_schema=argument_schema,
+    )
+    bad_const = _call(
+        arguments={
+            "ratio": 0.5,
+            "dry_run": False,
+            "sentinel": None,
+            "mode": "read",
+            "version": 2,
+        },
+        argument_schema=argument_schema,
+    )
+
+    assert registry.evaluate(EvaluationRequest(metadata={MCP_CALL_KEY: clean})) is None
+    enum_signal = registry.evaluate(EvaluationRequest(metadata={MCP_CALL_KEY: bad_enum}))
+    const_signal = registry.evaluate(
+        EvaluationRequest(metadata={MCP_CALL_KEY: bad_const})
+    )
+    assert enum_signal is not None
+    assert "enum" in enum_signal.rationale
+    assert const_signal is not None
+    assert "const" in const_signal.rationale
 
 
 def test_schema_drift_is_detected() -> None:

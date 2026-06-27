@@ -32,6 +32,7 @@ from director_class_ai.policy import (
     CapabilityGrant,
     PolicyGovernance,
     Profile,
+    resolve_runtime_posture,
 )
 from director_class_ai.sdk import ToolReviewMiddleware, ToolReviewRequest
 
@@ -158,6 +159,29 @@ class TestGovernanceToPolicyBridge:
         )
         active = PolicyGovernance.load(str(store)).active_fusion_policy()
         assert active == profile.to_fusion_policy()
+
+    def test_matching_live_profile_does_not_emit_runtime_drift(
+        self, tmp_path: Path
+    ) -> None:
+        store = tmp_path / "policy.json"
+        _approved_ledger(store, action_block_threshold=0.7, uncertainty_margin=0.0)
+        live = tmp_path / "live.toml"
+        live.write_text(
+            'name = "staging"\n'
+            "action_block_threshold = 0.7\n"
+            "uncertainty_margin = 0.0\n"
+            'capability_profile = "deny_all_actions"\n',
+            encoding="utf-8",
+        )
+
+        posture = resolve_runtime_posture(
+            str(store),
+            live_profile=live,
+            detected_at="t2",
+        )
+
+        assert posture.blocked is False
+        assert posture.drift_event is None
 
     def test_approved_head_yields_its_capability_policy(self, tmp_path: Path) -> None:
         store = tmp_path / "policy.json"

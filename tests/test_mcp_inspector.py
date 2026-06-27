@@ -367,6 +367,27 @@ class TestRustMCPScannerParity:
         monkeypatch.setattr(importlib, "import_module", lambda _: module)
         assert mcp_inspector._load_rust_mcp_scan() is None
 
+    def test_loader_returns_none_when_extension_is_absent(self, monkeypatch) -> None:
+        def missing_extension(_name: str) -> object:
+            raise ImportError("extension absent")
+
+        monkeypatch.setattr(importlib, "import_module", missing_extension)
+
+        assert mcp_inspector._load_rust_mcp_scan() is None
+
+    def test_scan_structural_uses_python_when_rust_scanner_is_absent(
+        self, monkeypatch
+    ) -> None:
+        call = MCPToolCall(
+            "fs",
+            "read_note",
+            {"text": "ok"},
+            arg_provenance={"text": "retrieved"},
+        )
+        monkeypatch.setattr(mcp_inspector, "_RUST_MCP_SCAN", None)
+
+        assert mcp_inspector._scan_structural(call) == mcp_inspector._scan_python(call)
+
     def test_rust_result_converter_handles_absent_and_unknown(self) -> None:
         assert mcp_inspector._rust_scan_to_python(None) is None
         assert mcp_inspector._rust_scan_to_python((0.1, "unknown", "x")) is None

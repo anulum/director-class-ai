@@ -167,6 +167,22 @@ def test_main_verifies_signed_head_from_env(
     assert captured.err == ""
 
 
+def test_main_fails_when_head_key_env_is_missing(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    source = tmp_path / "audit.jsonl"
+    monkeypatch.delenv("DCA_AUDIT_HEAD_KEY", raising=False)
+    _populate(source)
+
+    code = main((str(source), "--head-signing-key-env", "DCA_AUDIT_HEAD_KEY"))
+    captured = capsys.readouterr()
+
+    assert code == 2
+    assert "environment variable" in captured.err
+
+
 def test_main_writes_stdout_jsonl(capsys, tmp_path: Path) -> None:
     source = tmp_path / "audit.jsonl"
     _populate(source)

@@ -301,6 +301,32 @@ def test_default_halt_sidecar_blocks_before_execution_and_audits(
     assert verify_chain(audit_log).ok
 
 
+def test_review_consults_halt_sidecar_before_governor(tmp_path: Path) -> None:
+    halt_state = tmp_path / "halt.json"
+    LocalHaltSwitch(halt_state).halt(reason="incident", actor="operator-a")
+    request = ToolReviewRequest("fs.read", dry_run=False)
+
+    decision = ToolReviewMiddleware.default(halt_state=halt_state).review(request)
+
+    assert decision.route == "block"
+    assert decision.firing == ("sidecar_halt",)
+    assert decision.executed is False
+
+
+def test_non_halted_sidecar_allows_review_and_run_paths(tmp_path: Path) -> None:
+    spy = _ExecutorSpy()
+    halt_state = tmp_path / "halt.json"
+    request = ToolReviewRequest("fs.read", dry_run=False)
+    middleware = ToolReviewMiddleware.default(halt_state=halt_state, executor=spy)
+
+    reviewed = middleware.review(request)
+    executed = middleware.run(request)
+
+    assert reviewed.route == "allow"
+    assert executed.executed is True
+    assert spy.calls == [request]
+
+
 def test_default_rejects_duplicate_halt_sources(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="halt_switch or halt_state"):
         ToolReviewMiddleware.default(

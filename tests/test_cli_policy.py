@@ -249,6 +249,49 @@ def test_self_approval_is_rejected(
     assert "error:" in err
 
 
+def test_deny_marks_pending_proposal_rejected(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    store = tmp_path / "gov.json"
+    profile = _profile_toml(tmp_path / "p.toml", threshold=0.3)
+    rc, proposal = _run(
+        [
+            "propose",
+            "--store",
+            str(store),
+            "--profile",
+            str(profile),
+            "--proposer",
+            "alice",
+            "--reason",
+            "candidate",
+            "--at",
+            "t0",
+        ],
+        capsys,
+    )
+    assert rc == 0
+
+    rc, denied = _run(
+        [
+            "deny",
+            "--store",
+            str(store),
+            "--digest",
+            proposal["digest"],
+            "--reviewer",
+            "bob",
+            "--at",
+            "t1",
+        ],
+        capsys,
+    )
+
+    assert rc == 0
+    assert denied["status"] == "denied"
+    assert denied["reviewer"] == "bob"
+
+
 def test_expose_reports_transitions(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

@@ -219,9 +219,18 @@ def test_manual_decision_routes_cover_allow_and_approved_human() -> None:
         control["framework"] == "MCP security considerations"
         for control in approved.to_json()["controls"]
     )
-    assert any(
-        tag["technique_id"] == "AML.T0061" for tag in approved.to_json()["technique_tags"]
+
+
+def test_manual_pending_human_decision_records_pending_state() -> None:
+    pending = build_evidence_package(
+        _manual_decision(permitted=False, escalated=True, requires_human=True),
+        policy_profile="pilot",
     )
+    payload = pending.to_json()
+
+    assert payload["action_route"] == "human"
+    assert payload["approval_state"] == "denied_or_pending"
+    assert any(tag["technique_id"] == "AML.T0061" for tag in payload["technique_tags"])
 
 
 def test_malformed_capability_projection_defaults_empty(tmp_path: Path) -> None:
@@ -345,3 +354,33 @@ def test_incident_replay_covers_allow_and_block_routes() -> None:
     assert allowed.route_conformant is True
     assert blocked.observed_route == "block"
     assert blocked.route_conformant is True
+
+
+def test_incident_replay_covers_human_route() -> None:
+    class _HumanDetector:
+        name = "human_detector"
+        plane = Plane.ACTION
+        tier = 0
+
+        def evaluate(self, request: EvaluationRequest) -> DetectorSignal:
+            return DetectorSignal(
+                detector=self.name,
+                plane=Plane.ACTION,
+                score=0.2,
+                locus=Locus.ACTION,
+                signal_type="manual_review",
+                severity=Severity.MEDIUM,
+            )
+
+    result = replay_incident(
+        IncidentReplayFixture(
+            fixture_id="human",
+            request=EvaluationRequest(action="chmod -R 777 /srv"),
+            expected_route="human",
+            source_evidence_digest="source",
+        ),
+        ParallelEnsembleScorer([_HumanDetector()]),
+    )
+
+    assert result.observed_route == "human"
+    assert result.route_conformant is True

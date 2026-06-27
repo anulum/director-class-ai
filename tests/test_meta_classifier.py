@@ -167,6 +167,52 @@ class TestRustMetaClassifierParity:
         assert meta_classifier._load_rust_risk() is None
         assert meta_classifier._load_rust_fit() is None
 
+    def test_loaders_return_none_when_extension_is_absent(self, monkeypatch) -> None:
+        def missing_extension(_name: str) -> object:
+            raise ImportError("extension absent")
+
+        monkeypatch.setattr(importlib, "import_module", missing_extension)
+
+        assert meta_classifier._load_rust_extract_features() is None
+        assert meta_classifier._load_rust_risk() is None
+        assert meta_classifier._load_rust_fit() is None
+
+    def test_python_paths_are_used_when_rust_primitives_are_absent(
+        self, monkeypatch
+    ) -> None:
+        signals = [_sig(score=0.7)]
+        observations = [([_sig(score=0.1)], 0), ([_sig(score=0.9)], 1)]
+        monkeypatch.setattr(meta_classifier, "_RUST_EXTRACT_FEATURES", None)
+        monkeypatch.setattr(meta_classifier, "_RUST_RISK", None)
+        monkeypatch.setattr(meta_classifier, "_RUST_FIT", None)
+
+        assert meta_classifier.extract_signal_features(signals) == (
+            meta_classifier._extract_signal_features_python(signals)
+        )
+        model = SignalMetaClassifier(weights={"max_score": 1.0}, bias=0.0)
+        assert model.risk(signals) == pytest.approx(
+            meta_classifier._sigmoid(
+                model.weights["max_score"]
+                * meta_classifier._extract_signal_features_python(signals)["max_score"]
+            )
+        )
+        assert fit_signal_meta_classifier(observations, iters=20, lr=0.2) == (
+            meta_classifier._fit_signal_meta_classifier_python(
+                [
+                    (meta_classifier._extract_signal_features_python(row), label)
+                    for row, label in observations
+                ],
+                {
+                    name
+                    for row, _label in observations
+                    for name in meta_classifier._extract_signal_features_python(row)
+                },
+                iters=20,
+                lr=0.2,
+                l2=0.001,
+            )
+        )
+
     def test_feature_mismatch_falls_back_to_python(self, monkeypatch) -> None:
         signals = [_sig(score=0.7)]
         monkeypatch.setattr(

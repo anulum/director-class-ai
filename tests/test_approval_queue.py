@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from director_class_ai.approvals import ApprovalPolicy, ApprovalQueue
@@ -150,6 +152,85 @@ class TestApprovalQueue:
         t = q.get(_digest())
         assert t is not None and t.digest == _digest()
         assert q.get("nope") is None
+
+    def test_rejects_corrupt_queue_document(self, tmp_path) -> None:
+        path = tmp_path / "q.json"
+        path.write_text("[]", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="JSON object"):
+            ApprovalQueue(path).pending()
+
+    def test_rejects_corrupt_queue_entry(self, tmp_path) -> None:
+        path = tmp_path / "q.json"
+        path.write_text(json.dumps({"digest": "not-a-ticket"}), encoding="utf-8")
+
+        with pytest.raises(ValueError, match="ticket objects"):
+            ApprovalQueue(path).pending()
+
+    def test_legacy_single_approver_is_migrated(self, tmp_path) -> None:
+        path = tmp_path / "q.json"
+        digest = _digest()
+        path.write_text(
+            json.dumps(
+                {
+                    digest: {
+                        "digest": digest,
+                        "status": "approved",
+                        "created_at": 1,
+                        "decided_at": 2,
+                        "approver": "alice",
+                        "approvers": [],
+                        "required_approvals": 1,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        ticket = ApprovalQueue(path).get(digest)
+
+        assert ticket is not None
+        assert ticket.approvers == ("alice",)
+
+    def test_pending_ticket_required_approvals_can_increase(self, tmp_path) -> None:
+        q = ApprovalQueue(tmp_path / "q.json")
+        q.request_approval(None, _req())
+        verdict = Verdict(False, 0.97, True, firing=(_sig(Severity.CRITICAL),))
+
+        assert q.request_approval(verdict, _req()) is False
+
+        ticket = q.get(_digest())
+        assert ticket is not None
+        assert ticket.required_approvals == 2
+
+    def test_blank_approver_is_rejected(self, tmp_path) -> None:
+        q = ApprovalQueue(tmp_path / "q.json")
+        q.request_approval(None, _req())
+
+        with pytest.raises(ValueError, match="approver is required"):
+            q.approve(_digest(), approver="  ")
+
+    def test_invalid_required_approvals_defaults_to_one(self, tmp_path) -> None:
+        path = tmp_path / "q.json"
+        digest = _digest()
+        path.write_text(
+            json.dumps(
+                {
+                    digest: {
+                        "digest": digest,
+                        "status": "pending",
+                        "created_at": 1,
+                        "required_approvals": 0,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        ticket = ApprovalQueue(path).get(digest)
+
+        assert ticket is not None
+        assert ticket.required_approvals == 1
 
 
 def _sig(sev: Severity) -> DetectorSignal:

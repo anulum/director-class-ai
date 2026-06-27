@@ -14,6 +14,8 @@ from director_class_ai.action import (
     MCP_CALL_KEY,
     MCPToolCall,
     MCPToolRegistration,
+    MemoryActionContext,
+    MemoryPlanDelta,
     MemoryWriteContract,
     RemanentiaMemoryGovernanceDetector,
 )
@@ -269,3 +271,236 @@ def test_service_response_secret_review_is_redacted(tmp_path: Path) -> None:
     assert response.body["route"] == "block"
     assert response.body["firing"] == ("memory_secret_leakage",)
     assert "sk-" not in repr(response.body)
+
+
+def test_detector_ignores_remanentia_server_with_unknown_operation() -> None:
+    call = MCPToolCall(
+        server="remanentia",
+        tool="remanentia_ping",
+        arguments={},
+        server_identity={"name": "remanentia"},
+    )
+
+    signal = RemanentiaMemoryGovernanceDetector().evaluate(
+        EvaluationRequest(metadata={MCP_CALL_KEY: call})
+    )
+
+    assert signal is None
+
+
+def test_detector_uses_explicit_memory_context_mapping() -> None:
+    contract = MemoryWriteContract(
+        source="operator",
+        tenant="tenant-a",
+        scope="project",
+        expires_at=20,
+        trust_tier="curated",
+        allowed_retrieval_contexts=("director-class-ai",),
+    ).signed()
+    call = MCPToolCall(
+        server="remanentia",
+        tool="remanentia_remember",
+        arguments={"content": "safe preference"},
+        default_provenance="operator",
+        server_identity={"name": "remanentia"},
+    )
+
+    signal = RemanentiaMemoryGovernanceDetector().evaluate(
+        EvaluationRequest(
+            tenant_id="tenant-a",
+            metadata={
+                MCP_CALL_KEY: call,
+                "remanentia_memory_context": {
+                    "tenant": "tenant-a",
+                    "retrieval_context": "director-class-ai",
+                    "now": 10,
+                    "contract": contract.__dict__,
+                    "plan_delta": {
+                        "user_goal": "summarize notes",
+                        "current_plan": "read notes",
+                        "retrieved_context": "stable context",
+                        "proposed_next_action": "read notes",
+                    },
+                    "memory_text": "safe preference",
+                    "memory_source": "operator",
+                },
+            },
+        )
+    )
+
+    assert signal is None
+
+
+def test_detector_uses_explicit_memory_context_object_for_write() -> None:
+    context = MemoryActionContext(
+        tenant="tenant-a",
+        retrieval_context="director-class-ai",
+        now=10,
+        contract=MemoryWriteContract(
+            source="operator",
+            tenant="tenant-a",
+            scope="project",
+            expires_at=20,
+            trust_tier="curated",
+            allowed_retrieval_contexts=("director-class-ai",),
+        ).signed(),
+        plan_delta=MemoryPlanDelta(
+            user_goal="summarize notes",
+            current_plan="read notes",
+            retrieved_context="stable context",
+            proposed_next_action="read notes",
+        ),
+        memory_text="safe preference",
+        memory_source="operator",
+    )
+    call = MCPToolCall(
+        server="remanentia",
+        tool="store",
+        arguments={"memory": "safe preference"},
+        default_provenance="operator",
+        server_identity={"name": "remanentia"},
+    )
+
+    signal = RemanentiaMemoryGovernanceDetector().evaluate(
+        EvaluationRequest(
+            metadata={MCP_CALL_KEY: call, "remanentia_memory_context": context}
+        )
+    )
+
+    assert signal is None
+
+
+def test_detector_accepts_typed_contract_and_plan_delta_mapping() -> None:
+    contract = MemoryWriteContract(
+        source="operator",
+        tenant="tenant-a",
+        scope="project",
+        expires_at=20,
+        trust_tier="curated",
+        allowed_retrieval_contexts=("director-class-ai",),
+    ).signed()
+    call = MCPToolCall(
+        server="remanentia",
+        tool="remember",
+        arguments={
+            "content": "safe preference",
+            "project": "director-class-ai",
+            "tenant": "tenant-a",
+            "now": "10",
+            "memory_source": "operator",
+            "contract": contract,
+            "plan_delta": {
+                "user_goal": "summarize notes",
+                "current_plan": "read notes",
+                "retrieved_context": "stable context",
+                "proposed_next_action": "read notes",
+            },
+        },
+        default_provenance="operator",
+        server_identity={"name": "remanentia"},
+    )
+
+    signal = RemanentiaMemoryGovernanceDetector().evaluate(
+        EvaluationRequest(
+            query="summarize notes",
+            context="read notes",
+            action="read notes",
+            tenant_id="tenant-a",
+            metadata={MCP_CALL_KEY: call},
+        )
+    )
+
+    assert signal is None
+
+
+def test_detector_treats_nonnumeric_now_as_zero() -> None:
+    call = _remember_request(now=object()).call
+
+    signal = RemanentiaMemoryGovernanceDetector().evaluate(
+        EvaluationRequest(
+            query="remember",
+            tenant_id="tenant-a",
+            metadata={MCP_CALL_KEY: call},
+        )
+    )
+
+    assert signal is None
+
+
+def test_detector_routes_recall_label_mutations_to_human() -> None:
+    detector = RemanentiaMemoryGovernanceDetector()
+    by_correctness = MCPToolCall(
+        server="remanentia",
+        tool="recall_feedback",
+        arguments={"was_correct": "false"},
+        server_identity={"name": "remanentia"},
+    )
+    by_usage = MCPToolCall(
+        server="remanentia",
+        tool="recall_feedback",
+        arguments={"was_used": "false"},
+        server_identity={"name": "remanentia"},
+    )
+    by_query = MCPToolCall(
+        server="remanentia",
+        tool="recall_feedback",
+        arguments={"query": "deployment token"},
+        server_identity={"name": "remanentia"},
+    )
+
+    signals = [
+        detector.evaluate(EvaluationRequest(metadata={MCP_CALL_KEY: call}))
+        for call in (by_correctness, by_usage, by_query)
+    ]
+
+    assert [signal.signal_type if signal is not None else "" for signal in signals] == [
+        "remanentia_memory_mutation_approval",
+        "remanentia_memory_mutation_approval",
+        "remanentia_memory_mutation_approval",
+    ]
+
+
+def test_detector_blocks_secret_bearing_recall_action() -> None:
+    call = MCPToolCall(
+        server="remanentia",
+        tool="recall",
+        arguments={"query": "token"},
+        server_identity={"name": "remanentia"},
+    )
+
+    signal = RemanentiaMemoryGovernanceDetector().evaluate(
+        EvaluationRequest(
+            action="recalled access_token=ghp_1234567890abcdef1234567890",
+            metadata={MCP_CALL_KEY: call},
+        )
+    )
+
+    assert signal is not None
+    assert signal.signal_type == "memory_secret_leakage"
+
+
+def test_detector_parses_string_now_and_treats_boolean_now_as_zero() -> None:
+    detector = RemanentiaMemoryGovernanceDetector()
+    valid = _remember_request(now="10").call
+    invalid = _remember_request(now=True).call
+
+    assert (
+        detector.evaluate(
+            EvaluationRequest(
+                query="remember",
+                tenant_id="tenant-a",
+                metadata={MCP_CALL_KEY: valid},
+            )
+        )
+        is None
+    )
+    assert (
+        detector.evaluate(
+            EvaluationRequest(
+                query="remember",
+                tenant_id="tenant-a",
+                metadata={MCP_CALL_KEY: invalid},
+            )
+        )
+        is None
+    )

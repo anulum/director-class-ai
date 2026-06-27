@@ -229,6 +229,24 @@ class TestRustDestructiveMatcherParity:
 
         assert destructive._load_rust_match() is None
 
+    def test_loader_returns_none_when_extension_is_absent(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def missing_extension(_name: str) -> object:
+            raise ImportError("extension absent")
+
+        monkeypatch.setattr(importlib, "import_module", missing_extension)
+
+        assert destructive._load_rust_match() is None
+
+    def test_match_forms_uses_python_when_rust_loader_returns_none(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        forms = expand("rm -rf /")
+        monkeypatch.setattr(destructive, "_load_rust_match", lambda: None)
+
+        assert destructive._match_forms(forms) == destructive._match_python(forms)
+
     def test_rust_none_match_converts_to_empty_python_match(self) -> None:
         assert destructive._rust_match_to_python(None) == (None, "", "")
 

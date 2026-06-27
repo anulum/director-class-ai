@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 from director_class_ai.core.signal import Locus, Plane, Severity
+from director_class_ai.policy import BlastRadius
 from director_class_ai.policy.corpus import (
     case_from_mapping,
     load_cases,
@@ -108,6 +109,54 @@ def test_case_from_mapping_with_capability_context_and_grants() -> None:
     assert len(case.capability_grants) == 1
     assert case.capability_grants[0].grant_id == "read-workspace"
     assert case.capability_grants[0].max_blast_radius.name == "LOW"
+
+
+def test_case_from_mapping_accepts_numeric_blast_radius() -> None:
+    case = case_from_mapping(
+        {
+            "label": "workspace-read",
+            "signals": [],
+            "capability_grants": [
+                {
+                    "grant_id": "read-workspace",
+                    "subject": "agent-a",
+                    "tenant": "tenant-a",
+                    "session": "session-a",
+                    "source_origin": "user",
+                    "tool": "fs/read_file",
+                    "resource": "workspace:README.md",
+                    "action": "read",
+                    "max_blast_radius": 1,
+                }
+            ],
+        }
+    )
+
+    assert case.capability_grants[0].max_blast_radius is BlastRadius.LOW
+
+
+def test_case_from_mapping_accepts_blast_radius_enum() -> None:
+    case = case_from_mapping(
+        {
+            "label": "workspace-read",
+            "signals": [],
+            "capability_grants": [
+                {
+                    "grant_id": "read-workspace",
+                    "subject": "agent-a",
+                    "tenant": "tenant-a",
+                    "session": "session-a",
+                    "source_origin": "user",
+                    "tool": "fs/read_file",
+                    "resource": "workspace:README.md",
+                    "action": "read",
+                    "max_blast_radius": BlastRadius.LOW,
+                }
+            ],
+        }
+    )
+
+    assert case.capability_grants[0].max_blast_radius is BlastRadius.LOW
 
 
 def test_case_from_mapping_defaults_provenance_empty() -> None:

@@ -24,6 +24,7 @@ from director_class_ai.detectors import (
     LLMJudgeDetector,
     prompt_judge,
 )
+from director_class_ai.detectors.llm_judge import _coerce_probability, _score_from_json
 
 
 def const_judge(score: float, rationale: str = "r"):
@@ -38,6 +39,31 @@ class TestPromptJudge:
     def test_parses_json_risk_field(self) -> None:
         j = prompt_judge(lambda _p: '{"risk": 0.7, "reason": "quoted"}', lens="?")
         assert j(EvaluationRequest(response="x")).score == pytest.approx(0.7)
+
+    def test_parses_json_score_field(self) -> None:
+        j = prompt_judge(lambda _p: '{"score": "0.6"}', lens="?")
+        assert j(EvaluationRequest(response="x")).score == pytest.approx(0.6)
+
+    @pytest.mark.parametrize(
+        "completion",
+        [
+            '{"risk": true}',
+            '{"risk": "not-a-number"}',
+            '{"risk": 1.5}',
+            "{bad json",
+        ],
+    )
+    def test_rejects_non_probability_json_scores(self, completion: str) -> None:
+        j = prompt_judge(lambda _p: completion, lens="?")
+        assert j(EvaluationRequest(response="x")).score == pytest.approx(0.0)
+
+    def test_non_mapping_json_can_still_fall_back_to_text_score(self) -> None:
+        j = prompt_judge(lambda _p: '["risk", 0.7]', lens="?")
+        assert j(EvaluationRequest(response="x")).score == pytest.approx(0.7)
+
+    def test_probability_helpers_reject_unscored_objects(self) -> None:
+        assert _coerce_probability(object()) is None
+        assert _score_from_json('{"reason":"safe"}') is None
 
     def test_uses_last_numeric_token_only_when_it_is_a_probability(self) -> None:
         j = prompt_judge(lambda _p: "safe after review; final score 0.2", lens="?")

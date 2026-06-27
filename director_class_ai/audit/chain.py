@@ -397,7 +397,12 @@ def _verify_chain_python(path: Path) -> ChainVerification:
 
     head_path = path.with_suffix(path.suffix + ".head")
     if head_path.exists():
-        head = json.loads(head_path.read_text(encoding="utf-8"))
+        try:
+            head = json.loads(head_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return ChainVerification(False, last_seq, "head sidecar is corrupt")
+        if not isinstance(head, dict):
+            return ChainVerification(False, last_seq, "head sidecar is corrupt")
         if head.get("seq") != last_seq or head.get("entry_hash") != last_hash:
             if (
                 last_seq == previous_seq + 1

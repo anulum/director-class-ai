@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 import director_class_ai.action._normalize as normalize
-from director_class_ai.action import DestructiveCommandDetector
+from director_class_ai.action import DestructiveCommandDetector, _shell_segments
 from director_class_ai.action._normalize import (
     _expand_python,
     expand,
@@ -71,6 +71,9 @@ class TestExpand:
     def test_safe_command_expands_to_safe_forms(self) -> None:
         for f in expand("git push origin feature"):
             assert "rm -rf" not in f and "drop" not in f.lower()
+
+    def test_invalid_shell_assignment_name_is_not_classified(self) -> None:
+        assert _shell_segments._is_shell_assignment("1BAD=rm") is False
 
 
 class TestEvasionCaught:
@@ -387,6 +390,23 @@ class TestRustExpandParity:
         )
 
         assert normalize._load_rust_expand() is None
+
+    def test_loader_returns_none_when_extension_is_absent(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def missing_extension(_name: str) -> object:
+            raise ImportError("extension absent")
+
+        monkeypatch.setattr(normalize.importlib, "import_module", missing_extension)
+
+        assert normalize._load_rust_expand() is None
+
+    def test_public_expand_uses_python_when_rust_loader_returns_none(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(normalize, "_load_rust_expand", lambda: None)
+
+        assert normalize.expand("rm -r -f /") == _expand_python("rm -r -f /")
 
     def test_public_expand_accepts_exact_rust_parity(
         self, monkeypatch: pytest.MonkeyPatch
