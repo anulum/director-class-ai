@@ -161,25 +161,23 @@ class FusionPolicy:
 
     def uncertainty_margin_for(self, plane: Plane) -> float:
         """Return the review band configured for one signal plane."""
-        match plane:
-            case Plane.CONTENT:
-                return (
-                    self.uncertainty_margin
-                    if self.content_uncertainty_margin is None
-                    else self.content_uncertainty_margin
-                )
-            case Plane.INTEGRITY:
-                return (
-                    self.uncertainty_margin
-                    if self.integrity_uncertainty_margin is None
-                    else self.integrity_uncertainty_margin
-                )
-            case Plane.ACTION:
-                return (
-                    self.uncertainty_margin
-                    if self.action_uncertainty_margin is None
-                    else self.action_uncertainty_margin
-                )
+        if plane is Plane.CONTENT:
+            return (
+                self.uncertainty_margin
+                if self.content_uncertainty_margin is None
+                else self.content_uncertainty_margin
+            )
+        if plane is Plane.INTEGRITY:
+            return (
+                self.uncertainty_margin
+                if self.integrity_uncertainty_margin is None
+                else self.integrity_uncertainty_margin
+            )
+        return (
+            self.uncertainty_margin
+            if self.action_uncertainty_margin is None
+            else self.action_uncertainty_margin
+        )
 
     def user_authorised_destructive(
         self, objectors: Sequence[DetectorSignal], provenance: str
