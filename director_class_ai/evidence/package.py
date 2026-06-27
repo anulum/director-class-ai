@@ -29,6 +29,7 @@ from ..audit import verify_chain
 from ..core import EvaluationRequest, ParallelEnsembleScorer
 from ..core.governor import Decision, digest_request
 from ..core.signal import DetectorSignal
+from .techniques import TechniqueTag, technique_tags_for_findings
 
 __all__ = [
     "ControlMapping",
@@ -38,6 +39,7 @@ __all__ = [
     "IncidentReplayFixture",
     "IncidentReplayResult",
     "ProvenanceEdge",
+    "TechniqueTag",
     "build_evidence_package",
     "hash_chain_proof_for_digest",
     "replay_incident",
@@ -180,6 +182,7 @@ class EvidencePackage:
         default_factory=lambda: HashChainProof(verified=False, reason="not_supplied")
     )
     controls: tuple[ControlMapping, ...] = ()
+    technique_tags: tuple[TechniqueTag, ...] = ()
     evidence_digest: str = ""
 
     def __post_init__(self) -> None:
@@ -206,6 +209,7 @@ class EvidencePackage:
             "benchmark_replay_id": self.benchmark_replay_id,
             "hash_chain_proof": self.hash_chain_proof.to_json(),
             "controls": [control.to_json() for control in self.controls],
+            "technique_tags": [tag.to_json() for tag in self.technique_tags],
         }
 
 
@@ -278,12 +282,14 @@ def build_evidence_package(
         DetectorEvidence.from_signal(signal) for signal in decision.verdict.firing
     )
     grants = _capability_grants(capability_projection)
+    capability_findings = _capability_findings(capability_projection)
     edges = tuple(_edge(edge) for edge in provenance_graph)
     controls = controls_for_decision(
         action_route=_route(decision),
         detector_signals=detector_signals,
-        capability_findings=_capability_findings(capability_projection),
+        capability_findings=capability_findings,
     )
+    findings = tuple(signal.signal_type for signal in detector_signals)
     return EvidencePackage(
         request_digest=decision.record.request_digest,
         policy_profile=policy_profile,
@@ -296,6 +302,7 @@ def build_evidence_package(
         hash_chain_proof=hash_chain_proof
         or HashChainProof(verified=False, reason="not_supplied"),
         controls=controls,
+        technique_tags=technique_tags_for_findings(findings + capability_findings),
     )
 
 

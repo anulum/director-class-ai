@@ -70,9 +70,10 @@
       "production_surfaces": [
         "director_class_ai/audit/chain.py",
         "director_class_ai/audit/sinks.py",
-        "director_class_ai/audit/export_cli.py"
+        "director_class_ai/audit/export_cli.py",
+        "director_class_ai/evidence/techniques.py"
       ],
-      "required_behaviour": "Audit decisions append to hash-chained JSONL, optionally sign and externally anchor the head, verify across restart/tamper/replay cases, and export redacted SIEM JSONL through API and CLI entry points.",
+      "required_behaviour": "Audit decisions append to hash-chained JSONL, optionally sign and externally anchor the head, verify across restart/tamper/replay cases, and export redacted SIEM JSONL with bounded MITRE ATLAS and OWASP ASI technique tags through API and CLI entry points.",
       "evidence_tests": [
         {
           "file": "tests/test_audit_chain.py",
@@ -82,12 +83,12 @@
         {
           "file": "tests/test_audit_sinks.py",
           "mode": "integration",
-          "covers": "verified chain to SIEM JSONL export, signed anchor verification, and malformed detector-list handling"
+          "covers": "verified chain to SIEM JSONL export, signed anchor verification, bounded technique tags, OTel attributes, and malformed detector-list handling"
         },
         {
           "file": "tests/test_audit_export_cli.py",
           "mode": "integration",
-          "covers": "CLI stdout/file export, signed-head env-key verification, and fail-closed invalid-chain handling"
+          "covers": "CLI stdout/file export with technique ids, signed-head env-key verification, and fail-closed invalid-chain handling"
         }
       ]
     },
@@ -307,14 +308,20 @@
       "boundary_type": "file_format_replay_audit",
       "production_surfaces": [
         "director_class_ai/evidence/package.py",
+        "director_class_ai/evidence/techniques.py",
         "director_class_ai/audit/chain.py"
       ],
-      "required_behaviour": "Evidence packages bind to audit-chain proofs, redact payloads, preserve capability/control mappings, and replay sanitized incident fixtures across allow/block routes.",
+      "required_behaviour": "Evidence packages bind to audit-chain proofs, redact payloads, preserve capability/control mappings, attach bounded MITRE ATLAS and OWASP ASI technique tags, and replay sanitized incident fixtures across allow/block routes.",
       "evidence_tests": [
+        {
+          "file": "tests/test_evidence_techniques.py",
+          "mode": "integration",
+          "covers": "public evidence technique mapping API, stable deduplicated ids, prefix mappings, claim boundaries, and unknown-finding fail-closed behaviour"
+        },
         {
           "file": "tests/test_evidence_package.py",
           "mode": "integration",
-          "covers": "package JSON, hash-chain proof, controls, capability projection, sanitized incident replay"
+          "covers": "package JSON, hash-chain proof, controls, capability projection, bounded technique tags, sanitized incident replay"
         }
       ]
     },

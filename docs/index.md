@@ -28,8 +28,8 @@ and repository protection are complete.
 | Python SDK | `director_class_ai.sdk.ToolReviewMiddleware` | Review arbitrary Python tool calls before an executor runs. |
 | Command guard | `director-class-guard` | Review shell, database, cloud, Kubernetes, HTTP, and custom commands. |
 | MCP gateway | `director-class-mcp-gateway` | Review MCP discovery, tool calls, and tool responses on loopback. |
-| SIEM export | `director-class-siem-export` | Verify an audit chain and export redacted SOC events. |
-| Evidence package | `director_class_ai.evidence` | Emit redacted decision packages for audit and incident response. |
+| SIEM export | `director-class-siem-export` | Verify an audit chain and export redacted SOC events with bounded technique tags. |
+| Evidence package | `director_class_ai.evidence` | Emit redacted decision packages with controls and bounded technique tags for audit and incident response. |
 
 ## Local Gates
 

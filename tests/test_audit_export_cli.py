@@ -102,6 +102,7 @@ def test_run_export_writes_verified_siem_jsonl(tmp_path: Path) -> None:
     assert result.body == output.read_text(encoding="utf-8")
     assert events[1]["approval_state"] == "blocked"
     assert events[1]["chain_entry_hash"] == events[1]["decision_id"]
+    assert events[1]["technique_ids"] == ["ASI05", "AML.T0050"]
     assert "rm -rf /" not in repr(events)
 
 
@@ -178,6 +179,7 @@ def test_main_writes_stdout_jsonl(capsys, tmp_path: Path) -> None:
     assert captured.err == ""
     assert len(events) == 2
     assert events[0]["event_name"] == "director_class_ai.governance.decision"
+    assert events[1]["technique_ids"] == ["ASI05", "AML.T0050"]
 
 
 def test_main_writes_output_file_without_stdout(capsys, tmp_path: Path) -> None:

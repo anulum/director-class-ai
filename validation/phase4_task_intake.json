@@ -1,6 +1,6 @@
 {
   "schema_version": "director-class-ai.phase4-task-intake.v1",
-  "updated_at": "2026-06-26",
+  "updated_at": "2026-06-27",
   "policy": {
     "purpose": "Executable intake guard for Phase 4 roadmap work.",
     "required_fields": [
@@ -281,6 +281,39 @@
       ],
       "benchmark_impact": "none",
       "claim_boundary": "Local single-host halt boundary only. No distributed production-ready kill-switch, benchmark, certification, or legal evidence claim.",
+      "implementation_readiness": "executed",
+      "open_blockers": []
+    },
+    {
+      "id": "P4-EVIDENCE-TECHNIQUE-TAGS-001",
+      "plan_anchor": "Phase 4 / MITRE ATLAS + OWASP ASI technique tagging in evidence records",
+      "status": "done",
+      "buyer_user_value": "Lets SOC and incident-response consumers correlate governed blocks and escalations to familiar adversary-technique labels in evidence packages and SIEM exports without exposing raw prompts, commands, tools, or private context.",
+      "threat_model": "Blocked or escalated actions reach the audit trail as generic detector names only, forcing operators to hand-map events during incident triage and increasing the chance of inconsistent or overclaimed security/compliance language.",
+      "required_evidence": [
+        "bounded TechniqueTag model and deterministic finding-to-technique mapping",
+        "evidence packages include technique tags derived from detector firings and capability findings",
+        "verified SIEM JSONL and OTel export attributes include technique ids/tags",
+        "module-specific tests plus package, sink, and CLI integration tests over real production paths",
+        "strict mypy on touched production files and boundary evidence update"
+      ],
+      "affected_surfaces": [
+        "director_class_ai/evidence/techniques.py",
+        "director_class_ai/evidence/package.py",
+        "director_class_ai/evidence/__init__.py",
+        "director_class_ai/audit/sinks.py",
+        "tests/test_evidence_techniques.py",
+        "tests/test_evidence_package.py",
+        "tests/test_audit_sinks.py",
+        "tests/test_audit_export_cli.py",
+        "README.md",
+        "docs/evidence.md",
+        "docs/index.md",
+        "validation/test_boundary_evidence.json",
+        "validation/phase4_task_intake.json"
+      ],
+      "benchmark_impact": "none",
+      "claim_boundary": "Operational SOC correlation metadata only. Tags do not assert certification, complete framework coverage, prevention, legal admissibility, or benchmark performance.",
       "implementation_readiness": "executed",
       "open_blockers": []
     }

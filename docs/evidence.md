@@ -31,6 +31,14 @@ JSONL anchor log. `verify_chain(..., head_signing_key=..., anchor_path=...)` and
 closed if the signature is missing, mismatched, or replayed behind the latest
 anchor.
 
+## Technique-Tagged Evidence
+
+Evidence packages and verified SIEM exports attach bounded MITRE ATLAS and OWASP
+ASI technique tags derived from detector firing names and capability findings.
+The tags are for SOC correlation and incident triage. They do not assert
+certification, complete coverage of either framework, or prevention of a
+technique.
+
 ## Action-Plane Benchmark
 
 Run:

@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from ..evidence.techniques import TechniqueTag, technique_tags_for_findings
 from .chain import verify_chain
 
 if TYPE_CHECKING:
@@ -54,6 +55,8 @@ class AuditExportEvent:
     permitted: bool
     escalated: bool
     requires_human: bool
+    technique_ids: tuple[str, ...] = ()
+    technique_tags: tuple[TechniqueTag, ...] = ()
     chain_sequence: int | None = None
     chain_entry_hash: str = ""
 
@@ -68,6 +71,8 @@ class AuditExportEvent:
             "approval_state": self.approval_state,
             "request_digest": self.request_digest,
             "detector_ids": list(self.detector_ids),
+            "technique_ids": list(self.technique_ids),
+            "technique_tags": [tag.to_json() for tag in self.technique_tags],
             "risk": self.risk,
             "permitted": self.permitted,
             "escalated": self.escalated,
@@ -86,6 +91,8 @@ class AuditExportEvent:
             "approval.state": self.approval_state,
             "request.digest": self.request_digest,
             "detector.ids": list(self.detector_ids),
+            "threat.technique.ids": list(self.technique_ids),
+            "threat.technique.names": [tag.technique_name for tag in self.technique_tags],
             "governance.risk": self.risk,
             "governance.permitted": self.permitted,
             "governance.escalated": self.escalated,
@@ -114,6 +121,7 @@ def audit_record_to_event(
             "escalated": record.escalated,
         }
     )
+    technique_tags = technique_tags_for_findings(record.firing)
     return AuditExportEvent(
         decision_id=stable_id,
         observed_at_unix=observed_at_unix,
@@ -121,6 +129,8 @@ def audit_record_to_event(
         approval_state=approval_state,
         request_digest=record.request_digest,
         detector_ids=tuple(record.firing),
+        technique_ids=_technique_ids(technique_tags),
+        technique_tags=technique_tags,
         risk=record.risk,
         permitted=record.permitted,
         escalated=record.escalated,
@@ -131,13 +141,17 @@ def audit_record_to_event(
 def chain_entry_to_event(entry: dict[str, object]) -> AuditExportEvent:
     """Map one verified hash-chain entry to the export schema."""
     entry_hash = _string(entry.get("entry_hash"))
+    detector_ids = tuple(_strings(entry.get("firing")))
+    technique_tags = technique_tags_for_findings(detector_ids)
     return AuditExportEvent(
         decision_id=entry_hash,
         observed_at_unix=_float(entry.get("created_at")),
         policy_profile=_string(entry.get("policy_profile")),
         approval_state=_string(entry.get("approval_state")),
         request_digest=_string(entry.get("request_digest")),
-        detector_ids=tuple(_strings(entry.get("firing"))),
+        detector_ids=detector_ids,
+        technique_ids=_technique_ids(technique_tags),
+        technique_tags=technique_tags,
         risk=_float(entry.get("risk")),
         permitted=_bool(entry.get("permitted")),
         escalated=_bool(entry.get("escalated")),
@@ -187,6 +201,10 @@ def _read_entries(path: Path) -> list[dict[str, object]]:
 def _stable_decision_id(payload: dict[str, object]) -> str:
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _technique_ids(tags: tuple[TechniqueTag, ...]) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(tag.technique_id for tag in tags))
 
 
 def _approval_state(permitted: bool, escalated: bool) -> str:

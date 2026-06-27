@@ -360,7 +360,10 @@ compliance, and incident response. Packages bind the request digest, policy
 profile, capability grant ids, detector firings, approval state, action route,
 optional benchmark replay id, and hash-chain proof. Control mappings use bounded
 language for OWASP LLM risks, NIST AI RMF / GenAI profile, MCP security
-considerations, and buyer controls; they do not assert certification.
+considerations, and buyer controls; they do not assert certification. Evidence
+packages and SIEM exports also attach bounded MITRE ATLAS and OWASP ASI
+technique tags for SOC correlation without claiming complete coverage,
+prevention, or compliance certification.
 
 ```python
 from director_class_ai.evidence import build_evidence_package

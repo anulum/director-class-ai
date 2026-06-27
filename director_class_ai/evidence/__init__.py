@@ -20,6 +20,11 @@ from .package import (
     hash_chain_proof_for_digest,
     replay_incident,
 )
+from .techniques import (
+    TechniqueTag,
+    technique_ids_for_findings,
+    technique_tags_for_findings,
+)
 
 __all__ = [
     "ControlMapping",
@@ -29,7 +34,10 @@ __all__ = [
     "IncidentReplayFixture",
     "IncidentReplayResult",
     "ProvenanceEdge",
+    "TechniqueTag",
     "build_evidence_package",
     "hash_chain_proof_for_digest",
     "replay_incident",
+    "technique_ids_for_findings",
+    "technique_tags_for_findings",
 ]

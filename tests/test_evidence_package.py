@@ -124,6 +124,8 @@ def test_evidence_package_is_redacted_and_chain_bound(tmp_path: Path) -> None:
     assert payload["benchmark_replay_id"] == "action-plane-functional-2026-06-18"
     assert payload["evidence_digest"] == package.evidence_digest
     assert "destructive_command" in rendered
+    assert any(tag["technique_id"] == "AML.T0050" for tag in payload["technique_tags"])
+    assert all("does not" in tag["claim_boundary"] for tag in payload["technique_tags"])
     assert "rm -rf" not in rendered
     assert "private" not in rendered
 
@@ -157,6 +159,7 @@ def test_evidence_package_includes_capability_grants_and_controls(
     assert any(control["framework"] == "OWASP LLM risks" for control in controls)
     assert any(control["framework"] == "Buyer control taxonomy" for control in controls)
     assert all("does not" in control["claim_boundary"] for control in controls)
+    assert any(tag["technique_id"] == "ASI09" for tag in payload["technique_tags"])
 
 
 def test_evidence_package_accepts_mapping_edges_and_existing_digest() -> None:
@@ -194,6 +197,7 @@ def test_evidence_package_accepts_mapping_edges_and_existing_digest() -> None:
     assert payload["evidence_digest"] == "existing-digest"
     assert payload["provenance_graph"][0]["source"] == "operator"
     assert payload["controls"][0]["control_id"] == "manual"
+    assert payload["technique_tags"] == []
 
 
 def test_manual_decision_routes_cover_allow_and_approved_human() -> None:
@@ -214,6 +218,9 @@ def test_manual_decision_routes_cover_allow_and_approved_human() -> None:
     assert any(
         control["framework"] == "MCP security considerations"
         for control in approved.to_json()["controls"]
+    )
+    assert any(
+        tag["technique_id"] == "AML.T0061" for tag in approved.to_json()["technique_tags"]
     )
 
 
