@@ -213,6 +213,12 @@ those signals fail closed during discovery and response review without logging
 raw descriptor or response bodies in audit events.
 When no semantic override is supplied, the gateway uses the same dependency-light
 content/integrity defaults for discovery and tool-response review.
+Remanentia MCP memory tools are governed as first-class action boundaries:
+`remanentia_remember` writes require a signed memory contract, high-impact memory
+mutations route to human approval, and `remanentia_recall` / graph responses are
+reviewed for secret-shaped leakage before recalled memory reaches later agent
+context. Audit events keep only digests, routes, firing signal names, argument
+keys, and metadata keys.
 
 ## Out-of-band halt sidecar
 

@@ -177,6 +177,25 @@
       ]
     },
     {
+      "id": "remanentia-memory-governance",
+      "boundary_type": "mcp_memory_gateway_sdk_response",
+      "production_surfaces": [
+        "director_class_ai/action/remanentia.py",
+        "director_class_ai/action/memory.py",
+        "director_class_ai/gateway/mcp.py",
+        "director_class_ai/gateway/mcp_service.py",
+        "director_class_ai/sdk/middleware.py"
+      ],
+      "required_behaviour": "Remanentia MCP memory writes are classified at the DCA boundary, require signed memory contracts, reject memory poisoning or persistent instruction attempts, route high-impact memory mutations to human approval, and review recalled-memory responses for secret-shaped leakage before later agent context can consume them. Audit projections remain redacted to digests, route metadata, firing signal names, argument keys, and metadata keys.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_remanentia_memory_governance.py",
+          "mode": "integration",
+          "covers": "direct detector, MCPGateway call review, MCPGateway response review, SDK default middleware wiring, MCPGatewayService discovery/review/response dispatch, high-impact approval routing, signed low-impact write allow, missing-contract hard block, secret-response hard block, and redacted audit projections"
+        }
+      ]
+    },
+    {
       "id": "halt-sidecar",
       "boundary_type": "cli_http_service_storage",
       "production_surfaces": [

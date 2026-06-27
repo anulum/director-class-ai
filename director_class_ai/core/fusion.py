@@ -103,6 +103,7 @@ class FusionPolicy:
                 "persistent_instruction_injection",
                 "delayed_malicious_objective",
                 "task_plan_drift",
+                "memory_secret_leakage",
             }
         )
     )

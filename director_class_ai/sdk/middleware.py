@@ -34,6 +34,7 @@ from ..action import (
     IntentConsistencyDetector,
     MemoryThreatDetector,
     OriginTaintDetector,
+    RemanentiaMemoryGovernanceDetector,
     ReversibilityDetector,
 )
 from ..action._lexicon import UNTRUSTED_ORIGINS
@@ -366,6 +367,7 @@ def _default_detectors() -> tuple[Detector, ...]:
         ReversibilityDetector(),
         BrowserActionDetector(),
         MemoryThreatDetector(),
+        RemanentiaMemoryGovernanceDetector(),
     )
 
 

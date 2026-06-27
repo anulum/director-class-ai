@@ -32,6 +32,7 @@ from ..action import (
     MCPToolRegistration,
     MCPTrustRegistry,
     OriginTaintDetector,
+    RemanentiaMemoryGovernanceDetector,
     serialise_call,
 )
 from ..core import (
@@ -758,6 +759,7 @@ class MCPGateway:
         self._response_governor = response_governor or Governor(
             ensemble=ParallelEnsembleScorer(
                 [
+                    RemanentiaMemoryGovernanceDetector(),
                     DestructiveCommandDetector(),
                     BlastRadiusDetector(),
                     *self._semantic_detectors,
@@ -787,6 +789,7 @@ class MCPGateway:
         detectors: list[Detector] = [
             MCPCallInspector(registry=registry),
             _MCPRemoteAuthDetector(),
+            RemanentiaMemoryGovernanceDetector(),
             DestructiveCommandDetector(),
             BlastRadiusDetector(),
             OriginTaintDetector(),
@@ -805,6 +808,7 @@ class MCPGateway:
             else semantic_detectors
         )
         response_detectors: list[Detector] = [
+            RemanentiaMemoryGovernanceDetector(),
             DestructiveCommandDetector(),
             BlastRadiusDetector(),
             *semantic_detector_set,

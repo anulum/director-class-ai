@@ -34,6 +34,11 @@ from .memory import (
     MemoryWriteContract,
 )
 from .origin_taint import OriginTaintDetector
+from .remanentia import (
+    REMANENTIA_MEMORY_CONTEXT_KEY,
+    RemanentiaMemoryGovernanceDetector,
+    RemanentiaMemoryOperation,
+)
 from .reversibility import REVERSIBILITY_KEY, ReversibilityDetector
 
 __all__ = [
@@ -60,6 +65,9 @@ __all__ = [
     "MemoryThreatDetector",
     "MemoryWriteContract",
     "OriginTaintDetector",
+    "REMANENTIA_MEMORY_CONTEXT_KEY",
+    "RemanentiaMemoryGovernanceDetector",
+    "RemanentiaMemoryOperation",
     "REVERSIBILITY_KEY",
     "ReversibilityDetector",
     "serialise_call",

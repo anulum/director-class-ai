@@ -223,6 +223,36 @@
       "open_blockers": []
     },
     {
+      "id": "P4-MEM-REMANENTIA-001",
+      "plan_anchor": "Phase 4 / Ecosystem integration plan / Memory Governance effector for Remanentia",
+      "status": "done",
+      "buyer_user_value": "Closes the long-term-memory effector gap by putting Director-Class AI's action governance in front of Remanentia MCP memory writes and recalled-memory responses.",
+      "threat_model": "An agent can persist poisoned long-horizon instructions, mutate high-impact memory state without approval, or read secret-bearing historical memory into later agent context through Remanentia's MCP transport.",
+      "required_evidence": [
+        "Remanentia MCP tool classifier for recall/read, remember/write, and label-mutation operations",
+        "signed MemoryWriteContract enforcement reused for Remanentia memory writes",
+        "human-approval route for high-impact memory mutation",
+        "secret-shaped leakage block on Remanentia recall responses",
+        "SDK middleware, in-process MCP gateway, and loopback MCP service integration tests over production request paths",
+        "strict mypy on touched Python surfaces and boundary evidence update"
+      ],
+      "affected_surfaces": [
+        "director_class_ai/action/remanentia.py",
+        "director_class_ai/action/__init__.py",
+        "director_class_ai/core/fusion.py",
+        "director_class_ai/gateway/mcp.py",
+        "director_class_ai/sdk/middleware.py",
+        "tests/test_remanentia_memory_governance.py",
+        "README.md",
+        "validation/test_boundary_evidence.json",
+        "validation/phase4_task_intake.json"
+      ],
+      "benchmark_impact": "none",
+      "claim_boundary": "DCA-side deterministic MCP transport governance for Remanentia memory calls and responses. No Remanentia server change, no model-quality claim, no benchmark or certification claim.",
+      "implementation_readiness": "executed",
+      "open_blockers": []
+    },
+    {
       "id": "P4-HALT-001",
       "plan_anchor": "Phase 4 / Out-of-band kill-switch sidecar",
       "status": "done",
