@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -25,29 +26,34 @@ from director_class_ai.core.governor import digest_request
 
 
 class _Clock:
+    """Mutable clock for approval-expiry tests."""
+
     def __init__(self) -> None:
-        self.t = 1000.0
+        self.t: float = 1000.0
 
     def __call__(self) -> float:
+        """Return the current test timestamp."""
         return self.t
 
 
 def _req(action: str = "maybe risky") -> EvaluationRequest:
+    """Build a real evaluation request for queue digest tests."""
     return EvaluationRequest(action=action)
 
 
 def _digest(action: str = "maybe risky") -> str:
+    """Return the production request digest for the test action."""
     return digest_request(_req(action))
 
 
 class TestApprovalQueue:
-    def test_first_request_escalates_and_creates_pending(self, tmp_path) -> None:
+    def test_first_request_escalates_and_creates_pending(self, tmp_path: Path) -> None:
         q = ApprovalQueue(tmp_path / "q.json")
         assert q.request_approval(None, _req()) is False
         pend = q.pending()
         assert len(pend) == 1 and pend[0].status == "pending"
 
-    def test_approve_then_consume_once(self, tmp_path) -> None:
+    def test_approve_then_consume_once(self, tmp_path: Path) -> None:
         q = ApprovalQueue(tmp_path / "q.json")
         q.request_approval(None, _req())
         q.approve(_digest(), approver="alice")
@@ -55,7 +61,9 @@ class TestApprovalQueue:
         # single use: the same approval cannot permit a second execution
         assert q.request_approval(None, _req()) is False
 
-    def test_critical_verdict_requires_two_distinct_approvers(self, tmp_path) -> None:
+    def test_critical_verdict_requires_two_distinct_approvers(
+        self, tmp_path: Path
+    ) -> None:
         q = ApprovalQueue(tmp_path / "q.json")
         verdict = Verdict(False, 0.97, True, firing=(_sig(Severity.CRITICAL),))
         assert q.request_approval(verdict, _req()) is False
@@ -70,7 +78,7 @@ class TestApprovalQueue:
         assert second.approvers == ("alice", "bob")
         assert q.request_approval(verdict, _req()) is True
 
-    def test_same_approver_cannot_satisfy_dual_approval(self, tmp_path) -> None:
+    def test_same_approver_cannot_satisfy_dual_approval(self, tmp_path: Path) -> None:
         q = ApprovalQueue(tmp_path / "q.json")
         verdict = Verdict(False, 0.97, True, firing=(_sig(Severity.CRITICAL),))
         q.request_approval(verdict, _req())
@@ -79,26 +87,26 @@ class TestApprovalQueue:
         with pytest.raises(ValueError, match="already approved"):
             q.approve(_digest(), approver="alice")
 
-    def test_repeated_request_keeps_single_pending(self, tmp_path) -> None:
+    def test_repeated_request_keeps_single_pending(self, tmp_path: Path) -> None:
         q = ApprovalQueue(tmp_path / "q.json")
         assert q.request_approval(None, _req()) is False
         assert q.request_approval(None, _req()) is False  # existing pending reused
         assert len(q.pending()) == 1
 
-    def test_denied_stays_blocked(self, tmp_path) -> None:
+    def test_denied_stays_blocked(self, tmp_path: Path) -> None:
         q = ApprovalQueue(tmp_path / "q.json")
         q.request_approval(None, _req())
         q.deny(_digest(), approver="alice")
         assert q.request_approval(None, _req()) is False
 
-    def test_no_cross_digest_reuse(self, tmp_path) -> None:
+    def test_no_cross_digest_reuse(self, tmp_path: Path) -> None:
         q = ApprovalQueue(tmp_path / "q.json")
         q.request_approval(None, _req("maybe A"))
         q.approve(_digest("maybe A"), approver="alice")
         # an approval for action A must not permit a different action B
         assert q.request_approval(None, _req("maybe B")) is False
 
-    def test_expiry_invalidates_approval(self, tmp_path) -> None:
+    def test_expiry_invalidates_approval(self, tmp_path: Path) -> None:
         clock = _Clock()
         q = ApprovalQueue(tmp_path / "q.json", clock=clock, ttl_seconds=10.0)
         q.request_approval(None, _req())
@@ -106,26 +114,26 @@ class TestApprovalQueue:
         clock.t += 11.0  # past TTL
         assert q.request_approval(None, _req()) is False  # expired -> re-pending
 
-    def test_approve_unknown_raises(self, tmp_path) -> None:
+    def test_approve_unknown_raises(self, tmp_path: Path) -> None:
         q = ApprovalQueue(tmp_path / "q.json")
         with pytest.raises(KeyError):
             q.approve("deadbeef", approver="x")
 
-    def test_decide_non_pending_raises(self, tmp_path) -> None:
+    def test_decide_non_pending_raises(self, tmp_path: Path) -> None:
         q = ApprovalQueue(tmp_path / "q.json")
         q.request_approval(None, _req())
         q.approve(_digest(), approver="alice")
         with pytest.raises(ValueError, match="not pending"):
             q.approve(_digest(), approver="bob")
 
-    def test_persistence_across_instances(self, tmp_path) -> None:
+    def test_persistence_across_instances(self, tmp_path: Path) -> None:
         p = tmp_path / "q.json"
         ApprovalQueue(p).request_approval(None, _req())
         ApprovalQueue(p).approve(_digest(), approver="alice")  # fresh instance
         assert ApprovalQueue(p).request_approval(None, _req()) is True
 
     def test_failed_atomic_replace_preserves_existing_queue(
-        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         p = tmp_path / "q.json"
         q = ApprovalQueue(p)
@@ -146,28 +154,28 @@ class TestApprovalQueue:
         assert ticket.status == "pending"
         assert reloaded.get(_digest("maybe B")) is None
 
-    def test_get_returns_ticket(self, tmp_path) -> None:
+    def test_get_returns_ticket(self, tmp_path: Path) -> None:
         q = ApprovalQueue(tmp_path / "q.json")
         q.request_approval(None, _req())
         t = q.get(_digest())
         assert t is not None and t.digest == _digest()
         assert q.get("nope") is None
 
-    def test_rejects_corrupt_queue_document(self, tmp_path) -> None:
+    def test_rejects_corrupt_queue_document(self, tmp_path: Path) -> None:
         path = tmp_path / "q.json"
         path.write_text("[]", encoding="utf-8")
 
         with pytest.raises(ValueError, match="JSON object"):
             ApprovalQueue(path).pending()
 
-    def test_rejects_corrupt_queue_entry(self, tmp_path) -> None:
+    def test_rejects_corrupt_queue_entry(self, tmp_path: Path) -> None:
         path = tmp_path / "q.json"
         path.write_text(json.dumps({"digest": "not-a-ticket"}), encoding="utf-8")
 
         with pytest.raises(ValueError, match="ticket objects"):
             ApprovalQueue(path).pending()
 
-    def test_legacy_single_approver_is_migrated(self, tmp_path) -> None:
+    def test_legacy_single_approver_is_migrated(self, tmp_path: Path) -> None:
         path = tmp_path / "q.json"
         digest = _digest()
         path.write_text(
@@ -192,7 +200,7 @@ class TestApprovalQueue:
         assert ticket is not None
         assert ticket.approvers == ("alice",)
 
-    def test_pending_ticket_required_approvals_can_increase(self, tmp_path) -> None:
+    def test_pending_ticket_required_approvals_can_increase(self, tmp_path: Path) -> None:
         q = ApprovalQueue(tmp_path / "q.json")
         q.request_approval(None, _req())
         verdict = Verdict(False, 0.97, True, firing=(_sig(Severity.CRITICAL),))
@@ -203,14 +211,14 @@ class TestApprovalQueue:
         assert ticket is not None
         assert ticket.required_approvals == 2
 
-    def test_blank_approver_is_rejected(self, tmp_path) -> None:
+    def test_blank_approver_is_rejected(self, tmp_path: Path) -> None:
         q = ApprovalQueue(tmp_path / "q.json")
         q.request_approval(None, _req())
 
         with pytest.raises(ValueError, match="approver is required"):
             q.approve(_digest(), approver="  ")
 
-    def test_invalid_required_approvals_defaults_to_one(self, tmp_path) -> None:
+    def test_invalid_required_approvals_defaults_to_one(self, tmp_path: Path) -> None:
         path = tmp_path / "q.json"
         digest = _digest()
         path.write_text(
@@ -234,6 +242,7 @@ class TestApprovalQueue:
 
 
 def _sig(sev: Severity) -> DetectorSignal:
+    """Build a firing action signal for approval-policy route tests."""
     return DetectorSignal(
         detector="d",
         plane=Plane.ACTION,
