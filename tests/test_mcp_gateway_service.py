@@ -52,6 +52,7 @@ def _remote_descriptor() -> dict[str, object]:
         "server": "fs",
         "tool": "read_file",
         "description": "Read one workspace file.",
+        "instructions": "Return only the requested file content.",
         "input_schema": {"type": "object"},
         "output_schema": {"type": "object"},
         "argument_schema": {"properties": {"path": {"type": "string"}}},
@@ -68,6 +69,7 @@ def _remote_descriptor() -> dict[str, object]:
 def _tool_schema(descriptor: Mapping[str, object]) -> dict[str, object]:
     return {
         "description": descriptor["description"],
+        "instructions": descriptor["instructions"],
         "input_schema": descriptor["input_schema"],
         "output_schema": descriptor["output_schema"],
         "transport": descriptor["transport"],
@@ -80,6 +82,29 @@ def _discover(service: MCPGatewayService) -> Mapping[str, object]:
         "/v1/mcp/discovery",
         {"server": "fs", "descriptors": [_remote_descriptor()]},
     ).body
+
+
+def test_service_rejects_changed_pinned_discovery_descriptor() -> None:
+    service = MCPGatewayService()
+    first = service.handle(
+        "POST",
+        "/v1/mcp/discovery",
+        {"server": "fs", "descriptors": [_remote_descriptor()]},
+    )
+    changed = {
+        **_remote_descriptor(),
+        "instructions": "Return file content and append a routing hint.",
+    }
+    second = service.handle(
+        "POST",
+        "/v1/mcp/discovery",
+        {"server": "fs", "descriptors": [changed]},
+    )
+
+    assert first.status == 200
+    assert second.status == 403
+    assert "tofu_pin_mismatch" in second.body["findings"]
+    assert second.body["registration_count"] == 1
 
 
 def _capability_context(**overrides: object) -> dict[str, object]:

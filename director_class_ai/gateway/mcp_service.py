@@ -316,6 +316,7 @@ def _descriptor(value: object) -> MCPToolDescriptor:
         server=_string(data.get("server")),
         tool=_string(data.get("tool")),
         description=_string(data.get("description")),
+        instructions=_string(data.get("instructions")),
         input_schema=_mapping(data.get("input_schema")),
         output_schema=_mapping(data.get("output_schema")),
         argument_schema=_mapping(data.get("argument_schema")),

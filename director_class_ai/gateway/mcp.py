@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
@@ -51,6 +50,10 @@ from ..policy import (
     CapabilityPolicy,
 )
 from ..policy.capability import CapabilityPolicyDetector
+from .mcp_discovery_rules import (
+    descriptor_poisoning_findings,
+    normalise_tool_name,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -77,88 +80,6 @@ _REMOTE_TRANSPORTS = frozenset({"http", "https", "sse", "websocket"})
 _TRUSTED_TRANSPORT_PROVENANCE = frozenset(
     {"tls_verified", "pinned_certificate", "mtls", "loopback"}
 )
-_DISCOVERY_POISONING = re.compile(
-    r"\b("
-    r"ignore\s+(?:all\s+)?previous\s+instructions|"
-    r"system\s+prompt|"
-    r"developer\s+message|"
-    r"always\s+(?:choose|use|call)|"
-    r"prefer\s+this\s+tool|"
-    r"exfiltrat(?:e|ion)|"
-    r"send\s+(?:secrets?|credentials?)|"
-    r"hidden\s+instruction"
-    r")\b",
-    re.IGNORECASE,
-)
-_PARAMETER_POISONING = re.compile(
-    r"(?:^|[_\-.])("
-    r"ignore(?:[_\-.]?previous)?(?:[_\-.]?instructions?)?|"
-    r"system(?:[_\-.]?prompt|[_\-.]?message)?|"
-    r"developer(?:[_\-.]?message)?|"
-    r"hidden(?:[_\-.]?instruction)?|"
-    r"override(?:[_\-.]?policy)?|"
-    r"jailbreak|"
-    r"always(?:[_\-.]?(?:use|call|choose))"
-    r")(?:$|[_\-.])",
-    re.IGNORECASE,
-)
-_PREFERENCE_MANIPULATION = re.compile(
-    r"\b("
-    r"always\s+(?:choose|use|call)|"
-    r"prefer\s+this\s+tool|"
-    r"highest\s+priority|"
-    r"more\s+trusted\s+than|"
-    r"bypass\s+(?:policy|approval|review)"
-    r")\b",
-    re.IGNORECASE,
-)
-_FALSE_ERROR_ESCALATION = re.compile(
-    r"\b("
-    r"(?:if|when)\s+(?:an?\s+)?(?:error|failure|exception)\b.{0,80}"
-    r"(?:run|execute|call|invoke|use)\s+"
-    r"(?:shell|terminal|bash|cmd|powershell|rm|curl|wget|delete|drop)|"
-    r"on\s+(?:error|failure)\b.{0,80}(?:ask|tell)\s+the\s+user\s+to\s+run"
-    r")\b",
-    re.IGNORECASE,
-)
-_TOOL_TRANSFER = re.compile(
-    r"\b("
-    r"(?:call|invoke|delegate\s+to|transfer\s+to|chain\s+to)\s+"
-    r"(?:another\s+)?(?:tool|server|agent)|"
-    r"after\s+this\s+tool\b.{0,80}(?:call|invoke|use)\b"
-    r")\b",
-    re.IGNORECASE,
-)
-_MUTATING_PARAMETER = re.compile(
-    r"(?:^|[_\-.])("
-    r"command|cmd|shell|script|exec|execute|delete|remove|write|update|patch|"
-    r"drop|truncate|query|sql|payload|body|url|webhook|callback|destination"
-    r")(?:$|[_\-.])",
-    re.IGNORECASE,
-)
-_READ_TOOL = re.compile(
-    r"(?:^|[_\-.])(?:read|get|list|search|fetch|view|show|describe|query|find|"
-    r"lookup|inspect|open|stat)(?:$|[_\-.])",
-    re.IGNORECASE,
-)
-_READ_ALLOWED_PARAMETERS = frozenset(
-    {
-        "path",
-        "file",
-        "filename",
-        "pattern",
-        "glob",
-        "query",
-        "limit",
-        "offset",
-        "cursor",
-        "encoding",
-        "format",
-        "include",
-        "exclude",
-        "recursive",
-    }
-)
 
 
 @dataclass(frozen=True)
@@ -168,6 +89,7 @@ class MCPToolDescriptor:
     server: str
     tool: str
     description: str = ""
+    instructions: str = ""
     input_schema: Mapping[str, object] = field(default_factory=dict)
     output_schema: Mapping[str, object] = field(default_factory=dict)
     argument_schema: Mapping[str, object] = field(default_factory=dict)
@@ -184,6 +106,7 @@ class MCPToolDescriptor:
                 "server": self.server,
                 "tool": self.tool,
                 "description": self.description,
+                "instructions": self.instructions,
                 "input_schema": self.input_schema,
                 "output_schema": self.output_schema,
                 "argument_schema": self.argument_schema,
@@ -196,6 +119,14 @@ class MCPToolDescriptor:
 
     def to_registration(self) -> MCPToolRegistration:
         """Convert this clean descriptor into a signed trust registration."""
+        tool_schema = {
+            "description": self.description,
+            "input_schema": self.input_schema,
+            "output_schema": self.output_schema,
+            "transport": self.transport,
+        }
+        if self.instructions:
+            tool_schema["instructions"] = self.instructions
         return MCPToolRegistration(
             server=self.server,
             tool=self.tool,
@@ -203,12 +134,7 @@ class MCPToolDescriptor:
             input_schema=self.input_schema,
             output_schema=self.output_schema,
             server_identity=self.server_identity,
-            tool_schema={
-                "description": self.description,
-                "input_schema": self.input_schema,
-                "output_schema": self.output_schema,
-                "transport": self.transport,
-            },
+            tool_schema=tool_schema,
             argument_schema=self.argument_schema,
             allowed_transports=(self.transport,),
         ).signed()
@@ -429,10 +355,6 @@ def _route(*, permitted: bool, escalated: bool) -> MCPGatewayRoute:
     return "block"
 
 
-def _normalise_name(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "", value.lower())
-
-
 def _transport(metadata: Mapping[str, object], fallback: str = "") -> str:
     value = metadata.get("transport")
     if isinstance(value, str) and value.strip():
@@ -522,104 +444,6 @@ def _capability_audit_projection(
     }
 
 
-def _discovery_text(descriptor: MCPToolDescriptor) -> str:
-    return "\n".join(
-        (
-            descriptor.description,
-            _canonical(descriptor.input_schema),
-            _canonical(descriptor.output_schema),
-            _canonical(descriptor.argument_schema),
-            _canonical(descriptor.hidden_metadata),
-            _canonical(descriptor.remote_auth),
-        )
-    )
-
-
-def _iter_schema_names(value: object) -> tuple[str, ...]:
-    names: list[str] = []
-
-    def visit(node: object) -> None:
-        if isinstance(node, Mapping):
-            for key, child in node.items():
-                named_mapping = key in {"properties", "$defs", "definitions"}
-                named_sequence = key in {"required", "dependentRequired"}
-                if (named_mapping and isinstance(child, Mapping)) or (
-                    named_sequence
-                    and isinstance(child, Sequence)
-                    and not isinstance(child, str)
-                ):
-                    names.extend(str(name) for name in child)
-                visit(child)
-        elif isinstance(node, Sequence) and not isinstance(node, str):
-            for item in node:
-                visit(item)
-
-    visit(value)
-    return tuple(dict.fromkeys(names))
-
-
-def _iter_default_text(value: object) -> tuple[str, ...]:
-    texts: list[str] = []
-
-    def visit(node: object) -> None:
-        if isinstance(node, Mapping):
-            for key, child in node.items():
-                if key in {"default", "const", "examples", "example", "enum"}:
-                    texts.append(_canonical(child))
-                visit(child)
-        elif isinstance(node, Sequence) and not isinstance(node, str):
-            for item in node:
-                visit(item)
-
-    visit(value)
-    return tuple(texts)
-
-
-def _parameter_names(descriptor: MCPToolDescriptor) -> tuple[str, ...]:
-    names = [
-        *_iter_schema_names(descriptor.input_schema),
-        *_iter_schema_names(descriptor.argument_schema),
-    ]
-    return tuple(dict.fromkeys(name for name in names if name.strip()))
-
-
-def _default_texts(descriptor: MCPToolDescriptor) -> tuple[str, ...]:
-    return (
-        *_iter_default_text(descriptor.input_schema),
-        *_iter_default_text(descriptor.argument_schema),
-    )
-
-
-def _descriptor_poisoning_findings(descriptor: MCPToolDescriptor) -> tuple[str, ...]:
-    findings: list[str] = []
-    text = _discovery_text(descriptor)
-    hidden_text = _canonical(descriptor.hidden_metadata)
-    parameter_names = _parameter_names(descriptor)
-    default_texts = _default_texts(descriptor)
-
-    if _DISCOVERY_POISONING.search(text):
-        findings.append("discovery_poisoning")
-    if any(_PARAMETER_POISONING.search(name) for name in parameter_names):
-        findings.append("parameter_name_poisoning")
-    if any(_DISCOVERY_POISONING.search(default) for default in default_texts):
-        findings.append("schema_default_poisoning")
-    if descriptor.hidden_metadata and (
-        _DISCOVERY_POISONING.search(hidden_text)
-        or _PREFERENCE_MANIPULATION.search(hidden_text)
-    ):
-        findings.append("hidden_metadata_poisoning")
-    if _PREFERENCE_MANIPULATION.search(text):
-        findings.append("preference_manipulation")
-    if _FALSE_ERROR_ESCALATION.search(text):
-        findings.append("false_error_escalation")
-    if _TOOL_TRANSFER.search(text):
-        findings.append("tool_transfer")
-    if _out_of_scope_parameters(descriptor, parameter_names):
-        findings.append("out_of_scope_parameter")
-
-    return tuple(dict.fromkeys(findings))
-
-
 def _descriptor_remote_auth_findings(
     descriptor: MCPToolDescriptor,
 ) -> tuple[str, ...]:
@@ -630,28 +454,21 @@ def _descriptor_remote_auth_findings(
     )
 
 
-def _out_of_scope_parameters(
-    descriptor: MCPToolDescriptor,
-    parameter_names: tuple[str, ...],
-) -> bool:
-    if not _READ_TOOL.search(descriptor.tool):
-        return False
-    for name in parameter_names:
-        normalised = name.strip().lower().replace("-", "_").replace(".", "_")
-        if normalised in _READ_ALLOWED_PARAMETERS:
-            continue
-        if _MUTATING_PARAMETER.search(normalised):
-            return True
-    return False
-
-
-def _review_discovery(request: MCPDiscoveryRequest) -> tuple[str, ...]:
+def _review_discovery(
+    request: MCPDiscoveryRequest,
+    pinned_registrations: Sequence[MCPToolRegistration] = (),
+) -> tuple[str, ...]:
     findings: list[str] = []
     if not request.server.strip():
         findings.append("missing_server")
     if not request.descriptors:
         findings.append("empty_discovery")
 
+    pinned = {
+        registration.key: registration
+        for registration in pinned_registrations
+        if registration.server == request.server
+    }
     seen_exact: set[tuple[str, str]] = set()
     seen_normalised: dict[tuple[str, str], str] = {}
     for descriptor in request.descriptors:
@@ -666,15 +483,26 @@ def _review_discovery(request: MCPDiscoveryRequest) -> tuple[str, ...]:
         if exact in seen_exact:
             findings.append("duplicate_tool_descriptor")
         seen_exact.add(exact)
+        pinned_registration = pinned.get(exact)
+        if (
+            pinned_registration is not None
+            and descriptor.to_registration().fingerprint
+            != pinned_registration.fingerprint
+        ):
+            findings.append("tofu_pin_mismatch")
 
-        normalised = (descriptor.server, _normalise_name(descriptor.tool))
+        normalised = (descriptor.server, normalise_tool_name(descriptor.tool))
         previous = seen_normalised.get(normalised)
         if previous is not None and previous != descriptor.tool:
             findings.append("tool_name_collision")
         seen_normalised[normalised] = descriptor.tool
 
-        findings.extend(_descriptor_poisoning_findings(descriptor))
+        findings.extend(descriptor_poisoning_findings(descriptor))
         findings.extend(_descriptor_remote_auth_findings(descriptor))
+
+    for key in pinned:
+        if key not in seen_exact:
+            findings.append("tofu_pin_missing")
 
     return tuple(dict.fromkeys(findings))
 
@@ -890,9 +718,11 @@ class MCPGateway:
         *,
         capability_policy: CapabilityPolicy | None = None,
         response_governor: Governor | None = None,
+        pinned_registrations: Sequence[MCPToolRegistration] = (),
     ) -> None:
         self._governor = governor
         self._capability_policy = capability_policy
+        self._pinned_registrations = tuple(pinned_registrations)
         self._response_governor = response_governor or Governor(
             ensemble=ParallelEnsembleScorer(
                 [DestructiveCommandDetector(), BlastRadiusDetector()]
@@ -943,6 +773,7 @@ class MCPGateway:
             call_governor,
             capability_policy=capability_policy,
             response_governor=response_governor,
+            pinned_registrations=registrations,
         )
 
     @classmethod
@@ -973,7 +804,7 @@ class MCPGateway:
 
     def review_discovery(self, request: MCPDiscoveryRequest) -> MCPDiscoveryDecision:
         """Review a discovery envelope before trusting advertised tools."""
-        findings = _review_discovery(request)
+        findings = _review_discovery(request, self._pinned_registrations)
         permitted = not findings
         return MCPDiscoveryDecision(
             request=request,

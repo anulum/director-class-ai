@@ -114,6 +114,10 @@ service reads the approved head of the same Guardrail-as-Code ledger
 approved posture supplies the live fusion thresholds and capability envelope for
 gateway decisions. With no ledger or no approved head, the gateway keeps its
 fail-closed defaults.
+Permitted `tools/list` discovery appends signed registrations, and later
+rediscovery for an already pinned server/tool must match the original
+description, instructions, schemas, identity, and transport. Drift in those
+pinned fields is rejected before the registry is updated.
 
 ```bash
 director-class-mcp-gateway --host 127.0.0.1 --port 8765
@@ -187,7 +191,9 @@ unsigned, signature-mismatched, under-populated, schema-drifted, or
 transport-mismatched tool registrations, plus runtime argument-schema
 violations, cannot be softened by user approval. Argument validation covers
 required fields, closed schemas, scalar types, enums, and nested object/array
-items in the registered MCP schema.
+items in the registered MCP schema. MCP discovery also pins descriptor
+descriptions and instructions on first trust; changed `tools/list` metadata is
+treated as drift instead of a harmless refresh.
 
 ## External benchmark artefacts
 

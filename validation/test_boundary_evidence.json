@@ -117,7 +117,7 @@
         "director_class_ai/policy/capability.py",
         "director_class_ai/policy/governance.py"
       ],
-      "required_behaviour": "In-process MCP gateway reviews discovery, signed registrations, populated registration manifests, tool calls, remote auth, capability policy, approved policy-store heads, runtime nested argument-schema conformance, cross-server lookalike tools, and tool responses without executing tools or leaking raw argument values.",
+      "required_behaviour": "In-process MCP gateway reviews discovery, pins trusted tools/list descriptions and instructions, signed registrations, populated registration manifests, tool calls, remote auth, capability policy, approved policy-store heads, runtime nested argument-schema conformance, cross-server lookalike tools, and tool responses without executing tools or leaking raw argument values.",
       "evidence_tests": [
         {
           "file": "tests/test_mcp_gateway.py",
@@ -128,6 +128,11 @@
           "file": "tests/test_mcp_gateway_registry_guards.py",
           "mode": "integration",
           "covers": "gateway-level nested argument-schema violation hard blocks and dynamic-discovery cross-server lookalike hard blocks"
+        },
+        {
+          "file": "tests/test_mcp_tofu_pinning.py",
+          "mode": "integration",
+          "covers": "tools/list TOFU pinning, description/instruction drift rejection, missing pinned tool rejection, and runtime schema-drift blocking for changed instructions"
         },
         {
           "file": "tests/test_runtime_posture_binding.py",
@@ -155,12 +160,12 @@
         "director_class_ai/gateway/policy_binding.py",
         "director_class_ai/policy/store.py"
       ],
-      "required_behaviour": "Loopback MCP service exposes health/discovery/review/response endpoints, binds reviews to an approved policy store, authenticates protected routes, preserves redaction, and rejects malformed or oversized requests.",
+      "required_behaviour": "Loopback MCP service exposes health/discovery/review/response endpoints, pins trusted discovery descriptors, binds reviews to an approved policy store, authenticates protected routes, preserves redaction, and rejects malformed or oversized requests.",
       "evidence_tests": [
         {
           "file": "tests/test_mcp_gateway_service.py",
           "mode": "e2e",
-          "covers": "real loopback HTTP server discovery/review/health/error routes, policy-store binding, and operator-key handling"
+          "covers": "real loopback HTTP server discovery/review/health/error routes, TOFU descriptor-drift rejection, policy-store binding, and operator-key handling"
         }
       ]
     },
