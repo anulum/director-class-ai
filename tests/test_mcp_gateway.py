@@ -345,7 +345,7 @@ def test_serialized_argument_detector_still_blocks_destructive_payload() -> None
 
     decision = gateway.review(request)
 
-    assert decision.route == "human"
+    assert decision.route == "block"
     assert decision.permitted is False
     assert "destructive_command" in decision.firing
 

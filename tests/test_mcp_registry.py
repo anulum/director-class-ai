@@ -242,6 +242,18 @@ def test_cross_server_edit_distance_lookalike_tool_is_detected() -> None:
     assert sig.signal_type == "mcp_lookalike_tool"
 
 
+def test_dynamic_discovery_keeps_cross_server_lookalike_blocked() -> None:
+    registry = MCPTrustRegistry([_registration()], allow_dynamic_discovery=True)
+    sig = registry.evaluate(
+        EvaluationRequest(
+            metadata={MCP_CALL_KEY: _call(server="remote-fs", tool="read_fiel")}
+        )
+    )
+
+    assert sig is not None
+    assert sig.signal_type == "mcp_lookalike_tool"
+
+
 def test_missing_required_argument_is_denied() -> None:
     registry = MCPTrustRegistry([_registration()])
     sig = registry.evaluate(
@@ -291,6 +303,81 @@ def test_unexpected_argument_is_denied_when_schema_is_closed() -> None:
     assert sig is not None
     assert sig.signal_type == "mcp_argument_schema_violation"
     assert "unexpected argument 'payload'" in sig.rationale
+
+
+def test_nested_object_argument_schema_violation_is_denied() -> None:
+    argument_schema = {
+        "properties": {
+            "request": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "metadata": {
+                        "type": "object",
+                        "properties": {"depth": {"type": "integer"}},
+                        "additionalProperties": False,
+                    },
+                },
+                "required": ["path"],
+                "additionalProperties": False,
+            }
+        },
+        "required": ["request"],
+        "additionalProperties": False,
+    }
+    registration = MCPToolRegistration(
+        server="fs",
+        tool="read_file",
+        server_identity={"name": "local-fs", "transport": "stdio"},
+        tool_schema={"description": "read a project file", "mode": "read"},
+        argument_schema=argument_schema,
+    )
+    registry = MCPTrustRegistry([registration])
+    sig = registry.evaluate(
+        EvaluationRequest(
+            metadata={
+                MCP_CALL_KEY: _call(
+                    arguments={
+                        "request": {"path": "README.md", "metadata": {"depth": "deep"}}
+                    },
+                    argument_schema=argument_schema,
+                )
+            }
+        )
+    )
+
+    assert sig is not None
+    assert sig.signal_type == "mcp_argument_schema_violation"
+    assert "argument 'request.metadata.depth' must be integer" in sig.rationale
+
+
+def test_array_item_argument_schema_violation_is_denied() -> None:
+    argument_schema = {
+        "properties": {"paths": {"type": "array", "items": {"type": "string"}}},
+        "required": ["paths"],
+    }
+    registration = MCPToolRegistration(
+        server="fs",
+        tool="read_file",
+        server_identity={"name": "local-fs", "transport": "stdio"},
+        tool_schema={"description": "read a project file", "mode": "read"},
+        argument_schema=argument_schema,
+    )
+    registry = MCPTrustRegistry([registration])
+    sig = registry.evaluate(
+        EvaluationRequest(
+            metadata={
+                MCP_CALL_KEY: _call(
+                    arguments={"paths": ["README.md", 7]},
+                    argument_schema=argument_schema,
+                )
+            }
+        )
+    )
+
+    assert sig is not None
+    assert sig.signal_type == "mcp_argument_schema_violation"
+    assert "argument 'paths[1]' must be string" in sig.rationale
 
 
 def test_schema_drift_is_detected() -> None:

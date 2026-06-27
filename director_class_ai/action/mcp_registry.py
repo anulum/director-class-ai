@@ -17,6 +17,7 @@ import re
 import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from typing import TypeGuard
 
 from ..core import DetectorSignal, EvaluationRequest, Locus, Plane, Severity
 from .mcp_inspector import MCP_CALL_KEY, MCPToolCall
@@ -151,38 +152,102 @@ def _matches_schema_type(value: object, schema_type: str) -> bool:
     if schema_type == "object":
         return isinstance(value, Mapping)
     if schema_type == "array":
-        return isinstance(value, Sequence) and not isinstance(value, str)
+        return _is_json_array(value)
     if schema_type == "null":
         return value is None
     return False
+
+
+def _is_json_array(value: object) -> TypeGuard[Sequence[object]]:
+    return isinstance(value, Sequence) and not isinstance(
+        value,
+        str | bytes | bytearray,
+    )
+
+
+def _argument_path(parent: str, child: str) -> str:
+    if not parent:
+        return child
+    return f"{parent}.{child}"
+
+
+def _indexed_argument_path(parent: str, index: int) -> str:
+    return f"{parent}[{index}]"
+
+
+def _object_schema_violation(
+    arguments: Mapping[str, object],
+    schema: Mapping[str, object],
+    path: str,
+) -> str:
+    required = _string_sequence(schema.get("required"))
+    for name in required:
+        if name not in arguments:
+            return f"missing required argument {_argument_path(path, name)!r}"
+
+    properties = _mapping_value(schema, "properties")
+    if schema.get("additionalProperties") is False:
+        for name in sorted(arguments):
+            if name not in properties:
+                return f"unexpected argument {_argument_path(path, name)!r}"
+
+    for name, value in arguments.items():
+        property_schema = _property_schema(schema, name)
+        if not property_schema:
+            continue
+        argument_path = _argument_path(path, name)
+        violation = _value_schema_violation(value, property_schema, argument_path)
+        if violation:
+            return violation
+    return ""
+
+
+def _array_schema_violation(
+    values: Sequence[object],
+    schema: Mapping[str, object],
+    path: str,
+) -> str:
+    item_schema = schema.get("items")
+    if not isinstance(item_schema, Mapping):
+        return ""
+    for index, item in enumerate(values):
+        violation = _value_schema_violation(
+            item,
+            item_schema,
+            _indexed_argument_path(path, index),
+        )
+        if violation:
+            return violation
+    return ""
+
+
+def _value_schema_violation(
+    value: object,
+    schema: Mapping[str, object],
+    path: str,
+) -> str:
+    allowed = _schema_types(schema)
+    if allowed and not any(_matches_schema_type(value, kind) for kind in allowed):
+        return f"argument {path!r} must be {' or '.join(allowed)}"
+    enum = schema.get("enum")
+    if isinstance(enum, Sequence) and not isinstance(enum, str) and value not in enum:
+        return f"argument {path!r} must match one of the registered enum values"
+    if "const" in schema and value != schema["const"]:
+        return f"argument {path!r} must match the registered const value"
+    if isinstance(value, Mapping):
+        violation = _object_schema_violation(value, schema, path)
+        if violation:
+            return violation
+    if _is_json_array(value):
+        return _array_schema_violation(value, schema, path)
+    return ""
 
 
 def _argument_schema_violation(
     arguments: Mapping[str, object],
     schema: Mapping[str, object],
 ) -> str:
-    required = _string_sequence(schema.get("required"))
-    for name in required:
-        if name not in arguments:
-            return f"missing required argument {name!r}"
-
-    properties = _mapping_value(schema, "properties")
-    if schema.get("additionalProperties") is False:
-        for name in sorted(arguments):
-            if name not in properties:
-                return f"unexpected argument {name!r}"
-
-    for name, value in arguments.items():
-        property_schema = _property_schema(schema, name)
-        if not property_schema:
-            continue
-        allowed = _schema_types(property_schema)
-        if allowed and not any(_matches_schema_type(value, kind) for kind in allowed):
-            return f"argument {name!r} must be {' or '.join(allowed)}"
-        enum = property_schema.get("enum")
-        if isinstance(enum, Sequence) and not isinstance(enum, str) and value not in enum:
-            return f"argument {name!r} must match one of the registered enum values"
-    return ""
+    return _object_schema_violation(arguments, schema, "")
 
 
 @dataclass(frozen=True)

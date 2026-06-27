@@ -1,6 +1,6 @@
 {
   "schema_version": "director-class-ai.test-boundary-evidence.v1",
-  "updated_at": "2026-06-25",
+  "updated_at": "2026-06-27",
   "policy": {
     "source": "agentic-shared/BROADCAST_2026-06-25_real_surface_e2e_test_policy.md",
     "summary": "Boundary-crossing features must have e2e or integration tests for the actual API, CLI, service, adapter, file format, generated artifact, workflow, storage, or user-facing boundary."
@@ -117,12 +117,17 @@
         "director_class_ai/policy/capability.py",
         "director_class_ai/policy/governance.py"
       ],
-      "required_behaviour": "In-process MCP gateway reviews discovery, signed registrations, populated registration manifests, tool calls, remote auth, capability policy, approved policy-store heads, runtime argument-schema conformance, cross-server lookalike tools, and tool responses without executing tools or leaking raw argument values.",
+      "required_behaviour": "In-process MCP gateway reviews discovery, signed registrations, populated registration manifests, tool calls, remote auth, capability policy, approved policy-store heads, runtime nested argument-schema conformance, cross-server lookalike tools, and tool responses without executing tools or leaking raw argument values.",
       "evidence_tests": [
         {
           "file": "tests/test_mcp_gateway.py",
           "mode": "integration",
-          "covers": "discovery, signed call review, under-populated registration hard blocks, cross-server lookalike hard blocks, argument-schema violation hard blocks, remote auth fail-closed, capability policy, response review, redacted audit events"
+          "covers": "discovery, signed call review, under-populated registration hard blocks, cross-server and dynamic-discovery lookalike hard blocks, nested argument-schema violation hard blocks, remote auth fail-closed, capability policy, response review, redacted audit events"
+        },
+        {
+          "file": "tests/test_mcp_gateway_registry_guards.py",
+          "mode": "integration",
+          "covers": "gateway-level nested argument-schema violation hard blocks and dynamic-discovery cross-server lookalike hard blocks"
         },
         {
           "file": "tests/test_runtime_posture_binding.py",
@@ -137,7 +142,7 @@
         {
           "file": "tests/test_mcp_registry.py",
           "mode": "integration",
-          "covers": "registration signatures, under-populated manifest rejection, schema drift, cross-server NFKC/confusable/edit-distance lookalike names, runtime argument-schema conformance, dynamic discovery policy"
+          "covers": "registration signatures, under-populated manifest rejection, schema drift, cross-server NFKC/confusable/edit-distance lookalike names, dynamic-discovery lookalike blocking, nested runtime argument-schema conformance, dynamic discovery policy"
         }
       ]
     },

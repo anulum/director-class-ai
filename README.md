@@ -184,7 +184,10 @@ who asked. Critical escalations that are not in that never-soften set require
 the configured dual-human approval route before the ticket becomes executable.
 MCP trust-registry integrity findings are hard blocks too: unknown, lookalike,
 unsigned, signature-mismatched, under-populated, schema-drifted, or
-transport-mismatched tool registrations cannot be softened by user approval.
+transport-mismatched tool registrations, plus runtime argument-schema
+violations, cannot be softened by user approval. Argument validation covers
+required fields, closed schemas, scalar types, enums, and nested object/array
+items in the registered MCP schema.
 
 ## External benchmark artefacts
 
