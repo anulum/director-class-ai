@@ -13,14 +13,15 @@
         "director_class_ai/cli/guard.py",
         "director_class_ai/sdk/middleware.py",
         "director_class_ai/audit/chain.py",
-        "director_class_ai/approvals/queue.py"
+        "director_class_ai/approvals/queue.py",
+        "director_class_ai/sidecar/state.py"
       ],
-      "required_behaviour": "Command review CLI parses real options, writes redacted audit records with 256-bit tenant/salt-bound request digests, opens approval tickets for recoverable escalations, hard-blocks irreversible never-soften actions before approval, respects dry-run/execute modes, and preserves single-use approval semantics.",
+      "required_behaviour": "Command review CLI parses real options, writes redacted audit records with 256-bit tenant/salt-bound request digests, opens approval tickets for recoverable escalations, checks out-of-band halt state before execution, hard-blocks irreversible never-soften actions before approval, respects dry-run/execute modes, and preserves single-use approval semantics.",
       "evidence_tests": [
         {
           "file": "tests/test_cli_guard.py",
           "mode": "integration",
-          "covers": "run_guard/main paths, audit JSONL persistence, approval-store persistence, tenant/salt-bound request digest propagation, never-soften blocking, approval execution gating, console-script declaration"
+          "covers": "run_guard/main paths, audit JSONL persistence, approval-store persistence, tenant/salt-bound request digest propagation, sidecar halt-state blocking, never-soften blocking, approval execution gating, console-script declaration"
         }
       ]
     },
@@ -163,14 +164,33 @@
         "director_class_ai/gateway/mcp_service.py",
         "director_class_ai/gateway/mcp.py",
         "director_class_ai/gateway/policy_binding.py",
-        "director_class_ai/policy/store.py"
+        "director_class_ai/policy/store.py",
+        "director_class_ai/sidecar/state.py"
       ],
-      "required_behaviour": "Loopback MCP service exposes health/discovery/review/response endpoints, pins trusted discovery descriptors, binds reviews to an approved policy store, authenticates protected routes, preserves redaction, and rejects malformed or oversized requests.",
+      "required_behaviour": "Loopback MCP service exposes health/discovery/review/response endpoints, pins trusted discovery descriptors, binds reviews to an approved policy store, authenticates protected routes, checks out-of-band halt state before review/response handoff, preserves redaction, and rejects malformed or oversized requests.",
       "evidence_tests": [
         {
           "file": "tests/test_mcp_gateway_service.py",
           "mode": "e2e",
-          "covers": "real loopback HTTP server discovery/review/health/error routes, TOFU descriptor-drift rejection, policy-store binding, and operator-key handling"
+          "covers": "real loopback HTTP server discovery/review/health/error routes, TOFU descriptor-drift rejection, policy-store binding, sidecar halt-state blocking, and operator-key handling"
+        }
+      ]
+    },
+    {
+      "id": "halt-sidecar",
+      "boundary_type": "cli_http_service_storage",
+      "production_surfaces": [
+        "director_class_ai/sidecar/state.py",
+        "director_class_ai/sidecar/service.py",
+        "director_class_ai/sidecar/cli.py",
+        "pyproject.toml"
+      ],
+      "required_behaviour": "Operator-owned halt sidecar persists halt/resume state durably, exposes operator-key-protected loopback status/halt/resume routes, and provides a CLI that operates the same state file without exposing raw governed actions.",
+      "evidence_tests": [
+        {
+          "file": "tests/test_halt_sidecar.py",
+          "mode": "e2e",
+          "covers": "durable state file, generation increments, invalid operator changes, operator-key service protection, real loopback HTTP requests, CLI state commands, and console-script declaration"
         }
       ]
     },
@@ -181,12 +201,12 @@
         "director_class_ai/gateway/mcp_cli.py",
         "director_class_ai/gateway/mcp_service.py"
       ],
-      "required_behaviour": "MCP gateway CLI parses runtime flags including policy-store binding, builds loopback/non-loopback servers safely, exposes health, and closes servers on shutdown paths.",
+      "required_behaviour": "MCP gateway CLI parses runtime flags including policy-store binding and optional halt-state binding, builds loopback/non-loopback servers safely, exposes health, and closes servers on shutdown paths.",
       "evidence_tests": [
         {
           "file": "tests/test_mcp_gateway_cli.py",
           "mode": "integration",
-          "covers": "CLI option parsing, policy-store option, loopback binding, operator-key requirement, server lifecycle, console-script declaration"
+          "covers": "CLI option parsing, policy-store and halt-state options, loopback binding, operator-key requirement, server lifecycle, console-script declaration"
         }
       ]
     },
@@ -196,14 +216,15 @@
       "production_surfaces": [
         "director_class_ai/sdk/middleware.py",
         "director_class_ai/detectors/defaults.py",
-        "director_class_ai/core/governor.py"
+        "director_class_ai/core/governor.py",
+        "director_class_ai/sidecar/state.py"
       ],
-      "required_behaviour": "SDK middleware renders tool actions deterministically, runs dependency-light content/integrity defaults, reviews without default execution, executes permitted calls exactly once, blocks untrusted mutations and irreversible never-soften actions, routes recoverable approval through a durable digest-scoped queue when configured, and emits digest-only audit events to the hash-chained audit sink when configured.",
+      "required_behaviour": "SDK middleware renders tool actions deterministically, runs dependency-light content/integrity defaults, reviews without default execution, checks out-of-band halt state before execution, executes permitted calls exactly once, blocks untrusted mutations and irreversible never-soften actions, routes recoverable approval through a durable digest-scoped queue when configured, and emits digest-only audit events to the hash-chained audit sink when configured.",
       "evidence_tests": [
         {
           "file": "tests/test_sdk_middleware.py",
           "mode": "integration",
-          "covers": "review/run paths, default content/integrity blocking, dry-run behaviour, executor override, durable approval queue route, hash-chain audit sink, redacted audit event"
+          "covers": "review/run paths, default content/integrity blocking, dry-run behaviour, sidecar halt-state blocking, executor override, durable approval queue route, hash-chain audit sink, redacted audit event"
         }
       ]
     },

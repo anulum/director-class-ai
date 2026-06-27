@@ -136,6 +136,13 @@ export DIRECTOR_CLASS_MCP_KEY='operator-key'
 director-class-mcp-gateway --host 0.0.0.0 --operator-key-env DIRECTOR_CLASS_MCP_KEY
 ```
 
+The MCP loopback service can also consult the out-of-band halt state before
+reviewing tool calls or tool responses:
+
+```bash
+director-class-mcp-gateway --halt-state runtime/halt_state.json
+```
+
 ## Command guard
 
 For command-line workflows, `director-class-guard` reviews shell, database,
@@ -167,6 +174,7 @@ capability/origin envelope when corpus rows include `capability_context` and
 ```bash
 director-class-guard --surface kubernetes -- kubectl get pods
 director-class-guard --surface shell --execute -- printf guard-ok
+director-class-guard --halt-state runtime/halt_state.json --surface shell --execute -- printf guard-ok
 ```
 
 An escalated action is not permitted on its own. The first review opens a pending
@@ -205,6 +213,29 @@ those signals fail closed during discovery and response review without logging
 raw descriptor or response bodies in audit events.
 When no semantic override is supplied, the gateway uses the same dependency-light
 content/integrity defaults for discovery and tool-response review.
+
+## Out-of-band halt sidecar
+
+`director-class-halt-sidecar` owns a durable JSON halt state that SDK middleware,
+the command guard, and the MCP loopback service can consult before execution or
+tool-response handoff. The state file is intended to live in an operator-owned
+path so the governed agent reads the halt state but does not own the write path.
+This is a local process/permission boundary, not a distributed production
+kill-switch claim.
+
+```bash
+director-class-halt-sidecar status --state-path runtime/halt_state.json
+director-class-halt-sidecar halt --state-path runtime/halt_state.json --actor alice --reason incident
+director-class-halt-sidecar resume --state-path runtime/halt_state.json --actor bob --reason reviewed
+```
+
+The optional loopback service protects halt and resume endpoints with an operator
+key:
+
+```bash
+export DIRECTOR_CLASS_HALT_KEY='operator-key'
+director-class-halt-sidecar serve --state-path runtime/halt_state.json
+```
 
 Request digests are full SHA-256 identifiers over the canonical request payload
 and tenant id. Deployments can set `DIRECTOR_CLASS_DIGEST_SALT` to bind approval

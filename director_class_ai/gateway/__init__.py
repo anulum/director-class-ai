@@ -8,6 +8,13 @@
 
 """Deployable gateway contracts around Director-Class AI governance primitives."""
 
+from ..sidecar.service import (
+    HALT_AUTH_HEADER,
+    HaltSwitchHTTPServer,
+    HaltSwitchService,
+    HaltSwitchServiceConfig,
+    HaltSwitchServiceResponse,
+)
 from .mcp import (
     MCPDiscoveryDecision,
     MCPDiscoveryRequest,
@@ -46,5 +53,10 @@ __all__ = [
     "MCPGatewayServiceConfig",
     "MCPGatewayServiceResponse",
     "MCPGatewayServerOptions",
+    "HALT_AUTH_HEADER",
+    "HaltSwitchHTTPServer",
+    "HaltSwitchService",
+    "HaltSwitchServiceConfig",
+    "HaltSwitchServiceResponse",
     "build_gateway_server",
 ]

@@ -30,6 +30,7 @@ def test_gateway_server_options_parse_defaults() -> None:
     assert options.operator_key == ""
     assert options.operator_key_env == ""
     assert options.policy_store == "runtime/policy.json"
+    assert options.halt_state == ""
 
 
 def test_gateway_server_options_parse_runtime_flags(
@@ -51,6 +52,8 @@ def test_gateway_server_options_parse_runtime_flags(
             "DIRECTOR_CLASS_MCP_KEY",
             "--policy-store",
             "/tmp/policy.json",
+            "--halt-state",
+            "/tmp/halt.json",
         )
     )
 
@@ -62,6 +65,7 @@ def test_gateway_server_options_parse_runtime_flags(
     assert options.operator_key == "operator-key"
     assert options.operator_key_env == "DIRECTOR_CLASS_MCP_KEY"
     assert options.policy_store == "/tmp/policy.json"
+    assert options.halt_state == "/tmp/halt.json"
 
 
 def test_build_gateway_server_binds_loopback_and_serves_health() -> None:

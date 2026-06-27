@@ -31,6 +31,7 @@ from director_class_ai.policy import (
     PolicyGovernance,
     Profile,
 )
+from director_class_ai.sidecar import LocalHaltSwitch
 
 
 def _remote_auth(audience: str = "mcp://fs") -> dict[str, object]:
@@ -243,6 +244,31 @@ def test_service_review_accepts_malformed_optional_mappings_safely() -> None:
     assert response.status == 403
     assert response.body["route"] == "human"
     assert response.body["permitted"] is False
+
+
+def test_service_review_blocks_when_halt_sidecar_is_active(tmp_path: Path) -> None:
+    halt_state = tmp_path / "halt.json"
+    LocalHaltSwitch(halt_state).halt(reason="incident", actor="operator-a")
+    service = MCPGatewayService(
+        config=MCPGatewayServiceConfig(halt_state=str(halt_state))
+    )
+
+    response = service.handle(
+        "POST",
+        "/v1/mcp/review",
+        {
+            "server": "fs",
+            "tool": "read_file",
+            "arguments": {"path": "README.md"},
+            "provenance": "user",
+        },
+    )
+
+    assert response.status == 403
+    assert response.body["route"] == "block"
+    assert response.body["permitted"] is False
+    assert response.body["findings"] == ("sidecar_halt",)
+    assert response.body["halt_reason"] == "incident"
 
 
 def test_service_review_preserves_argument_provenance_mapping() -> None:

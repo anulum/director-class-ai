@@ -37,6 +37,7 @@ director-class-guard = "director_class_ai.cli.guard:main"
 director-class-mcp-gateway = "director_class_ai.gateway.mcp_cli:main"
 director-class-policy = "director_class_ai.cli.policy:main"
 director-class-siem-export = "director_class_ai.audit.export_cli:main"
+director-class-halt-sidecar = "director_class_ai.sidecar.cli:main"
 
 [project.optional-dependencies]
 # Content/integrity detectors reuse director-ai model primitives. The upper

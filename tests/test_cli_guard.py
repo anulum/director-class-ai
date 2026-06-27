@@ -24,6 +24,7 @@ from director_class_ai.cli.guard import (
     run_guard,
 )
 from director_class_ai.policy import PolicyGovernance, Profile
+from director_class_ai.sidecar import LocalHaltSwitch
 
 _PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
 
@@ -45,6 +46,7 @@ def _opts(
     require_policy_store: bool = False,
     audit_head_key_env: str = "",
     audit_anchor_log: str = "",
+    halt_state: str = "",
 ) -> CommandGuardOptions:
     """Build guard options whose runtime state lives under tmp."""
     return CommandGuardOptions(
@@ -68,6 +70,7 @@ def _opts(
         require_policy_store=require_policy_store,
         audit_head_key_env=audit_head_key_env,
         audit_anchor_log=audit_anchor_log,
+        halt_state=halt_state,
     )
 
 
@@ -188,6 +191,14 @@ def test_command_guard_options_parse_signed_audit_paths() -> None:
     assert options.audit_anchor_log == "/tmp/audit-anchor.jsonl"
 
 
+def test_command_guard_options_parse_halt_state_path() -> None:
+    options = CommandGuardOptions.from_argv(
+        ("--halt-state", "/tmp/halt.json", "--", "noop")
+    )
+
+    assert options.halt_state == "/tmp/halt.json"
+
+
 def test_build_command_request_uses_existing_sdk_contract() -> None:
     options = CommandGuardOptions(
         surface="kubernetes",
@@ -244,6 +255,27 @@ def test_untrusted_cloud_mutation_blocks_without_approval_downgrade(
     assert event["permitted"] is False
     assert event["executed"] is False
     assert "origin_taint" in event["firing"]
+
+
+def test_halt_state_blocks_command_before_execution(tmp_path: Path) -> None:
+    halt_state = tmp_path / "halt.json"
+    LocalHaltSwitch(halt_state).halt(reason="incident", actor="operator-a")
+
+    event = run_guard(
+        _opts(
+            tmp_path,
+            surface="shell",
+            command=("printf", "should-not-run"),
+            execute=True,
+            halt_state=str(halt_state),
+        )
+    )
+
+    assert event["route"] == "block"
+    assert event["permitted"] is False
+    assert event["executed"] is False
+    assert event["firing"] == ("sidecar_halt",)
+    assert "should-not-run" not in repr(event)
 
 
 def test_execute_runs_only_after_permit(tmp_path: Path) -> None:

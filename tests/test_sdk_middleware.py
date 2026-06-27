@@ -27,6 +27,7 @@ from director_class_ai.sdk import (
     ToolReviewMiddleware,
     ToolReviewRequest,
 )
+from director_class_ai.sidecar import LocalHaltSwitch
 
 
 class _BorderlineAction:
@@ -275,6 +276,37 @@ def test_default_wires_durable_approval_and_audit_paths(tmp_path: Path) -> None:
     assert spy.calls == [request]
     assert verify_chain(audit_log).ok
     assert len(audit_log.read_text(encoding="utf-8").splitlines()) == 2
+
+
+def test_default_halt_sidecar_blocks_before_execution_and_audits(
+    tmp_path: Path,
+) -> None:
+    spy = _ExecutorSpy()
+    audit_log = tmp_path / "sdk-audit.jsonl"
+    halt_state = tmp_path / "halt.json"
+    LocalHaltSwitch(halt_state).halt(reason="incident", actor="operator-a")
+    request = ToolReviewRequest("fs.read", dry_run=False)
+
+    decision = ToolReviewMiddleware.default(
+        audit_log=audit_log,
+        halt_state=halt_state,
+        executor=spy,
+    ).run(request)
+
+    assert decision.route == "block"
+    assert decision.permitted is False
+    assert decision.executed is False
+    assert decision.firing == ("sidecar_halt",)
+    assert spy.calls == []
+    assert verify_chain(audit_log).ok
+
+
+def test_default_rejects_duplicate_halt_sources(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="halt_switch or halt_state"):
+        ToolReviewMiddleware.default(
+            halt_switch=LocalHaltSwitch(tmp_path / "halt.json"),
+            halt_state=tmp_path / "other.json",
+        )
 
 
 def test_default_can_sign_and_anchor_audit_log(tmp_path: Path) -> None:

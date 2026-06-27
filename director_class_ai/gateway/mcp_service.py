@@ -38,6 +38,7 @@ from typing import Literal
 from ..action import MCPToolCall, MCPToolRegistration
 from ..core.governor import ApprovalHook, AuditSink
 from ..policy import CapabilityGrant, CapabilityPolicy
+from ..sidecar import HaltSwitchReader, LocalHaltSwitch
 from .mcp import (
     MCPDiscoveryRequest,
     MCPGateway,
@@ -66,6 +67,7 @@ class MCPGatewayServiceConfig:
     require_signed_registrations: bool = True
     max_body_bytes: int = 1_048_576
     operator_key: str = ""
+    halt_state: str = ""
 
 
 @dataclass(frozen=True)
@@ -106,6 +108,7 @@ class MCPGatewayService:
         capability_grants: Sequence[CapabilityGrant] = (),
         approval: ApprovalHook | None = None,
         audit_sink: AuditSink | None = None,
+        halt_switch: HaltSwitchReader | None = None,
     ) -> None:
         if capability_policy is not None and policy_store is not None:
             raise ValueError("pass either capability_policy or policy_store, not both")
@@ -116,6 +119,9 @@ class MCPGatewayService:
         self._capability_grants = tuple(capability_grants)
         self._approval = approval
         self._audit_sink = audit_sink
+        self._halt_switch = halt_switch or (
+            LocalHaltSwitch(self._config.halt_state) if self._config.halt_state else None
+        )
         self._gateway = self._build_gateway()
 
     @property
@@ -199,6 +205,9 @@ class MCPGatewayService:
         )
 
     def _handle_review(self, payload: Mapping[str, object]) -> MCPGatewayServiceResponse:
+        halted = self._halt_response()
+        if halted is not None:
+            return halted
         self._refresh_gateway_if_policy_bound()
         request = MCPGatewayRequest.from_parts(
             _string(payload.get("server")),
@@ -226,6 +235,9 @@ class MCPGatewayService:
     def _handle_response(
         self, payload: Mapping[str, object]
     ) -> MCPGatewayServiceResponse:
+        halted = self._halt_response()
+        if halted is not None:
+            return halted
         self._refresh_gateway_if_policy_bound()
         request = MCPResponseRequest(
             call=_call(_mapping(payload.get("call"))),
@@ -245,6 +257,24 @@ class MCPGatewayService:
     def _refresh_gateway_if_policy_bound(self) -> None:
         if self._policy_store is not None:
             self._gateway = self._build_gateway()
+
+    def _halt_response(self) -> MCPGatewayServiceResponse | None:
+        if self._halt_switch is None:
+            return None
+        snapshot = self._halt_switch.snapshot()
+        if not snapshot.halted:
+            return None
+        return MCPGatewayServiceResponse(
+            HTTPStatus.FORBIDDEN,
+            {
+                "event_type": "mcp_sidecar_halt",
+                "route": "block",
+                "permitted": False,
+                "findings": ("sidecar_halt",),
+                "halt_generation": snapshot.generation,
+                "halt_reason": snapshot.reason,
+            },
+        )
 
 
 class MCPGatewayHTTPServer(ThreadingHTTPServer):

@@ -40,9 +40,11 @@ from ..action._lexicon import UNTRUSTED_ORIGINS
 from ..approvals import ApprovalQueue
 from ..audit import AuditChainSink
 from ..core import Decision, Detector, EvaluationRequest, Governor, ParallelEnsembleScorer
-from ..core.fusion import FusionPolicy
-from ..core.governor import ApprovalHook, AuditSink
+from ..core.fusion import FusionPolicy, Verdict
+from ..core.governor import ApprovalHook, AuditRecord, AuditSink, digest_request
+from ..core.signal import DetectorSignal, Locus, Plane, Severity
 from ..detectors import default_content_integrity_detectors
+from ..sidecar import HaltSwitchReader, LocalHaltSwitch
 
 __all__ = [
     "ToolExecutionResult",
@@ -208,9 +210,13 @@ class ToolReviewMiddleware:
         governor: Governor,
         *,
         executor: ToolExecutor | None = None,
+        halt_switch: HaltSwitchReader | None = None,
+        audit_sink: AuditSink | None = None,
     ) -> None:
         self._governor = governor
         self._executor = executor
+        self._halt_switch = halt_switch
+        self._audit_sink = audit_sink
 
     @classmethod
     def default(
@@ -224,6 +230,8 @@ class ToolReviewMiddleware:
         audit_log: str | Path | None = None,
         audit_head_signing_key: bytes | str | None = None,
         audit_anchor_path: str | Path | None = None,
+        halt_switch: HaltSwitchReader | None = None,
+        halt_state: str | Path | None = None,
         policy_profile: str = "",
         executor: ToolExecutor | None = None,
     ) -> ToolReviewMiddleware:
@@ -238,6 +246,8 @@ class ToolReviewMiddleware:
             raise ValueError("pass either approval or approval_store, not both")
         if audit_sink is not None and audit_log is not None:
             raise ValueError("pass either audit_sink or audit_log, not both")
+        if halt_switch is not None and halt_state is not None:
+            raise ValueError("pass either halt_switch or halt_state, not both")
         if approval_store is not None:
             Path(approval_store).parent.mkdir(parents=True, exist_ok=True)
             approval = ApprovalQueue(approval_store).request_approval
@@ -254,6 +264,8 @@ class ToolReviewMiddleware:
                 if audit_anchor_path is not None
                 else None,
             )
+        if halt_state is not None:
+            halt_switch = LocalHaltSwitch(halt_state)
         ensemble = ParallelEnsembleScorer(
             tuple(detectors or _default_detectors()), policy=policy
         )
@@ -262,10 +274,18 @@ class ToolReviewMiddleware:
             approval=approval,
             audit_sink=audit_sink,
         )
-        return cls(governor, executor=executor)
+        return cls(
+            governor,
+            executor=executor,
+            halt_switch=halt_switch,
+            audit_sink=audit_sink,
+        )
 
     def review(self, request: ToolReviewRequest) -> ToolMiddlewareDecision:
         """Review a tool call without dispatching the underlying tool."""
+        halted = self._halt_decision(request)
+        if halted is not None:
+            return halted
         decision = self._governor.review(request.to_evaluation())
         return ToolMiddlewareDecision.from_governor(request, decision)
 
@@ -276,6 +296,9 @@ class ToolReviewMiddleware:
         executor: ToolExecutor | None = None,
     ) -> ToolMiddlewareDecision:
         """Review and optionally execute one tool call after a permit decision."""
+        halted = self._halt_decision(request)
+        if halted is not None:
+            return halted
         decision = self._governor.review(request.to_evaluation())
         runner = executor or self._executor
         if not decision.permitted or request.dry_run or runner is None:
@@ -284,6 +307,51 @@ class ToolReviewMiddleware:
             request,
             decision,
             execution=runner(request),
+        )
+
+    def _halt_decision(self, request: ToolReviewRequest) -> ToolMiddlewareDecision | None:
+        if self._halt_switch is None:
+            return None
+        snapshot = self._halt_switch.snapshot()
+        if not snapshot.halted:
+            return None
+        evaluation = request.to_evaluation()
+        signal = DetectorSignal(
+            detector="out_of_band_halt_sidecar",
+            plane=Plane.ACTION,
+            score=1.0,
+            locus=Locus.ACTION,
+            signal_type="sidecar_halt",
+            severity=Severity.CRITICAL,
+            rationale=f"halt generation {snapshot.generation}: {snapshot.reason}",
+        )
+        verdict = Verdict(
+            allow=False,
+            risk=1.0,
+            requires_human=False,
+            plane_risk={Plane.ACTION: 1.0},
+            firing=(signal,),
+            rationale="out-of-band halt sidecar is active",
+        )
+        record = AuditRecord(
+            permitted=False,
+            escalated=False,
+            risk=1.0,
+            requires_human=False,
+            rationale=verdict.rationale,
+            firing=("sidecar_halt",),
+            request_digest=digest_request(evaluation),
+        )
+        if self._audit_sink is not None:
+            self._audit_sink(record)
+        return ToolMiddlewareDecision.from_governor(
+            request,
+            Decision(
+                permitted=False,
+                escalated=False,
+                verdict=verdict,
+                record=record,
+            ),
         )
 
 

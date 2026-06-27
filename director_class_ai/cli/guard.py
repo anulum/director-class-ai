@@ -72,6 +72,7 @@ class CommandGuardOptions:
     require_policy_store: bool = False
     audit_head_key_env: str = ""
     audit_anchor_log: str = ""
+    halt_state: str = ""
 
     @classmethod
     def from_argv(cls, argv: Sequence[str] | None = None) -> CommandGuardOptions:
@@ -95,6 +96,7 @@ class CommandGuardOptions:
             require_policy_store=args.require_policy_store,
             audit_head_key_env=args.audit_head_key_env,
             audit_anchor_log=args.audit_anchor_log,
+            halt_state=args.halt_state,
         )
 
 
@@ -158,6 +160,7 @@ def run_guard(options: CommandGuardOptions) -> dict[str, object]:
             if options.audit_anchor_log
             else None,
         ),
+        halt_state=options.halt_state or None,
     )
     decision = middleware.run(request)
     event = decision.to_audit_event()
@@ -254,6 +257,11 @@ def _parser() -> argparse.ArgumentParser:
         "--audit-anchor-log",
         default="",
         help="Optional append-only external anchor JSONL for signed audit heads.",
+    )
+    parser.add_argument(
+        "--halt-state",
+        default="",
+        help="Optional out-of-band halt-state JSON path checked before execution.",
     )
     parser.add_argument(
         "--approval-store",

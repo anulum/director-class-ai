@@ -39,6 +39,7 @@ class MCPGatewayServerOptions:
     operator_key: str = ""
     operator_key_env: str = ""
     policy_store: str = DEFAULT_POLICY_STORE
+    halt_state: str = ""
 
     @classmethod
     def from_argv(
@@ -57,6 +58,7 @@ class MCPGatewayServerOptions:
             operator_key=os.environ.get(operator_key_env, "") if operator_key_env else "",
             operator_key_env=operator_key_env,
             policy_store=args.policy_store,
+            halt_state=args.halt_state,
         )
 
 
@@ -70,6 +72,7 @@ def build_gateway_server(options: MCPGatewayServerOptions) -> MCPGatewayHTTPServ
             require_signed_registrations=options.require_signed_registrations,
             max_body_bytes=options.max_body_bytes,
             operator_key=options.operator_key,
+            halt_state=options.halt_state,
         ),
         policy_store=options.policy_store,
     )
@@ -136,6 +139,11 @@ def _parser() -> argparse.ArgumentParser:
             "Guardrail-as-Code ledger whose approved head posture governs MCP "
             f"reviews. Default: {DEFAULT_POLICY_STORE}."
         ),
+    )
+    parser.add_argument(
+        "--halt-state",
+        default="",
+        help="Optional out-of-band halt-state JSON path checked before review.",
     )
     return parser
 

@@ -221,6 +221,38 @@
       "claim_boundary": "Internal governance workflow and CLI over the policy primitives; deterministic, no model or network dependency. No public benchmark or accuracy claim.",
       "implementation_readiness": "executed",
       "open_blockers": []
+    },
+    {
+      "id": "P4-HALT-001",
+      "plan_anchor": "Phase 4 / Out-of-band kill-switch sidecar",
+      "status": "done",
+      "buyer_user_value": "Gives operators a separate local halt control that SDK, command guard, and MCP loopback deployments can consult before any governed execution or tool-response handoff.",
+      "threat_model": "A compromised or malfunctioning agent process continues to execute through in-process hooks after an operator has declared an incident halt; the halt state must be written by an operator-owned sidecar path and read by governed runtimes.",
+      "required_evidence": [
+        "durable halt/resume state with operator actor, reason, timestamp, and generation",
+        "operator-key-protected loopback status/halt/resume service",
+        "CLI status/halt/resume/serve command surface",
+        "SDK, command guard, and MCP loopback service block on active halt state before execution or response handoff",
+        "strict mypy, ruff, and boundary evidence pass"
+      ],
+      "affected_surfaces": [
+        "director_class_ai/sidecar/state.py",
+        "director_class_ai/sidecar/service.py",
+        "director_class_ai/sidecar/cli.py",
+        "director_class_ai/sdk/middleware.py",
+        "director_class_ai/cli/guard.py",
+        "director_class_ai/gateway/mcp_cli.py",
+        "director_class_ai/gateway/mcp_service.py",
+        "pyproject.toml",
+        "tests/test_halt_sidecar.py",
+        "tests/test_sdk_middleware.py",
+        "tests/test_cli_guard.py",
+        "tests/test_mcp_gateway_service.py"
+      ],
+      "benchmark_impact": "none",
+      "claim_boundary": "Local single-host halt boundary only. No distributed production-ready kill-switch, benchmark, certification, or legal evidence claim.",
+      "implementation_readiness": "executed",
+      "open_blockers": []
     }
   ]
 }
