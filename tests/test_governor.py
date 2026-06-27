@@ -17,6 +17,7 @@ from director_class_ai.core import (
     ParallelEnsembleScorer,
     Plane,
 )
+from director_class_ai.core.governor import digest_request
 
 
 class _BorderlineContent:
@@ -85,7 +86,7 @@ def test_audit_record_and_trail() -> None:
     assert len(gov.trail) == 2
     first = gov.trail[0]
     assert first.permitted is False
-    assert first.request_digest and len(first.request_digest) == 16
+    assert first.request_digest and len(first.request_digest) == 64
     # the digest must not leak the raw command
     assert "rm -rf" not in first.request_digest
 
@@ -102,6 +103,25 @@ def test_digest_is_stable_for_same_request() -> None:
     a = gov.review(EvaluationRequest(action="rm -rf /tmp/x")).record.request_digest
     b = gov.review(EvaluationRequest(action="rm -rf /tmp/x")).record.request_digest
     assert a == b
+
+
+def test_digest_binds_tenant_id() -> None:
+    first = digest_request(EvaluationRequest(action="rm -rf /tmp/x", tenant_id="a"))
+    second = digest_request(EvaluationRequest(action="rm -rf /tmp/x", tenant_id="b"))
+
+    assert first != second
+    assert len(first) == len(second) == 64
+
+
+def test_digest_binds_deployment_salt(monkeypatch) -> None:
+    request = EvaluationRequest(action="rm -rf /tmp/x", tenant_id="tenant")
+    monkeypatch.setenv("DIRECTOR_CLASS_DIGEST_SALT", "deployment-a")
+    first = digest_request(request)
+    monkeypatch.setenv("DIRECTOR_CLASS_DIGEST_SALT", "deployment-b")
+    second = digest_request(request)
+
+    assert first != second
+    assert len(first) == len(second) == 64
 
 
 def _action_governor(**kw) -> Governor:

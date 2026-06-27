@@ -288,7 +288,7 @@ def test_incident_replay_uses_sanitized_fixture_without_raw_output() -> None:
             action="rm -rf /sanitized",
             action_provenance="user",
         ),
-        expected_route="human",
+        expected_route="block",
         source_evidence_digest="evidence-digest",
         notes="curated local fixture",
     )
@@ -301,8 +301,8 @@ def test_incident_replay_uses_sanitized_fixture_without_raw_output() -> None:
     rendered = json.dumps(payload, sort_keys=True)
 
     assert payload["fixture_id"] == "replay-001"
-    assert payload["expected_route"] == "human"
-    assert payload["observed_route"] == "human"
+    assert payload["expected_route"] == "block"
+    assert payload["observed_route"] == "block"
     assert payload["route_conformant"] is True
     assert payload["fixture_digest"] == fixture.fixture_digest()
     assert "destructive_command" in rendered

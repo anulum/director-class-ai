@@ -32,6 +32,8 @@ It is fail-closed by construction:
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -41,6 +43,8 @@ from .signal import EvaluationRequest
 
 __all__ = ["AuditRecord", "Decision", "Governor", "digest_request"]
 
+_DIGEST_SALT_ENV = "DIRECTOR_CLASS_DIGEST_SALT"
+
 ApprovalHook = Callable[[Verdict, EvaluationRequest], bool]
 AuditSink = Callable[["AuditRecord"], None]
 
@@ -49,10 +53,20 @@ def digest_request(request: EvaluationRequest) -> str:
     """Privacy-preserving identifier for a request — no raw content / PII.
 
     The single source of truth for the digest, so the audit chain and the approval
-    queue bind to the *same* value for the same request.
+    queue bind to the *same* value for the same request. The digest is tenant-
+    scoped and deployment-salted through ``DIRECTOR_CLASS_DIGEST_SALT`` when that
+    environment variable is set.
     """
-    payload = f"{request.action}\x1f{request.response}\x1f{request.context}"
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    payload = {
+        "version": 2,
+        "tenant_id": request.tenant_id,
+        "action": request.action,
+        "response": request.response,
+        "context": request.context,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    salt = os.environ.get(_DIGEST_SALT_ENV, "")
+    return hashlib.sha256(f"{salt}\x1f{encoded}".encode()).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -65,7 +79,7 @@ class AuditRecord:
     requires_human: bool
     rationale: str
     firing: tuple[str, ...]  # signal types that fired
-    request_digest: str  # sha256 prefix of the request — no raw content / PII
+    request_digest: str  # sha256 of tenant/salt-bound request — no raw content / PII
 
 
 @dataclass(frozen=True)

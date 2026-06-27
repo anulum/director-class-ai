@@ -195,6 +195,11 @@ items in the registered MCP schema. MCP discovery also pins descriptor
 descriptions and instructions on first trust; changed `tools/list` metadata is
 treated as drift instead of a harmless refresh.
 
+Request digests are full SHA-256 identifiers over the canonical request payload
+and tenant id. Deployments can set `DIRECTOR_CLASS_DIGEST_SALT` to bind approval
+and audit digests to a deployment-specific salt without logging raw request
+content.
+
 ## External benchmark artefacts
 
 External action benchmark rows are never inferred from benchmark names. A local

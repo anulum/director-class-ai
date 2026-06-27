@@ -15,12 +15,12 @@
         "director_class_ai/audit/chain.py",
         "director_class_ai/approvals/queue.py"
       ],
-      "required_behaviour": "Command review CLI parses real options, writes redacted audit records, opens approval tickets for recoverable escalations, hard-blocks irreversible never-soften actions before approval, respects dry-run/execute modes, and preserves single-use approval semantics.",
+      "required_behaviour": "Command review CLI parses real options, writes redacted audit records with 256-bit tenant/salt-bound request digests, opens approval tickets for recoverable escalations, hard-blocks irreversible never-soften actions before approval, respects dry-run/execute modes, and preserves single-use approval semantics.",
       "evidence_tests": [
         {
           "file": "tests/test_cli_guard.py",
           "mode": "integration",
-          "covers": "run_guard/main paths, audit JSONL persistence, approval-store persistence, never-soften blocking, approval execution gating, console-script declaration"
+          "covers": "run_guard/main paths, audit JSONL persistence, approval-store persistence, tenant/salt-bound request digest propagation, never-soften blocking, approval execution gating, console-script declaration"
         }
       ]
     },
@@ -42,7 +42,7 @@
         {
           "file": "tests/test_approval_queue.py",
           "mode": "integration",
-          "covers": "ApprovalQueue JSON store persistence, single-use approval semantics, dual-human critical-ticket approval, and atomic-replacement failure preservation"
+          "covers": "ApprovalQueue JSON store persistence, single-use approval semantics over widened request digests, dual-human critical-ticket approval, and atomic-replacement failure preservation"
         }
       ]
     },
