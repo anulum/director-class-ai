@@ -21,15 +21,16 @@ from director_class_ai.core import (
 
 
 def sig(
-    plane,
-    score,
+    plane: Plane,
+    score: float,
     *,
-    sev=Severity.MEDIUM,
-    calib=1.0,
-    locus=Locus.RESPONSE,
-    name="d",
-    stype="t",
-):
+    sev: Severity = Severity.MEDIUM,
+    calib: float = 1.0,
+    locus: Locus = Locus.RESPONSE,
+    name: str = "d",
+    stype: str = "t",
+) -> DetectorSignal:
+    """Build a detector signal for fusion-path tests."""
     return DetectorSignal(
         detector=name,
         plane=plane,
@@ -114,7 +115,13 @@ class TestAuthorisedDestructiveRouting:
     fired. Every other path keeps the fail-closed hard block.
     """
 
-    def _destructive(self, *, sev=Severity.HIGH, stype="permission_wipe"):
+    def _destructive(
+        self,
+        *,
+        sev: Severity = Severity.HIGH,
+        stype: str = "permission_wipe",
+    ) -> DetectorSignal:
+        """Return a high-risk action signal for routing tests."""
         return sig(Plane.ACTION, 0.9, sev=sev, locus=Locus.ACTION, stype=stype)
 
     def test_user_authorised_destructive_escalates_not_blocks(self) -> None:
