@@ -11,7 +11,10 @@ from __future__ import annotations
 import importlib
 import json
 import threading
+from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 import director_class_ai.audit.chain as audit_chain
 from director_class_ai.action import DestructiveCommandDetector
@@ -312,6 +315,62 @@ def test_last_skips_blank_lines_on_append(tmp_path) -> None:
     _governor(p).review(EvaluationRequest(action="ls"))  # _last must skip the blank
     assert verify_chain(p).ok is True
     assert json.loads(p.read_text().splitlines()[-1])["seq"] == 4
+
+
+def test_sink_caches_head_after_initial_tail_scan(tmp_path, monkeypatch) -> None:
+    p = tmp_path / "audit.jsonl"
+    sink = AuditChainSink(path=p, policy_profile="test", clock=_Clock())
+    ensemble = ParallelEnsembleScorer([DestructiveCommandDetector()])
+    gov = Governor(ensemble=ensemble, audit_sink=sink)
+    calls = 0
+    original_last = AuditChainSink._last
+
+    def counted_last(self: AuditChainSink) -> tuple[int, str]:
+        nonlocal calls
+        calls += 1
+        return original_last(self)
+
+    monkeypatch.setattr(AuditChainSink, "_last", counted_last)
+
+    for action in ("rm -rf /", "ls -la", "DROP TABLE t;", "cat x"):
+        gov.review(EvaluationRequest(action=action))
+
+    assert calls == 1
+    lines = [json.loads(line) for line in p.read_text().splitlines()]
+    assert [line["seq"] for line in lines] == [0, 1, 2, 3]
+    assert verify_chain(p).ok is True
+
+
+def test_sink_reloads_head_after_partial_sidecar_failure(tmp_path, monkeypatch) -> None:
+    p = tmp_path / "audit.jsonl"
+    sink = AuditChainSink(path=p, policy_profile="test", clock=_Clock())
+    ensemble = ParallelEnsembleScorer([DestructiveCommandDetector()])
+    gov = Governor(ensemble=ensemble, audit_sink=sink)
+    failed = False
+    original_atomic_write = audit_chain.atomic_write_text
+
+    def fail_first_head_write(
+        path: str | Path,
+        text: str,
+        *,
+        encoding: str = "utf-8",
+    ) -> None:
+        nonlocal failed
+        if not failed and Path(path).suffix == ".head":
+            failed = True
+            raise OSError("simulated sidecar crash")
+        original_atomic_write(path, text, encoding=encoding)
+
+    monkeypatch.setattr(audit_chain, "atomic_write_text", fail_first_head_write)
+
+    with pytest.raises(OSError, match="simulated sidecar crash"):
+        gov.review(EvaluationRequest(action="rm -rf /"))
+    gov.review(EvaluationRequest(action="ls -la"))
+
+    lines = [json.loads(line) for line in p.read_text().splitlines()]
+    assert [line["seq"] for line in lines] == [0, 1]
+    assert lines[1]["prev_hash"] == lines[0]["entry_hash"]
+    assert verify_chain(p).ok is True
 
 
 class TestRustAuditPrimitivesParity:

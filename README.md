@@ -315,14 +315,21 @@ Apache-2.0.
 writes SIEM/SOC JSONL. Exported events contain decision ids, detector ids, policy
 profile, approval state, request digest, verdict booleans, risk, and chain
 metadata. Raw prompts, actions, context, responses, and command output are not in
-the export schema. For signed deployments, pass `--head-signing-key-env <ENV>`
-and `--anchor-log <path>` so export fails closed unless the local head signature
-and latest anchor match.
+the export schema. The append path keeps the latest `(seq, entry_hash)` cached
+under the sink lock after the first on-disk tail scan, while verification still
+replays the full chain. For signed deployments, pass
+`--head-signing-key-env <ENV>` and `--anchor-log <path>` so export fails closed
+unless the local head signature and latest anchor match.
 
 ```bash
 director-class-siem-export runtime/audit.jsonl -o runtime/siem.jsonl
 director-class-siem-export runtime/audit.jsonl --head-signing-key-env DCA_AUDIT_HEAD_KEY --anchor-log runtime/audit-anchor.jsonl
 ```
+
+`make bench-audit` records a local, functional audit-chain append hot-path run in
+`benchmarks/results/audit_chain_hot_path.json`. That result is not an isolated
+throughput, external benchmark, comparative performance, certification, or legal
+evidence claim.
 
 ## Operator approvals
 

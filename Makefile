@@ -2,7 +2,7 @@
 # Director-Class AI — developer task runner
 .DEFAULT_GOAL := help
 PY ?= python
-.PHONY: help test lint fmt types sast spdx test-quality test-boundaries godfiles docs build bench bench-evidence import-external redteam repository-readiness phase4-intake claim-boundaries preflight
+.PHONY: help test lint fmt types sast spdx test-quality test-boundaries godfiles docs build bench bench-evidence bench-audit import-external redteam repository-readiness phase4-intake claim-boundaries preflight
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -51,6 +51,9 @@ bench: ## Run the action-plane benchmark
 
 bench-evidence: ## Run action benchmark with evidence-grade metadata
 	$(PY) -m benchmarks.action_evidence
+
+bench-audit: ## Run local audit-chain append hot-path benchmark
+	$(PY) -m benchmarks.audit_chain_hot_path
 
 import-external: ## Import reviewed external JSONL: make import-external SURFACE=... INPUT=...
 	@test -n "$(SURFACE)" || (echo "SURFACE is required" && exit 2)

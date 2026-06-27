@@ -1,0 +1,12 @@
+{
+  "appends": 500,
+  "appends_per_second": 75.33233184395749,
+  "benchmark": "audit_chain_hot_path",
+  "claim_boundary": "Audit append hot-path evidence for this checkout and host only; not an isolated throughput, external benchmark, comparative performance, certification, or counsel-reviewed evidence-status claim.",
+  "elapsed_seconds": 6.637256377987796,
+  "evidence_grade": "local-functional-non-isolated",
+  "hot_path": "AuditChainSink append with in-process locked head cache",
+  "log_bytes": 253949,
+  "verification_ok": true,
+  "verification_reason": ""
+}

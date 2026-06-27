@@ -50,6 +50,14 @@ _RustVerifyChain: TypeAlias = Callable[
 ]
 
 
+@dataclass(frozen=True)
+class _ChainHead:
+    """Latest audit-chain sequence number and entry hash observed by one sink."""
+
+    seq: int
+    entry_hash: str
+
+
 def _approval_state(permitted: bool, escalated: bool) -> str:
     if escalated:
         return "approved" if permitted else "denied_or_pending"
@@ -149,6 +157,7 @@ class AuditChainSink:
         """Resolve sink paths and initialise the append lock."""
         self.path = Path(self.path)
         self._lock = threading.Lock()
+        self._cached_head: _ChainHead | None = None
         self._head_path = self.path.with_suffix(self.path.suffix + ".head")
         self._head_signature_path = self.path.with_suffix(self.path.suffix + ".head.sig")
         if self.anchor_path is not None:
@@ -157,6 +166,7 @@ class AuditChainSink:
             self.anchor_path = Path(self.anchor_path)
 
     def _last(self) -> tuple[int, str]:
+        """Read the latest non-blank chain entry from disk."""
         if not self.path.exists():
             return -1, _GENESIS
         last_line = ""
@@ -169,11 +179,19 @@ class AuditChainSink:
         rec = json.loads(last_line)
         return int(rec["seq"]), str(rec["entry_hash"])
 
+    def _current_head(self) -> _ChainHead:
+        """Return the cached head, initialising it from disk on first append."""
+        if self._cached_head is None:
+            seq, entry_hash = self._last()
+            self._cached_head = _ChainHead(seq, entry_hash)
+        return self._cached_head
+
     def __call__(self, record: AuditRecord) -> None:
         """Append one audit record while preserving chain continuity."""
         with self._lock:
-            seq, prev_hash = self._last()
-            seq += 1
+            head = self._current_head()
+            seq = head.seq + 1
+            prev_hash = head.entry_hash
             payload: dict[str, object] = {
                 "seq": seq,
                 "prev_hash": prev_hash,
@@ -189,33 +207,39 @@ class AuditChainSink:
                 "request_digest": record.request_digest,
             }
             entry = dict(payload)
-            entry["entry_hash"] = _entry_hash(prev_hash, payload)
-            # fsync the entry to disk before the head advances, so a crash can
-            # never leave a head that points past a record the chain has lost.
-            durable_append_line(self.path, json.dumps(entry) + "\n")
-            head_json = _canonical_json(_head_payload(seq, entry["entry_hash"]))
-            atomic_write_text(
-                self._head_path,
-                head_json,
-            )
-            if self.head_signing_key is not None:
-                signature = _head_signature(head_json, self.head_signing_key)
+            entry_hash = _entry_hash(prev_hash, payload)
+            entry["entry_hash"] = entry_hash
+            try:
+                # fsync the entry to disk before the head advances, so a crash can
+                # never leave a head that points past a record the chain has lost.
+                durable_append_line(self.path, json.dumps(entry) + "\n")
+                head_json = _canonical_json(_head_payload(seq, entry_hash))
                 atomic_write_text(
-                    self._head_signature_path,
-                    _canonical_json(_signature_payload(signature)),
+                    self._head_path,
+                    head_json,
                 )
-                if self.anchor_path is not None:
-                    durable_append_line(
-                        self.anchor_path,
-                        _canonical_json(
-                            {
-                                "alg": "HMAC-SHA256",
-                                "head": json.loads(head_json),
-                                "signature": signature,
-                            }
-                        )
-                        + "\n",
+                if self.head_signing_key is not None:
+                    signature = _head_signature(head_json, self.head_signing_key)
+                    atomic_write_text(
+                        self._head_signature_path,
+                        _canonical_json(_signature_payload(signature)),
                     )
+                    if self.anchor_path is not None:
+                        durable_append_line(
+                            self.anchor_path,
+                            _canonical_json(
+                                {
+                                    "alg": "HMAC-SHA256",
+                                    "head": json.loads(head_json),
+                                    "signature": signature,
+                                }
+                            )
+                            + "\n",
+                        )
+            except Exception:
+                self._cached_head = None
+                raise
+            self._cached_head = _ChainHead(seq, entry_hash)
 
 
 @dataclass(frozen=True)

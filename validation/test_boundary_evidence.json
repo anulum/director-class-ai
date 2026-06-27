@@ -73,12 +73,12 @@
         "director_class_ai/audit/export_cli.py",
         "director_class_ai/evidence/techniques.py"
       ],
-      "required_behaviour": "Audit decisions append to hash-chained JSONL, optionally sign and externally anchor the head, verify across restart/tamper/replay cases, and export redacted SIEM JSONL with bounded MITRE ATLAS and OWASP ASI technique tags through API and CLI entry points.",
+      "required_behaviour": "Audit decisions append to hash-chained JSONL, cache the latest head under the sink append lock after the first tail scan, optionally sign and externally anchor the head, verify across restart/tamper/replay cases, and export redacted SIEM JSONL with bounded MITRE ATLAS and OWASP ASI technique tags through API and CLI entry points.",
       "evidence_tests": [
         {
           "file": "tests/test_audit_chain.py",
           "mode": "integration",
-          "covers": "append, verify, mutation/reorder/deletion/truncation/corrupt-line detection, sidecar handling, recoverable append-before-head crash window, signed-head replay detection, external anchor verification, and optional Rust verifier parity"
+          "covers": "append, verify, mutation/reorder/deletion/truncation/corrupt-line detection, sidecar handling, locked head-cache reuse, cache invalidation after partial sidecar failure, recoverable append-before-head crash window, signed-head replay detection, external anchor verification, and optional Rust verifier parity"
         },
         {
           "file": "tests/test_audit_sinks.py",

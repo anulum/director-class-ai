@@ -280,7 +280,7 @@
         "tests/test_mcp_gateway_service.py"
       ],
       "benchmark_impact": "none",
-      "claim_boundary": "Local single-host halt boundary only. No distributed production-ready kill-switch, benchmark, certification, or legal evidence claim.",
+      "claim_boundary": "Local single-host halt boundary only. No distributed production-ready kill-switch, benchmark, certification, or counsel-reviewed evidence-status claim.",
       "implementation_readiness": "executed",
       "open_blockers": []
     },
@@ -342,7 +342,41 @@
         "validation/phase4_task_intake.json"
       ],
       "benchmark_impact": "none",
-      "claim_boundary": "Governance posture tuning only. This does not change detector scoring, model quality, benchmark performance, certification status, or legal evidence claims.",
+      "claim_boundary": "Governance posture tuning only. This does not change detector scoring, model quality, benchmark performance, certification status, or counsel-reviewed evidence-status claims.",
+      "implementation_readiness": "executed",
+      "open_blockers": []
+    },
+    {
+      "id": "P4-AUDIT-HOTPATH-001",
+      "plan_anchor": "Phase 4 / Strategic bets / Audit-chain hot path",
+      "status": "done",
+      "buyer_user_value": "Keeps high-volume governed deployments from paying an O(n) audit-log tail scan on every decision while preserving the same tamper-evident append, head sidecar, signature, anchor, and verification semantics.",
+      "threat_model": "An audit append path that rereads the full JSONL file for every decision degrades over log lifetime, tempting operators to disable or rotate evidence prematurely; a naive cache could fork sequence numbers after a partial sidecar failure.",
+      "required_evidence": [
+        "AuditChainSink caches the latest (seq, entry_hash) under its append lock after the first on-disk tail scan",
+        "cache advances only after durable append plus head, optional signature, and optional anchor persistence complete",
+        "partial sidecar-write failure invalidates the cache and the next append reloads the on-disk tail",
+        "module-specific integration tests exercise Governor.review through the real AuditChainSink path",
+        "local audit hot-path benchmark records functional, non-isolated evidence without external or comparative claims"
+      ],
+      "affected_surfaces": [
+        "director_class_ai/audit/chain.py",
+        "benchmarks/audit_chain_hot_path.py",
+        "benchmarks/results/audit_chain_hot_path.json",
+        "tests/test_audit_chain.py",
+        "tests/test_audit_chain_hot_path_benchmark.py",
+        "Makefile",
+        "README.md",
+        "docs/evidence.md",
+        "docs/internal/ARCHITECTURE.md",
+        "docs/internal/AUDIT_INDEX.md",
+        "docs/internal/PLAN.md",
+        "docs/internal/strategy_and_audit_2026-06-20.md",
+        "validation/test_boundary_evidence.json",
+        "validation/phase4_task_intake.json"
+      ],
+      "benchmark_impact": "functional_regression",
+      "claim_boundary": "Local audit append functional evidence only. This is not an isolated throughput claim, external benchmark claim, comparative performance claim, certification claim, or counsel-reviewed evidence-status claim.",
       "implementation_readiness": "executed",
       "open_blockers": []
     }

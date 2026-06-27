@@ -22,14 +22,23 @@ The local gate stack covers:
 ## Audit-Chain Verification
 
 The default audit chain is hash-linked and stores its latest head in a sidecar
-file. Deployments that provide `AuditChainSink(head_signing_key=...)`, the
-command guard's `--audit-head-key-env`, or the SDK's `audit_head_signing_key`
-also write a HMAC signature for that head. When an `anchor_path` or
+file. `AuditChainSink` caches the latest `(seq, entry_hash)` under its append
+lock after the first on-disk tail scan, then advances that cache only after the
+entry, sidecar head, optional signature, and optional anchor are persisted.
+Verification still replays the full JSONL chain. Deployments that provide
+`AuditChainSink(head_signing_key=...)`, the command guard's
+`--audit-head-key-env`, or the SDK's `audit_head_signing_key` also write a HMAC
+signature for that head. When an `anchor_path` or
 `--audit-anchor-log` is configured, each signed head is appended to a separate
 JSONL anchor log. `verify_chain(..., head_signing_key=..., anchor_path=...)` and
 `director-class-siem-export --head-signing-key-env ... --anchor-log ...` fail
 closed if the signature is missing, mismatched, or replayed behind the latest
 anchor.
+
+`make bench-audit` runs the local audit append hot-path benchmark and writes
+`benchmarks/results/audit_chain_hot_path.json`. Treat that artefact as functional
+regression evidence for the recorded checkout and host only, not as isolated,
+external, comparative, certification, or counsel-reviewed evidence status.
 
 ## Technique-Tagged Evidence
 
