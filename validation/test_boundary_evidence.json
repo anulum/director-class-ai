@@ -524,7 +524,7 @@
         {
           "file": "tests/test_llm_judge.py",
           "mode": "integration",
-          "covers": "judge spec, panel construction, optional model-backed detector boundary"
+          "covers": "judge spec, panel construction, JSON/anchored/final-token risk parsing, one-of-ten safe-text rejection, optional model-backed detector boundary"
         }
       ]
     },
@@ -646,7 +646,7 @@
         {
           "file": "tests/test_calibration.py",
           "mode": "integration",
-          "covers": "calibration policy applied to detector signals"
+          "covers": "calibration policy applied to detector signals without double-discounting Platt probabilities"
         }
       ]
     }

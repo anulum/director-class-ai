@@ -35,6 +35,18 @@ class TestPromptJudge:
         j = prompt_judge(lambda _p: "risk: 0.8", lens="is it safe?")
         assert j(EvaluationRequest(response="x")).score == pytest.approx(0.8)
 
+    def test_parses_json_risk_field(self) -> None:
+        j = prompt_judge(lambda _p: '{"risk": 0.7, "reason": "quoted"}', lens="?")
+        assert j(EvaluationRequest(response="x")).score == pytest.approx(0.7)
+
+    def test_uses_last_numeric_token_only_when_it_is_a_probability(self) -> None:
+        j = prompt_judge(lambda _p: "safe after review; final score 0.2", lens="?")
+        assert j(EvaluationRequest(response="x")).score == pytest.approx(0.2)
+
+    def test_ignores_unanchored_one_of_ten_safe_text(self) -> None:
+        j = prompt_judge(lambda _p: "risk level 1 of 10, totally safe", lens="?")
+        assert j(EvaluationRequest(response="x")).score == pytest.approx(0.0)
+
     def test_unsafe_keyword_fallback(self) -> None:
         j = prompt_judge(lambda _p: "this is UNSAFE", lens="?")
         assert j(EvaluationRequest(response="x")).score == pytest.approx(0.85)

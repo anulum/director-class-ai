@@ -118,7 +118,7 @@ class CalibrationRegistry:
             locus=signal.locus,
             signal_type=signal.signal_type,
             severity=signal.severity,
-            calibration=signal.calibration,
+            calibration=1.0,
             spans=signal.spans,
             rationale=signal.rationale,
             latency_ms=signal.latency_ms,

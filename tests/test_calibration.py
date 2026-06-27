@@ -75,6 +75,23 @@ class TestCalibrationRegistry:
         assert out.score == pytest.approx(0.5)
         assert out.detector == "d"
 
+    def test_apply_resets_signal_calibration_after_platt_probability(self) -> None:
+        reg = CalibrationRegistry()
+        reg.set("d", PlattCalibrator(a=0.0, b=0.0))  # always 0.5
+        signal = DetectorSignal(
+            detector="d",
+            plane=Plane.CONTENT,
+            score=0.9,
+            locus=Locus.RESPONSE,
+            signal_type="t",
+            calibration=0.4,
+        )
+        out = reg.apply(signal)
+
+        assert out.score == pytest.approx(0.5)
+        assert out.calibration == pytest.approx(1.0)
+        assert out.weighted_score == pytest.approx(0.5)
+
     def test_unregistered_detector_passes_through(self) -> None:
         reg = CalibrationRegistry()
         sig = _sig("other", 0.9)

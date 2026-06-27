@@ -34,6 +34,7 @@ callable.
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -60,7 +61,54 @@ class JudgeResult:
 
 JudgeFn = Callable[[EvaluationRequest], JudgeResult]
 
-_SCORE_RE = re.compile(r"(?:0?\.\d+|[01](?:\.0+)?)")
+_ANCHORED_SCORE_RE = re.compile(
+    r"^\s*(?:risk|score)\s*[:=]\s*(0?\.\d+|[01](?:\.0+)?)\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+_NUMBER_RE = re.compile(r"[-+]?\d+(?:\.\d+)?")
+
+
+def _coerce_probability(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int | float):
+        score = float(value)
+    elif isinstance(value, str):
+        try:
+            score = float(value.strip())
+        except ValueError:
+            return None
+    else:
+        return None
+    if 0.0 <= score <= 1.0:
+        return score
+    return None
+
+
+def _score_from_json(text: str) -> float | None:
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    for key in ("risk", "score"):
+        if key in payload:
+            return _coerce_probability(payload[key])
+    return None
+
+
+def _score_from_text(text: str) -> float | None:
+    json_score = _score_from_json(text.strip())
+    if json_score is not None:
+        return json_score
+    match = _ANCHORED_SCORE_RE.search(text)
+    if match:
+        return float(match.group(1))
+    numbers = [float(match.group()) for match in _NUMBER_RE.finditer(text)]
+    if numbers and 0.0 <= numbers[-1] <= 1.0:
+        return numbers[-1]
+    return None
 
 
 def prompt_judge(
@@ -71,9 +119,11 @@ def prompt_judge(
 ) -> JudgeFn:
     """Build a JudgeFn from a text-completion callable and a lens instruction.
 
-    The completion is asked for a 0–1 risk; the parser is tolerant (first float in
-    range, or the word "unsafe"/"safe"). ``complete`` is provider-agnostic — wire
-    any LLM client (director-ai's judge, OpenAI, a local model) behind it.
+    The completion is asked for a 0–1 risk. The parser accepts a JSON ``risk`` or
+    ``score`` field, an anchored ``RISK: <float>`` / ``SCORE: <float>`` line, or a
+    final numeric token that is already a probability. Otherwise it falls back to
+    explicit unsafe/safe wording. ``complete`` is provider-agnostic — wire any LLM
+    client behind it.
     """
 
     def judge(request: EvaluationRequest) -> JudgeResult:
@@ -84,9 +134,9 @@ def prompt_judge(
             "Reply with a single risk score from 0 (safe) to 1 (problem)."
         )
         text = complete(prompt) or ""
-        match = _SCORE_RE.search(text)
-        if match:
-            score = max(0.0, min(1.0, float(match.group())))
+        parsed_score = _score_from_text(text)
+        if parsed_score is not None:
+            score = parsed_score
         else:
             score = 0.85 if "unsafe" in text.lower() else 0.0
         return JudgeResult(score=score, rationale=text.strip()[:200])
