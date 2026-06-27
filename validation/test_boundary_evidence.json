@@ -117,12 +117,17 @@
         "director_class_ai/policy/capability.py",
         "director_class_ai/policy/governance.py"
       ],
-      "required_behaviour": "In-process MCP gateway reviews discovery, pins trusted tools/list descriptions and instructions, signed registrations, populated registration manifests, tool calls, remote auth, capability policy, approved policy-store heads, runtime nested argument-schema conformance, cross-server lookalike tools, and tool responses without executing tools or leaking raw argument values.",
+      "required_behaviour": "In-process MCP gateway reviews discovery, pins trusted tools/list descriptions and instructions, scans encoded descriptor poisoning variants, accepts injected semantic detectors for discovery/response prompt-injection review, signed registrations, populated registration manifests, tool calls, remote auth, capability policy, approved policy-store heads, runtime nested argument-schema conformance, cross-server lookalike tools, and tool responses without executing tools or leaking raw argument values.",
       "evidence_tests": [
         {
           "file": "tests/test_mcp_gateway.py",
           "mode": "integration",
-          "covers": "discovery, signed call review, under-populated registration hard blocks, cross-server and dynamic-discovery lookalike hard blocks, nested argument-schema violation hard blocks, remote auth fail-closed, capability policy, response review, redacted audit events"
+          "covers": "discovery, signed call review, obfuscated descriptor poisoning, injected semantic discovery/response detectors, under-populated registration hard blocks, cross-server and dynamic-discovery lookalike hard blocks, nested argument-schema violation hard blocks, remote auth fail-closed, capability policy, response review, redacted audit events"
+        },
+        {
+          "file": "tests/test_mcp_semantic_injection.py",
+          "mode": "integration",
+          "covers": "encoded discovery-poisoning rescans and injected semantic detector fail-closed routing across discovery and response review"
         },
         {
           "file": "tests/test_mcp_gateway_registry_guards.py",

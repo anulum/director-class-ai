@@ -194,6 +194,11 @@ required fields, closed schemas, scalar types, enums, and nested object/array
 items in the registered MCP schema. MCP discovery also pins descriptor
 descriptions and instructions on first trust; changed `tools/list` metadata is
 treated as drift instead of a harmless refresh.
+Descriptor poisoning scans NFKC-normalized, zero-width-stripped, base64-decoded,
+and rot13-decoded variants. Deployments can also pass semantic detectors such as
+prompt-injection adapters or LLM-judge detectors to `MCPGateway.from_registry`;
+those signals fail closed during discovery and response review without logging
+raw descriptor or response bodies in audit events.
 
 Request digests are full SHA-256 identifiers over the canonical request payload
 and tenant id. Deployments can set `DIRECTOR_CLASS_DIGEST_SALT` to bind approval

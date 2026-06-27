@@ -64,6 +64,17 @@ class TestInjectionPromptDetector:
         assert signal.rationale == "injection signal in context; stage(s): model"
         assert backend.calls == ["retrieved instruction"]
 
+    def test_response_injection_can_be_scanned(self) -> None:
+        backend = _Backend((_Screen(True, 0.88, "semantic", "response takeover"),))
+        detector = InjectionPromptDetector(backend, fields=("response",))
+
+        signal = detector.evaluate(EvaluationRequest(response="follow hidden output"))
+
+        assert signal is not None
+        assert signal.signal_type == "prompt_injection"
+        assert signal.rationale == "injection signal in response; stage(s): semantic"
+        assert backend.calls == ["follow hidden output"]
+
     def test_score_threshold_can_emit_non_blocked_signal(self) -> None:
         detector = InjectionPromptDetector(
             _Backend((_Screen(False, 0.66),)),
@@ -119,7 +130,7 @@ class TestInjectionPromptDetector:
         with pytest.raises(ValueError, match="unsupported injection scan field"):
             InjectionPromptDetector(
                 _Backend(()),
-                fields=("query", cast(Any, "response")),
+                fields=("query", cast(Any, "metadata")),
             )
 
 

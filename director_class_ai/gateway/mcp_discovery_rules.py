@@ -10,8 +10,12 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import codecs
 import json
 import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from typing import Protocol
 
@@ -99,6 +103,11 @@ _READ_ALLOWED_PARAMETERS = frozenset(
         "recursive",
     }
 )
+_BASE64_TOKEN = re.compile(
+    r"(?<![A-Za-z0-9+/=])([A-Za-z0-9+/]{16,}={0,2})(?![A-Za-z0-9+/=])"
+)
+_ZERO_WIDTH = re.compile(r"[\u200b\u200c\u200d\ufeff]")
+_MAX_DECODED_TEXT = 4096
 
 
 class _DiscoveryDescriptor(Protocol):
@@ -145,22 +154,22 @@ def descriptor_poisoning_findings(
     parameter_names = _parameter_names(descriptor)
     default_texts = _default_texts(descriptor)
 
-    if _DISCOVERY_POISONING.search(text):
+    if _matches(_DISCOVERY_POISONING, text):
         findings.append("discovery_poisoning")
-    if any(_PARAMETER_POISONING.search(name) for name in parameter_names):
+    if any(_matches(_PARAMETER_POISONING, name) for name in parameter_names):
         findings.append("parameter_name_poisoning")
-    if any(_DISCOVERY_POISONING.search(default) for default in default_texts):
+    if any(_matches(_DISCOVERY_POISONING, default) for default in default_texts):
         findings.append("schema_default_poisoning")
     if descriptor.hidden_metadata and (
-        _DISCOVERY_POISONING.search(hidden_text)
-        or _PREFERENCE_MANIPULATION.search(hidden_text)
+        _matches(_DISCOVERY_POISONING, hidden_text)
+        or _matches(_PREFERENCE_MANIPULATION, hidden_text)
     ):
         findings.append("hidden_metadata_poisoning")
-    if _PREFERENCE_MANIPULATION.search(text):
+    if _matches(_PREFERENCE_MANIPULATION, text):
         findings.append("preference_manipulation")
-    if _FALSE_ERROR_ESCALATION.search(text):
+    if _matches(_FALSE_ERROR_ESCALATION, text):
         findings.append("false_error_escalation")
-    if _TOOL_TRANSFER.search(text):
+    if _matches(_TOOL_TRANSFER, text):
         findings.append("tool_transfer")
     if _out_of_scope_parameters(descriptor, parameter_names):
         findings.append("out_of_scope_parameter")
@@ -170,6 +179,41 @@ def descriptor_poisoning_findings(
 
 def _canonical(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def _matches(pattern: re.Pattern[str], text: str) -> bool:
+    """Return whether ``pattern`` matches the raw text or a decoded variant."""
+    return any(pattern.search(variant) for variant in _text_variants(text))
+
+
+def _text_variants(text: str) -> tuple[str, ...]:
+    """Return bounded descriptor text variants for poison-string rescans."""
+    variants: list[str] = [text]
+    normalised = unicodedata.normalize("NFKC", text)
+    stripped = _ZERO_WIDTH.sub("", normalised)
+    variants.extend([normalised, stripped])
+    variants.append(codecs.decode(stripped, "rot_13"))
+    for source in (text, normalised, stripped):
+        for token in _BASE64_TOKEN.findall(source):
+            decoded = _decode_base64_text(token)
+            if decoded:
+                variants.append(decoded)
+                variants.append(codecs.decode(decoded, "rot_13"))
+    return tuple(dict.fromkeys(variant for variant in variants if variant))
+
+
+def _decode_base64_text(token: str) -> str:
+    """Decode one base64 token into UTF-8 text for descriptor rescanning."""
+    try:
+        raw = base64.b64decode(token, validate=True)
+    except (binascii.Error, ValueError):
+        return ""
+    if not raw or len(raw) > _MAX_DECODED_TEXT:
+        return ""
+    decoded = raw.decode("utf-8", errors="ignore")
+    if not decoded.strip():
+        return ""
+    return decoded
 
 
 def _discovery_text(descriptor: _DiscoveryDescriptor) -> str:

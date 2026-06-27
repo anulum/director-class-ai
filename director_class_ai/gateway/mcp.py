@@ -347,6 +347,31 @@ def _context_digest(value: Mapping[str, object]) -> str:
     return _digest(value)
 
 
+def _descriptor_evaluation_request(
+    request: MCPDiscoveryRequest,
+    descriptor: MCPToolDescriptor,
+) -> EvaluationRequest:
+    """Build a detector request for semantic review of one discovery descriptor."""
+    text = "\n".join(
+        (
+            descriptor.description,
+            descriptor.instructions,
+            _canonical(descriptor.input_schema),
+            _canonical(descriptor.output_schema),
+            _canonical(descriptor.argument_schema),
+            _canonical(descriptor.hidden_metadata),
+        )
+    )
+    return EvaluationRequest(
+        query=descriptor.tool,
+        response=text,
+        context=text,
+        action=descriptor.tool,
+        action_provenance=request.provenance,
+        tenant_id=request.tenant_id,
+    )
+
+
 def _route(*, permitted: bool, escalated: bool) -> MCPGatewayRoute:
     if escalated:
         return "human"
@@ -719,13 +744,19 @@ class MCPGateway:
         capability_policy: CapabilityPolicy | None = None,
         response_governor: Governor | None = None,
         pinned_registrations: Sequence[MCPToolRegistration] = (),
+        semantic_detectors: Sequence[Detector] = (),
     ) -> None:
         self._governor = governor
         self._capability_policy = capability_policy
         self._pinned_registrations = tuple(pinned_registrations)
+        self._semantic_detectors = tuple(semantic_detectors)
         self._response_governor = response_governor or Governor(
             ensemble=ParallelEnsembleScorer(
-                [DestructiveCommandDetector(), BlastRadiusDetector()]
+                [
+                    DestructiveCommandDetector(),
+                    BlastRadiusDetector(),
+                    *self._semantic_detectors,
+                ]
             )
         )
 
@@ -738,6 +769,7 @@ class MCPGateway:
         require_signed_registrations: bool = False,
         fusion_policy: FusionPolicy | None = None,
         capability_policy: CapabilityPolicy | None = None,
+        semantic_detectors: Sequence[Detector] = (),
         approval: ApprovalHook | None = None,
         audit_sink: AuditSink | None = None,
     ) -> MCPGateway:
@@ -762,10 +794,13 @@ class MCPGateway:
             approval=approval,
             audit_sink=audit_sink,
         )
+        response_detectors: list[Detector] = [
+            DestructiveCommandDetector(),
+            BlastRadiusDetector(),
+            *semantic_detectors,
+        ]
         response_governor = Governor(
-            ensemble=ParallelEnsembleScorer(
-                [DestructiveCommandDetector(), BlastRadiusDetector()]
-            ),
+            ensemble=ParallelEnsembleScorer(response_detectors),
             approval=approval,
             audit_sink=audit_sink,
         )
@@ -774,6 +809,7 @@ class MCPGateway:
             capability_policy=capability_policy,
             response_governor=response_governor,
             pinned_registrations=registrations,
+            semantic_detectors=semantic_detectors,
         )
 
     @classmethod
@@ -804,7 +840,10 @@ class MCPGateway:
 
     def review_discovery(self, request: MCPDiscoveryRequest) -> MCPDiscoveryDecision:
         """Review a discovery envelope before trusting advertised tools."""
-        findings = _review_discovery(request, self._pinned_registrations)
+        findings = (
+            *_review_discovery(request, self._pinned_registrations),
+            *self._semantic_discovery_findings(request),
+        )
         permitted = not findings
         return MCPDiscoveryDecision(
             request=request,
@@ -815,6 +854,19 @@ class MCPGateway:
                 descriptor.digest for descriptor in request.descriptors
             ),
         )
+
+    def _semantic_discovery_findings(
+        self, request: MCPDiscoveryRequest
+    ) -> tuple[str, ...]:
+        """Return fail-closed findings from optional semantic discovery detectors."""
+        findings: list[str] = []
+        for descriptor in request.descriptors:
+            evaluation = _descriptor_evaluation_request(request, descriptor)
+            for detector in self._semantic_detectors:
+                signal = detector.evaluate(evaluation)
+                if signal is not None:
+                    findings.append(f"semantic_{signal.signal_type}")
+        return tuple(dict.fromkeys(findings))
 
     def review_response(self, request: MCPResponseRequest) -> MCPResponseDecision:
         """Review a tool response before it is exposed to later agent steps."""

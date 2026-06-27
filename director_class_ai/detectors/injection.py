@@ -30,7 +30,7 @@ __all__ = [
     "InjectionScreenResult",
 ]
 
-InjectionField = Literal["query", "context"]
+InjectionField = Literal["query", "context", "response"]
 
 
 @runtime_checkable
@@ -172,8 +172,9 @@ class InjectionPromptDetector:
             Prompt guard exposing ``screen(text)`` with ``blocked``, ``score``,
             ``stage``, and ``reason`` attributes.
         fields:
-            Request fields to screen. Only query and context are supported; action
-            injection-to-effector handling lives in the action plane.
+            Request fields to screen. Query, retrieved context, and generated
+            response are supported; action injection-to-effector handling lives in
+            the action plane.
         threshold:
             Minimum backend score required to emit a signal when the backend did
             not already hard-block. Values must be in ``[0, 1]``.
@@ -186,7 +187,9 @@ class InjectionPromptDetector:
         """
         if not 0.0 <= threshold <= 1.0:
             raise ValueError(f"threshold must be in [0, 1], got {threshold}")
-        invalid = [field for field in fields if field not in ("query", "context")]
+        invalid = [
+            field for field in fields if field not in ("query", "context", "response")
+        ]
         if invalid:
             raise ValueError(f"unsupported injection scan field(s): {invalid!r}")
         self._backend = backend
@@ -254,6 +257,8 @@ class InjectionPromptDetector:
     @staticmethod
     def _field_text(request: EvaluationRequest, field: InjectionField) -> str:
         """Return the requested screenable text field."""
+        if field == "response":
+            return request.response
         if field == "context":
             return request.context
         return request.query
