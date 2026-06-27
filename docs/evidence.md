@@ -70,6 +70,11 @@ Current committed benchmark evidence is local regression evidence:
 - false hard-block rate on authored safe cases: 0.000;
 - safe route conformance on authored safe routed cases: 1.000.
 
+Every metric-like numeric claim in the configured public Markdown surfaces must
+appear in `validation/numeric_claim_evidence.json` with JSON-pointer assertions
+against the current evidence artefact. Run `make numeric-claims` before changing
+public evidence copy or committed benchmark outputs.
+
 ## Adversarial Red Team
 
 Run:

@@ -407,12 +407,14 @@
       "production_surfaces": [
         "tools/check_documentation_surface.py",
         "tools/check_claim_boundaries.py",
+        "tools/check_numeric_claim_evidence.py",
+        "validation/numeric_claim_evidence.json",
         "demos/action_checkpoint.py",
         "docs/index.md",
         "docs/CLAIM_BOUNDARIES.md",
         "notebooks/action_checkpoint.ipynb"
       ],
-      "required_behaviour": "Documentation surface checker validates docs/notebook/demo entry points, the claim-boundary guard rejects public audit-integrity and legal-positioning overclaims, and the action checkpoint demo runs as a subprocess while keeping command text redacted.",
+      "required_behaviour": "Documentation surface checker validates docs/notebook/demo entry points, the claim-boundary guard rejects public audit-integrity and legal-positioning overclaims, the numeric-claim guard ties metric-like public claims to current evidence artefacts, and the action checkpoint demo runs as a subprocess while keeping command text redacted.",
       "evidence_tests": [
         {
           "file": "tests/test_documentation_surface.py",
@@ -423,6 +425,11 @@
           "file": "tests/test_claim_boundaries.py",
           "mode": "integration",
           "covers": "current repository public-surface scan plus CLI rejection of prohibited audit-integrity and legal-positioning claims"
+        },
+        {
+          "file": "tests/test_numeric_claim_evidence.py",
+          "mode": "integration",
+          "covers": "current repository numeric-claim ledger plus CLI rejection of uncovered or stale metric claims"
         }
       ]
     },

@@ -60,9 +60,9 @@ make preflight
 ```
 
 `make preflight` runs the SPDX, test-quality, boundary-evidence, godfile,
-documentation, lint, strict-typing, readiness, and intake gates locally before a
-commit. Run focused tests for touched modules locally; GitHub Actions owns the
-full test and coverage gate.
+documentation, numeric-claim evidence, lint, strict-typing, readiness, and intake
+gates locally before a commit. Run focused tests for touched modules locally;
+GitHub Actions owns the full test and coverage gate.
 
 ## 5. Read the Boundaries
 

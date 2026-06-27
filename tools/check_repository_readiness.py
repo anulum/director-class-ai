@@ -42,6 +42,7 @@ _REQUIRED_LOCAL_GATES = (
     "godfiles",
     "repository-readiness",
     "phase4-intake",
+    "numeric-claims",
     "lint",
     "types",
 )

@@ -1,0 +1,182 @@
+{
+  "schema_version": "director-class-ai.numeric-claim-evidence.v1",
+  "updated_at": "2026-06-27",
+  "policy": "Metric-like numeric claims in configured public Markdown surfaces must be quoted here and tied to current evidence artifact values. Non-claim numeric lines require an explicit allow pattern with a reason.",
+  "scan_surfaces": [
+    "README.md",
+    "docs/CLAIM_BOUNDARIES.md",
+    "docs/demos.md",
+    "docs/evidence.md",
+    "docs/index.md",
+    "docs/onboarding.md",
+    "benchmarks/results/action_plane_evidence.md"
+  ],
+  "allow_line_patterns": [
+    {
+      "pattern": "^<a href=.*<img .*alt=.*>$",
+      "reason": "Badge and link metadata contain versions or coverage service URLs, not project metric claims."
+    },
+    {
+      "pattern": "^Source-available under the \\*\\*Business Source License 1\\.1\\*\\*",
+      "reason": "Licence version is legal metadata, not a benchmark or readiness metric."
+    },
+    {
+      "pattern": "Apache-2\\.0",
+      "reason": "Future change licence identifier is legal metadata, not a benchmark or readiness metric."
+    },
+    {
+      "pattern": "Do not claim 100% prompt-injection prevention\\.",
+      "reason": "Explicit prohibition, not an asserted project metric."
+    },
+    {
+      "pattern": "^## [0-9]+\\. ",
+      "reason": "Numbered documentation section heading, not a metric claim."
+    },
+    {
+      "pattern": "^- Python: `3\\.12\\.3`$",
+      "reason": "Benchmark host interpreter metadata is evidence context, not a result claim."
+    },
+    {
+      "pattern": "^- platform: `Linux-6\\.17\\.0-35-generic-x86_64-with-glibc2\\.39`$",
+      "reason": "Benchmark host platform metadata is evidence context, not a result claim."
+    },
+    {
+      "pattern": "loaded=False",
+      "reason": "External-source import status rows are source-review state, not benchmark metric claims."
+    }
+  ],
+  "claims": [
+    {
+      "id": "readme-external-empty-partition",
+      "surface": "README.md",
+      "quote": "reports external n=0 because no third-party JSONL artefacts are vendored.",
+      "claim_boundary": "Partition-count statement only; no external benchmark, comparative performance, or accuracy claim.",
+      "evidence": [
+        {
+          "path": "benchmarks/results/action_plane_evidence.json",
+          "json_pointers": [
+            {
+              "pointer": "/metrics/external_metrics/n",
+              "equals": 0
+            },
+            {
+              "pointer": "/metrics/corpus_partitions/external/n",
+              "equals": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "docs-evidence-current-action-plane-metrics",
+      "surface": "docs/evidence.md",
+      "quote": "- authored action cases: 356;\n- external action cases: 0;\n- customer/private cases: 0;\n- catastrophic recall on authored cases: 1.000;\n- false hard-block rate on authored safe cases: 0.000;\n- safe route conformance on authored safe routed cases: 1.000.",
+      "claim_boundary": "Local functional regression evidence only; not external, comparative, certified, or production-readiness evidence.",
+      "evidence": [
+        {
+          "path": "benchmarks/results/action_plane_evidence.json",
+          "json_pointers": [
+            {
+              "pointer": "/metrics/authored_metrics/n",
+              "equals": 356
+            },
+            {
+              "pointer": "/metrics/external_metrics/n",
+              "equals": 0
+            },
+            {
+              "pointer": "/metrics/corpus_partitions/customer_private/n",
+              "equals": 0
+            },
+            {
+              "pointer": "/metrics/authored_metrics/catastrophic_recall",
+              "equals": 1.0
+            },
+            {
+              "pointer": "/metrics/authored_metrics/false_block_rate",
+              "equals": 0.0
+            },
+            {
+              "pointer": "/metrics/authored_metrics/safe_route_conformance",
+              "equals": 1.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "action-plane-evidence-run-context",
+      "surface": "benchmarks/results/action_plane_evidence.md",
+      "quote": "- host load before: `3.78, 4.61, 22.63`\n- host load after: `3.78, 4.61, 22.63`",
+      "claim_boundary": "Run-context disclosure for the recorded local benchmark only; not a performance or isolation claim.",
+      "evidence": [
+        {
+          "path": "benchmarks/results/action_plane_evidence.json",
+          "json_pointers": [
+            {
+              "pointer": "/run_context/host_load_before",
+              "equals": [
+                3.7802734375,
+                4.60986328125,
+                22.62890625
+              ]
+            },
+            {
+              "pointer": "/run_context/host_load_after",
+              "equals": [
+                3.7802734375,
+                4.60986328125,
+                22.62890625
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "action-plane-evidence-metrics-block",
+      "surface": "benchmarks/results/action_plane_evidence.md",
+      "quote": "- authored n: 356\n- external n: 0\n- customer/private n: 0\n- catastrophic recall: 1.000\n- false hard-block rate: 0.000\n- false escalation rate: 0.018\n- safe route conformance: 1.000\n- elapsed: 191.931 ms",
+      "claim_boundary": "Local functional regression evidence for the recorded checkout and host only; not an isolated throughput, external, comparative, certification, or legal evidence claim.",
+      "evidence": [
+        {
+          "path": "benchmarks/results/action_plane_evidence.json",
+          "json_pointers": [
+            {
+              "pointer": "/metrics/authored_metrics/n",
+              "equals": 356
+            },
+            {
+              "pointer": "/metrics/external_metrics/n",
+              "equals": 0
+            },
+            {
+              "pointer": "/metrics/corpus_partitions/customer_private/n",
+              "equals": 0
+            },
+            {
+              "pointer": "/metrics/authored_metrics/catastrophic_recall",
+              "equals": 1.0
+            },
+            {
+              "pointer": "/metrics/authored_metrics/false_block_rate",
+              "equals": 0.0
+            },
+            {
+              "pointer": "/metrics/authored_metrics/false_escalation_rate",
+              "equals": 0.01818181818181818
+            },
+            {
+              "pointer": "/metrics/authored_metrics/safe_route_conformance",
+              "equals": 1.0
+            },
+            {
+              "pointer": "/metrics/elapsed_ms",
+              "equals": 191.93068298045546
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

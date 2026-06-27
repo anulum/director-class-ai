@@ -298,6 +298,9 @@ Public copy and demos use the same bounded claim language in
 evidence for autonomous agents. Do not claim comparative benchmark leadership,
 certification, or production readiness until the corresponding evidence gates are
 complete.
+Metric-like numeric claims in public Markdown surfaces are additionally pinned in
+`validation/numeric_claim_evidence.json` and checked by `make numeric-claims` so
+docs cannot drift away from committed evidence artefacts silently.
 
 ## Licence
 
