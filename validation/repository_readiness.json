@@ -1,6 +1,6 @@
 {
   "schema_version": "director-class-ai.repository-readiness.v1",
-  "updated_at": "2026-06-26",
+  "updated_at": "2026-06-27",
   "package_name": "director-class-ai",
   "module_name": "director_class_ai",
   "remote_url": "https://github.com/anulum/director-class-ai.git",
@@ -44,11 +44,9 @@
     "lint",
     "types"
   ],
-  "remote_ci_status": "blocked_until_push",
-  "branch_protection_status": "blocked_until_repo_settings",
+  "remote_ci_status": "green_on_main",
+  "branch_protection_status": "required_checks_configured",
   "open_remote_blockers": [
-    "Remote CI cannot be observed until the CEO authorises pushing the ahead local commits.",
-    "Branch protection and required checks must be configured in GitHub repository settings after remote CI check names exist.",
     "Historical filter-repo rewriting is not performed from this working checkout without explicit approval because it changes repository history."
   ]
 }

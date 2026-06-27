@@ -74,6 +74,39 @@ def test_repository_readiness_rejects_missing_remote_blockers(
     assert any("open_remote_blockers" in failure for failure in failures)
 
 
+def test_repository_readiness_accepts_completed_remote_evidence(
+    tmp_path: Path,
+) -> None:
+    repo = _copy_readiness_surface(tmp_path)
+    spec_path = repo / "validation/repository_readiness.json"
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    spec["remote_ci_status"] = "green_on_main"
+    spec["branch_protection_status"] = "required_checks_configured"
+    spec["open_remote_blockers"] = [
+        "Historical filter-repo rewriting is not performed from this working "
+        "checkout without explicit approval because it changes repository history."
+    ]
+    spec_path.write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8")
+
+    assert validate_repository_readiness(repo) == []
+
+
+def test_repository_readiness_rejects_unknown_remote_status(
+    tmp_path: Path,
+) -> None:
+    repo = _copy_readiness_surface(tmp_path)
+    spec_path = repo / "validation/repository_readiness.json"
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    spec["remote_ci_status"] = "green-ish"
+    spec["branch_protection_status"] = "maybe"
+    spec_path.write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8")
+
+    failures = validate_repository_readiness(repo)
+
+    assert any("remote_ci_status" in failure for failure in failures)
+    assert any("branch_protection_status" in failure for failure in failures)
+
+
 def test_repository_readiness_rejects_missing_ci_job(tmp_path: Path) -> None:
     repo = _copy_readiness_surface(tmp_path)
     ci = repo / ".github/workflows/ci.yml"

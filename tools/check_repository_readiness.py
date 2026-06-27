@@ -6,12 +6,13 @@
 # Contact: www.anulum.li | protoscience@anulum.li
 # Director-Class AI — repository readiness guard
 
-"""Validate local repository readiness evidence.
+"""Validate repository readiness evidence.
 
-The remaining remote work for this repository is settings-bound: push, remote CI
-observation, and branch-protection configuration. This guard validates the local
-parts that can be proven before that remote step: package identity, licence
-wiring, workflow surfaces, required local gates, and explicit remote blockers.
+The guard validates package identity, licence wiring, workflow surfaces, required
+local gates, and the tracked remote-readiness state. Remote CI and branch
+protection are represented as evidence labels in the readiness ledger so stale
+pre-push blockers cannot remain marked as current after GitHub has been
+observed.
 """
 
 from __future__ import annotations
@@ -49,8 +50,9 @@ _REQUIRED_SCRIPTS = (
     "director-class-mcp-gateway",
     "director-class-siem-export",
 )
-_REMOTE_BLOCKER_STATUSES = frozenset(
-    {"blocked_until_push", "blocked_until_repo_settings"}
+_REMOTE_CI_STATUSES = frozenset({"blocked_until_push", "green_on_main"})
+_BRANCH_PROTECTION_STATUSES = frozenset(
+    {"blocked_until_repo_settings", "required_checks_configured"}
 )
 
 
@@ -114,10 +116,17 @@ def _validate_spec(spec: Mapping[str, object]) -> list[str]:
         failures.append(f"remote_url must be {_EXPECTED_REMOTE!r}")
     if spec.get("branch") != "main":
         failures.append("branch must be 'main'")
-    if spec.get("remote_ci_status") != "blocked_until_push":
-        failures.append("remote_ci_status must be 'blocked_until_push'")
-    if spec.get("branch_protection_status") != "blocked_until_repo_settings":
-        failures.append("branch_protection_status must be 'blocked_until_repo_settings'")
+    remote_ci_status = spec.get("remote_ci_status")
+    if remote_ci_status not in _REMOTE_CI_STATUSES:
+        failures.append(
+            f"remote_ci_status must be one of {sorted(_REMOTE_CI_STATUSES)!r}"
+        )
+    branch_protection_status = spec.get("branch_protection_status")
+    if branch_protection_status not in _BRANCH_PROTECTION_STATUSES:
+        failures.append(
+            "branch_protection_status must be one of "
+            f"{sorted(_BRANCH_PROTECTION_STATUSES)!r}"
+        )
     blockers = _string_list(spec, "open_remote_blockers")
     if not blockers:
         failures.append("open_remote_blockers must list the remote blockers")
