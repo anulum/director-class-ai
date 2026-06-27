@@ -44,6 +44,7 @@ from ..core import (
 )
 from ..core.governor import ApprovalHook, AuditSink
 from ..core.signal import DetectorSignal, Locus, Plane, Severity
+from ..detectors import default_content_integrity_detectors
 from ..policy import (
     CAPABILITY_CONTEXT_KEY,
     CapabilityContext,
@@ -744,12 +745,16 @@ class MCPGateway:
         capability_policy: CapabilityPolicy | None = None,
         response_governor: Governor | None = None,
         pinned_registrations: Sequence[MCPToolRegistration] = (),
-        semantic_detectors: Sequence[Detector] = (),
+        semantic_detectors: Sequence[Detector] | None = None,
     ) -> None:
         self._governor = governor
         self._capability_policy = capability_policy
         self._pinned_registrations = tuple(pinned_registrations)
-        self._semantic_detectors = tuple(semantic_detectors)
+        self._semantic_detectors = tuple(
+            default_content_integrity_detectors()
+            if semantic_detectors is None
+            else semantic_detectors
+        )
         self._response_governor = response_governor or Governor(
             ensemble=ParallelEnsembleScorer(
                 [
@@ -769,7 +774,7 @@ class MCPGateway:
         require_signed_registrations: bool = False,
         fusion_policy: FusionPolicy | None = None,
         capability_policy: CapabilityPolicy | None = None,
-        semantic_detectors: Sequence[Detector] = (),
+        semantic_detectors: Sequence[Detector] | None = None,
         approval: ApprovalHook | None = None,
         audit_sink: AuditSink | None = None,
     ) -> MCPGateway:
@@ -794,10 +799,15 @@ class MCPGateway:
             approval=approval,
             audit_sink=audit_sink,
         )
+        semantic_detector_set = tuple(
+            default_content_integrity_detectors()
+            if semantic_detectors is None
+            else semantic_detectors
+        )
         response_detectors: list[Detector] = [
             DestructiveCommandDetector(),
             BlastRadiusDetector(),
-            *semantic_detectors,
+            *semantic_detector_set,
         ]
         response_governor = Governor(
             ensemble=ParallelEnsembleScorer(response_detectors),
@@ -809,7 +819,7 @@ class MCPGateway:
             capability_policy=capability_policy,
             response_governor=response_governor,
             pinned_registrations=registrations,
-            semantic_detectors=semantic_detectors,
+            semantic_detectors=semantic_detector_set,
         )
 
     @classmethod

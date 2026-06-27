@@ -42,6 +42,7 @@ from ..audit import AuditChainSink
 from ..core import Decision, Detector, EvaluationRequest, Governor, ParallelEnsembleScorer
 from ..core.fusion import FusionPolicy
 from ..core.governor import ApprovalHook, AuditSink
+from ..detectors import default_content_integrity_detectors
 
 __all__ = [
     "ToolExecutionResult",
@@ -85,6 +86,7 @@ class ToolReviewRequest:
     provenance: str = ""
     query: str = ""
     context: str = ""
+    response: str = ""
     tenant_id: str = ""
     dry_run: bool = True
     argument_provenance: Mapping[str, str] = field(default_factory=dict)
@@ -103,6 +105,7 @@ class ToolReviewRequest:
         """Build the shared Governor request for this tool call."""
         return EvaluationRequest(
             query=self.query,
+            response=self.response,
             context=self.context,
             action=self.rendered_action(),
             action_provenance=self.provenance,
@@ -224,7 +227,7 @@ class ToolReviewMiddleware:
         policy_profile: str = "",
         executor: ToolExecutor | None = None,
     ) -> ToolReviewMiddleware:
-        """Build middleware with the default action-plane detector ensemble.
+        """Build middleware with the default three-plane detector ensemble.
 
         ``policy`` is the fused governance posture in force. Passing the approved
         head of a Guardrail-as-Code ledger (``Profile.to_fusion_policy()``) is how
@@ -286,6 +289,7 @@ class ToolReviewMiddleware:
 
 def _default_detectors() -> tuple[Detector, ...]:
     return (
+        *default_content_integrity_detectors(),
         DestructiveCommandDetector(),
         BlastRadiusDetector(),
         OriginTaintDetector(),

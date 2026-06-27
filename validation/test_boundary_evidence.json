@@ -117,7 +117,7 @@
         "director_class_ai/policy/capability.py",
         "director_class_ai/policy/governance.py"
       ],
-      "required_behaviour": "In-process MCP gateway reviews discovery, pins trusted tools/list descriptions and instructions, scans encoded descriptor poisoning variants, accepts injected semantic detectors for discovery/response prompt-injection review, signed registrations, populated registration manifests, tool calls, remote auth, capability policy, approved policy-store heads, runtime nested argument-schema conformance, cross-server lookalike tools, and tool responses without executing tools or leaking raw argument values.",
+      "required_behaviour": "In-process MCP gateway reviews discovery, pins trusted tools/list descriptions and instructions, scans encoded descriptor poisoning variants, runs dependency-light semantic defaults or injected semantic detectors for discovery/response review, signed registrations, populated registration manifests, tool calls, remote auth, capability policy, approved policy-store heads, runtime nested argument-schema conformance, cross-server lookalike tools, and tool responses without executing tools or leaking raw argument values.",
       "evidence_tests": [
         {
           "file": "tests/test_mcp_gateway.py",
@@ -127,7 +127,7 @@
         {
           "file": "tests/test_mcp_semantic_injection.py",
           "mode": "integration",
-          "covers": "encoded discovery-poisoning rescans and injected semantic detector fail-closed routing across discovery and response review"
+          "covers": "encoded discovery-poisoning rescans plus default and injected semantic detector fail-closed routing across discovery and response review"
         },
         {
           "file": "tests/test_mcp_gateway_registry_guards.py",
@@ -195,14 +195,15 @@
       "boundary_type": "adapter_execution_audit",
       "production_surfaces": [
         "director_class_ai/sdk/middleware.py",
+        "director_class_ai/detectors/defaults.py",
         "director_class_ai/core/governor.py"
       ],
-      "required_behaviour": "SDK middleware renders tool actions deterministically, reviews without default execution, executes permitted calls exactly once, blocks untrusted mutations and irreversible never-soften actions, routes recoverable approval through a durable digest-scoped queue when configured, and emits digest-only audit events to the hash-chained audit sink when configured.",
+      "required_behaviour": "SDK middleware renders tool actions deterministically, runs dependency-light content/integrity defaults, reviews without default execution, executes permitted calls exactly once, blocks untrusted mutations and irreversible never-soften actions, routes recoverable approval through a durable digest-scoped queue when configured, and emits digest-only audit events to the hash-chained audit sink when configured.",
       "evidence_tests": [
         {
           "file": "tests/test_sdk_middleware.py",
           "mode": "integration",
-          "covers": "review/run paths, dry-run behaviour, executor override, durable approval queue route, hash-chain audit sink, redacted audit event"
+          "covers": "review/run paths, default content/integrity blocking, dry-run behaviour, executor override, durable approval queue route, hash-chain audit sink, redacted audit event"
         }
       ]
     },
@@ -493,14 +494,20 @@
       "boundary_type": "adapter_optional_dependency",
       "production_surfaces": [
         "director_class_ai/detectors/citation.py",
+        "director_class_ai/detectors/defaults.py",
         "director_class_ai/detectors/injection.py",
         "director_class_ai/detectors/pii.py",
         "director_class_ai/detectors/response_nli.py",
         "director_class_ai/detectors/semantic_action_support.py",
         "director_class_ai/detectors/llm_judge.py"
       ],
-      "required_behaviour": "Content/model-backed adapters run through injected production adapter contracts in tests, keep optional external model loading behind factories, emit real DetectorSignal objects, and redact sensitive values.",
+      "required_behaviour": "Content/model-backed adapters run through injected production adapter contracts in tests, dependency-light defaults provide prompt-injection and response-PII signals for runtime factories, optional external model loading stays behind factories, adapters emit real DetectorSignal objects, and sensitive values are redacted.",
       "evidence_tests": [
+        {
+          "file": "tests/test_default_detectors.py",
+          "mode": "integration",
+          "covers": "dependency-light default prompt-injection and response-PII detectors through real adapter protocols"
+        },
         {
           "file": "tests/test_citation_adapter.py",
           "mode": "integration",
@@ -509,7 +516,7 @@
         {
           "file": "tests/test_injection_adapter.py",
           "mode": "integration",
-          "covers": "LayeredPromptGuard backend contract, query/context scanning, redacted rationale"
+          "covers": "LayeredPromptGuard backend contract, query/context/response scanning, redacted rationale"
         },
         {
           "file": "tests/test_pii_adapter.py",

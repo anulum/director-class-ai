@@ -109,3 +109,15 @@ def test_semantic_detector_blocks_mcp_response() -> None:
     assert "prompt_injection" in decision.firing
     assert detector.requests
     assert "subtle takeover" in detector.requests[0].response
+
+
+def test_default_semantic_detectors_block_mcp_response_pii() -> None:
+    request = MCPResponseRequest(
+        call=MCPToolCall("fs", "read_file", {"path": "README.md"}),
+        output="Contact operator@example.com for the private rollout.",
+    )
+
+    decision = MCPGateway.from_registry([]).review_response(request)
+
+    assert decision.route == "block"
+    assert "pii_detected" in decision.firing

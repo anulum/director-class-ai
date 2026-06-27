@@ -16,6 +16,7 @@ unit-tested with injected scorers / judge functions.
 
 from .citation import CitationCoverageDetector, CitationTrace, CitationTracer
 from .contradiction import ContradictionContentDetector
+from .defaults import default_content_integrity_detectors
 from .injection import (
     InjectionPromptDetector,
     InjectionScreenBackend,
@@ -56,5 +57,6 @@ __all__ = [
     "SemanticActionSupportDetector",
     "SupportScorer",
     "TokenSpanContentDetector",
+    "default_content_integrity_detectors",
     "prompt_judge",
 ]

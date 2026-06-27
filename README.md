@@ -75,6 +75,10 @@ their executor. Dry-run is the default; real execution requires both a permittin
 Governor decision and `dry_run=False`. Production middleware should pass durable
 approval and audit paths so escalations open digest-scoped tickets and every
 decision lands in the hash-chained audit log.
+The default middleware runs dependency-light content/integrity detectors as well
+as the action-plane detectors: prompt-injection screening covers query, context,
+and supplied response text, while response PII screening catches common sensitive
+data patterns without requiring the optional model stack.
 
 ```python
 from director_class_ai.sdk import (
@@ -199,6 +203,8 @@ and rot13-decoded variants. Deployments can also pass semantic detectors such as
 prompt-injection adapters or LLM-judge detectors to `MCPGateway.from_registry`;
 those signals fail closed during discovery and response review without logging
 raw descriptor or response bodies in audit events.
+When no semantic override is supplied, the gateway uses the same dependency-light
+content/integrity defaults for discovery and tool-response review.
 
 Request digests are full SHA-256 identifiers over the canonical request payload
 and tenant id. Deployments can set `DIRECTOR_CLASS_DIGEST_SALT` to bind approval
