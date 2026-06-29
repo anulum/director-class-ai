@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from director_class_ai.action import MCP_CALL_KEY, MCPToolCall, MCPToolRegistration
 from director_class_ai.core import EvaluationRequest
 from director_class_ai.gateway import (
@@ -26,6 +28,13 @@ from director_class_ai.policy import (
     CapabilityPolicy,
     OriginRule,
 )
+
+
+def _section(payload: Mapping[str, object], key: str) -> Mapping[str, object]:
+    """Return a nested mapping field of an audit event, asserting its type."""
+    value = payload[key]
+    assert isinstance(value, Mapping), f"{key} is not a mapping: {type(value)!r}"
+    return value
 
 
 def _registration() -> MCPToolRegistration:
@@ -144,13 +153,14 @@ def test_capability_policy_allows_signed_call_with_redacted_audit() -> None:
 
     assert decision.route == "allow"
     assert decision.permitted is True
-    assert event["policy"]["summary"]["resource_present"] is True
-    assert event["policy"]["summary"]["source_origin"] == "user"
-    assert event["policy"]["context_digest"]
-    assert event["policy"]["decision"]["matched_grant_ids"] == ("grant-read",)
-    assert event["policy"]["decision"]["rationale"] == (
-        "capability and origin policy matched"
-    )
+    policy = _section(event, "policy")
+    summary = _section(policy, "summary")
+    assert summary["resource_present"] is True
+    assert summary["source_origin"] == "user"
+    assert policy["context_digest"]
+    policy_decision = _section(policy, "decision")
+    assert policy_decision["matched_grant_ids"] == ("grant-read",)
+    assert policy_decision["rationale"] == ("capability and origin policy matched")
     assert "workspace:README.md" not in repr(event)
 
 
@@ -190,11 +200,11 @@ def test_capability_context_audit_without_policy_has_no_policy_decision() -> Non
     )
 
     decision = MCPGateway.from_registry([_registration()]).review(request)
-    policy = decision.to_audit_event()["policy"]
+    policy = _section(decision.to_audit_event(), "policy")
 
     assert decision.route == "allow"
     assert policy["context_digest"]
-    assert policy["summary"]["resource_present"] is True
+    assert _section(policy, "summary")["resource_present"] is True
     assert "decision" not in policy
 
 
