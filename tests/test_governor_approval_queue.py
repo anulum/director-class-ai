@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from director_class_ai.approvals import ApprovalQueue
 from director_class_ai.core import (
     DetectorSignal,
@@ -26,7 +28,7 @@ class _BorderlineAction:
     plane = Plane.ACTION
     tier = 0
 
-    def evaluate(self, request: EvaluationRequest):
+    def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
         if "maybe" not in request.action:
             return None
         return DetectorSignal(
@@ -39,7 +41,7 @@ class _BorderlineAction:
         )
 
 
-def test_escalate_then_approve_then_permit(tmp_path) -> None:
+def test_escalate_then_approve_then_permit(tmp_path: Path) -> None:
     queue = ApprovalQueue(tmp_path / "q.json")
     gov = Governor(
         ensemble=ParallelEnsembleScorer([_BorderlineAction()]),

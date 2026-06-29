@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 
 from director_class_ai.policy import (
+    PolicyChangeProposal,
     PolicyChangeReview,
     PolicyHistory,
     Profile,
@@ -35,7 +36,9 @@ def _review(seed: Profile | None = None) -> PolicyChangeReview:
     return PolicyChangeReview(history)
 
 
-def _propose(review: PolicyChangeReview, profile: Profile, *, proposer: str = "alice"):
+def _propose(
+    review: PolicyChangeReview, profile: Profile, *, proposer: str = "alice"
+) -> PolicyChangeProposal:
     return review.propose(
         profile,
         proposer=proposer,

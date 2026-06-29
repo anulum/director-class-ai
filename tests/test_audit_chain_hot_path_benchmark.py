@@ -9,12 +9,13 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from benchmarks.audit_chain_hot_path import main, run_audit_chain_hot_path
 from director_class_ai.audit import verify_chain
 
 
-def test_audit_chain_hot_path_runs_real_sink_and_verifies(tmp_path) -> None:
+def test_audit_chain_hot_path_runs_real_sink_and_verifies(tmp_path: Path) -> None:
     audit_path = tmp_path / "audit.jsonl"
 
     result = run_audit_chain_hot_path(audit_path, appends=8)
@@ -27,7 +28,7 @@ def test_audit_chain_hot_path_runs_real_sink_and_verifies(tmp_path) -> None:
     assert verify_chain(audit_path).ok is True
 
 
-def test_audit_chain_hot_path_cli_writes_bounded_result(tmp_path) -> None:
+def test_audit_chain_hot_path_cli_writes_bounded_result(tmp_path: Path) -> None:
     output = tmp_path / "audit_hot_path.json"
 
     assert main(["--appends", "3", "--output", str(output)]) == 0

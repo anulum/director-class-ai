@@ -18,6 +18,7 @@ from director_class_ai.core import (
     Plane,
     Severity,
 )
+from director_class_ai.core.governor import ApprovalHook
 from director_class_ai.effectors import (
     EffectorKind,
     EffectorRequest,
@@ -35,7 +36,7 @@ class _BorderlineAction:
     plane = Plane.ACTION
     tier = 0
 
-    def evaluate(self, request: EvaluationRequest):
+    def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
         if "maybe" not in request.action:
             return None
         return DetectorSignal(
@@ -57,7 +58,7 @@ class _Spy:
         return ("output", 0)
 
 
-def _adapter(spy: _Spy, *, approval=None) -> ShellEffectorAdapter:
+def _adapter(spy: _Spy, *, approval: ApprovalHook | None = None) -> ShellEffectorAdapter:
     gov = Governor(
         ensemble=ParallelEnsembleScorer(
             [DestructiveCommandDetector(), _BorderlineAction()]

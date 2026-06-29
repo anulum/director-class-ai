@@ -78,7 +78,7 @@ def test_boundary_evidence_rejects_missing_production_surface(tmp_path: Path) ->
 def test_boundary_evidence_rejects_non_integration_mode(tmp_path: Path) -> None:
     payload = _valid_payload()
     boundary = payload["boundaries"][0]  # type: ignore[index]
-    boundary["evidence_tests"][0]["mode"] = "unit"  # type: ignore[index]
+    boundary["evidence_tests"][0]["mode"] = "unit"
     (tmp_path / "tests").mkdir()
     (tmp_path / "prod.py").write_text("VALUE = 1\n", encoding="utf-8")
     (tmp_path / "tests" / "test_demo_boundary.py").write_text(

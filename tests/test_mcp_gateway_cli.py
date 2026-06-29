@@ -121,7 +121,9 @@ def test_gateway_console_script_is_declared() -> None:
     )
 
 
-def test_main_closes_server_on_keyboard_interrupt(monkeypatch) -> None:
+def test_main_closes_server_on_keyboard_interrupt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     closed: list[bool] = []
 
     class _Server:
@@ -140,7 +142,7 @@ def test_main_closes_server_on_keyboard_interrupt(monkeypatch) -> None:
     assert closed == [True]
 
 
-def test_main_closes_server_after_clean_shutdown(monkeypatch) -> None:
+def test_main_closes_server_after_clean_shutdown(monkeypatch: pytest.MonkeyPatch) -> None:
     closed: list[bool] = []
 
     class _Server:
