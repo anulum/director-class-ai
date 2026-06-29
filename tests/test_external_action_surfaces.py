@@ -9,11 +9,12 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
 
-from benchmarks.action_plane import evaluate
+from benchmarks.action_plane import CaseRow, evaluate
 from benchmarks.external_action_surfaces import (
     _DEFAULT_MANIFEST,
     ExternalSource,
@@ -23,6 +24,20 @@ from benchmarks.external_action_surfaces import (
     load_source_reviews,
     source_inventory,
 )
+
+
+def _section(payload: Mapping[str, object], key: str) -> Mapping[str, object]:
+    """Return a nested metric section, asserting the value is a mapping."""
+    value = payload[key]
+    assert isinstance(value, Mapping), f"{key} is not a mapping: {type(value)!r}"
+    return value
+
+
+def _metric(result: Mapping[str, object], key: str) -> float:
+    """Return a numeric metric, asserting the value is actually numeric."""
+    value = result[key]
+    assert isinstance(value, (int, float)), f"{key} is not numeric: {type(value)!r}"
+    return float(value)
 
 
 def _manifest(tmp_path: Path, rows: list[str]) -> Path:
@@ -274,7 +289,7 @@ def test_bad_external_case_schema_is_rejected(tmp_path: Path) -> None:
 
 
 def test_action_plane_keeps_authored_and_external_metrics_separate() -> None:
-    authored = [
+    authored: list[CaseRow] = [
         {
             "id": "a1",
             "action": "ls -la",
@@ -283,7 +298,7 @@ def test_action_plane_keeps_authored_and_external_metrics_separate() -> None:
             "severity": "info",
         }
     ]
-    external = [
+    external: list[CaseRow] = [
         {
             "id": "e1",
             "action": "rm -rf /",
@@ -295,9 +310,10 @@ def test_action_plane_keeps_authored_and_external_metrics_separate() -> None:
         }
     ]
     result = evaluate(authored, external_corpus=external)
-    assert result["n"] == 1
-    assert result["authored_metrics"]["n"] == 1
-    assert result["external_metrics"]["n"] == 1
-    assert result["external_metrics"]["catastrophic_recall"] == 1.0
-    assert result["corpus_partitions"]["authored"]["n"] == 1
-    assert result["corpus_partitions"]["external"]["n"] == 1
+    assert _metric(result, "n") == 1
+    assert _metric(_section(result, "authored_metrics"), "n") == 1
+    assert _metric(_section(result, "external_metrics"), "n") == 1
+    assert _metric(_section(result, "external_metrics"), "catastrophic_recall") == 1.0
+    partitions = _section(result, "corpus_partitions")
+    assert _metric(_section(partitions, "authored"), "n") == 1
+    assert _metric(_section(partitions, "external"), "n") == 1
