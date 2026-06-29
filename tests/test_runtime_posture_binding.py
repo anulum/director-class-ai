@@ -40,6 +40,8 @@ from director_class_ai.sdk import ToolReviewMiddleware, ToolReviewRequest
 class _FixedActionDetector:
     """A detector that emits one action-plane objection at a fixed score."""
 
+    name = "fixture"
+    plane = Plane.ACTION
     tier = 0
 
     def __init__(self, score: float) -> None:

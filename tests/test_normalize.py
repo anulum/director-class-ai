@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import importlib
 from types import SimpleNamespace
 
 import pytest
@@ -19,13 +20,19 @@ from director_class_ai.action._normalize import (
     expand,
     rust_backend_available,
 )
-from director_class_ai.core import EvaluationRequest, Severity
+from director_class_ai.core import DetectorSignal, EvaluationRequest, Severity
 
 DET = DestructiveCommandDetector()
 
 
-def caught(command: str):
+def caught(command: str) -> DetectorSignal | None:
     return DET.evaluate(EvaluationRequest(action=command))
+
+
+def severity(command: str) -> Severity:
+    sig = caught(command)
+    assert sig is not None, command
+    return sig.severity
 
 
 class TestExpand:
@@ -78,24 +85,22 @@ class TestExpand:
 
 class TestEvasionCaught:
     def test_split_flags(self) -> None:
-        assert caught("rm -r -f /").severity is Severity.CRITICAL
+        assert severity("rm -r -f /") is Severity.CRITICAL
 
     def test_quote_break(self) -> None:
-        assert caught("r''m -rf /").severity is Severity.CRITICAL
+        assert severity("r''m -rf /") is Severity.CRITICAL
 
     def test_base64_pipe_to_shell(self) -> None:
-        assert (
-            caught("echo cm0gLXJmIC8K | base64 -d | bash").severity is Severity.CRITICAL
-        )
+        assert severity("echo cm0gLXJmIC8K | base64 -d | bash") is Severity.CRITICAL
 
     def test_alias_indirection(self) -> None:
         assert caught("alias x='rm -rf /'; x") is not None
 
     def test_find_delete(self) -> None:
-        assert caught("find / -delete").severity is Severity.HIGH
+        assert severity("find / -delete") is Severity.HIGH
 
     def test_find_exec_rm(self) -> None:
-        assert caught("find . -exec rm -rf {} +").severity is Severity.HIGH
+        assert severity("find . -exec rm -rf {} +") is Severity.HIGH
 
 
 class TestSafeStillClean:
@@ -118,7 +123,7 @@ class TestRecursiveAndNewTransforms:
         outer = (
             "echo " + base64.b64encode(inner.encode()).decode() + " | base64 -d | bash"
         )
-        assert caught(outer).severity is Severity.CRITICAL
+        assert severity(outer) is Severity.CRITICAL
 
     def test_hex_run_decoded(self) -> None:
         assert caught(r"\x72\x6d\x20\x2d\x72\x66\x20\x2f") is not None  # rm -rf /
@@ -132,11 +137,11 @@ class TestRecursiveAndNewTransforms:
         assert isinstance(forms, list) and forms
 
     def test_command_substitution_inline_echo(self) -> None:
-        assert caught("$(echo rm) -rf /").severity is Severity.CRITICAL
+        assert severity("$(echo rm) -rf /") is Severity.CRITICAL
 
     def test_ifs_substitution_revealed(self) -> None:
         # ${IFS} replaces literal spaces between complete tokens
-        assert caught("rm${IFS}-rf${IFS}/").severity is Severity.CRITICAL
+        assert severity("rm${IFS}-rf${IFS}/") is Severity.CRITICAL
 
     def test_double_quote_break_in_verb_revealed(self) -> None:
         # embedded-quote break the empty-pair dequote misses
@@ -169,10 +174,10 @@ class TestRecursiveAndNewTransforms:
         assert caught('echo "hello world"') is None
 
     def test_command_substitution_backtick(self) -> None:
-        assert caught("`rm -rf /`").severity is Severity.CRITICAL
+        assert severity("`rm -rf /`") is Severity.CRITICAL
 
     def test_command_substitution_full_echo(self) -> None:
-        assert caught("$(echo 'rm -rf /')").severity is Severity.CRITICAL
+        assert severity("$(echo 'rm -rf /')") is Severity.CRITICAL
 
     def test_empty_substitution_ignored(self) -> None:
         forms = expand("$() echo hi")
@@ -248,10 +253,10 @@ class TestRecursiveAndNewTransforms:
         assert not any("\x00" in f for f in forms)
 
     def test_env_var_command_indirection_revealed(self) -> None:
-        assert caught("X=rm; $X -rf /").severity is Severity.CRITICAL
+        assert severity("X=rm; $X -rf /") is Severity.CRITICAL
 
     def test_env_var_full_payload_revealed(self) -> None:
-        assert caught("CMD='DROP TABLE users;'; $CMD").severity is Severity.CRITICAL
+        assert severity("CMD='DROP TABLE users;'; $CMD") is Severity.CRITICAL
 
     def test_env_var_echo_lookalike_stays_clean(self) -> None:
         assert caught("X=rm; echo $X -rf /") is None
@@ -261,25 +266,25 @@ class TestRecursiveAndNewTransforms:
         assert "\x00 -rf /" not in forms
 
     def test_zero_width_command_revealed(self) -> None:
-        assert caught("r\u200bm -rf /").severity is Severity.CRITICAL
+        assert severity("r\u200bm -rf /") is Severity.CRITICAL
 
     def test_fullwidth_command_revealed(self) -> None:
-        assert caught("ｒｍ -rf /").severity is Severity.CRITICAL
+        assert severity("ｒｍ -rf /") is Severity.CRITICAL
 
     def test_homoglyph_command_revealed(self) -> None:
-        assert caught("rм -rf /").severity is Severity.CRITICAL
+        assert severity("rм -rf /") is Severity.CRITICAL
 
     def test_printed_homoglyph_lookalike_stays_clean(self) -> None:
         assert caught("echo r\u200bm -rf /") is None
 
     def test_brace_list_command_revealed(self) -> None:
-        assert caught("{rm,-rf,/}").severity is Severity.CRITICAL
+        assert severity("{rm,-rf,/}") is Severity.CRITICAL
 
     def test_brace_embedded_command_revealed(self) -> None:
-        assert caught("r{m,} -rf /").severity is Severity.CRITICAL
+        assert severity("r{m,} -rf /") is Severity.CRITICAL
 
     def test_brace_split_flags_revealed(self) -> None:
-        assert caught("rm -{r,f} /").severity is Severity.CRITICAL
+        assert severity("rm -{r,f} /") is Severity.CRITICAL
 
     def test_printed_brace_lookalike_stays_clean(self) -> None:
         assert caught("echo {rm,-rf,/}") is None
@@ -292,7 +297,7 @@ class TestRecursiveAndNewTransforms:
             r"printf \"$(printf '\\%03o' $((0x72)))"
             r"$(printf '\\%03o' $((0x6d)))\" | xargs -I{} {} -rf /"
         )
-        assert caught(command).severity is Severity.CRITICAL
+        assert severity(command) is Severity.CRITICAL
 
     def test_arithmetic_printf_xargs_echo_stays_clean(self) -> None:
         command = (
@@ -384,7 +389,7 @@ class TestRustExpandParity:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
-            normalize.importlib,
+            importlib,
             "import_module",
             lambda _: SimpleNamespace(expand="not-callable"),
         )
@@ -397,7 +402,7 @@ class TestRustExpandParity:
         def missing_extension(_name: str) -> object:
             raise ImportError("extension absent")
 
-        monkeypatch.setattr(normalize.importlib, "import_module", missing_extension)
+        monkeypatch.setattr(importlib, "import_module", missing_extension)
 
         assert normalize._load_rust_expand() is None
 
@@ -439,7 +444,7 @@ class TestRustExpandParity:
             assert expand("rm -rf /") == _expand_python("rm -rf /")
             return
 
-        from director_class_ai import _rust
+        _rust = importlib.import_module("director_class_ai._rust")
 
         commands = (
             "rm -r -f /",

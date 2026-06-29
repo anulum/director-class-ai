@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import tomllib
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import pytest
@@ -27,6 +28,29 @@ from director_class_ai.policy import PolicyGovernance, Profile
 from director_class_ai.sidecar import LocalHaltSwitch
 
 _PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
+
+
+def _section(payload: Mapping[str, object], key: str) -> Mapping[str, object]:
+    """Return a nested mapping field of a guard event, asserting its type."""
+    value = payload[key]
+    assert isinstance(value, Mapping), f"{key} is not a mapping: {type(value)!r}"
+    return value
+
+
+def _seq(payload: Mapping[str, object], key: str) -> Sequence[object]:
+    """Return a sequence field of a guard event (list or tuple, not text)."""
+    value = payload[key]
+    assert isinstance(value, Sequence) and not isinstance(value, (str, bytes)), (
+        f"{key} is not a non-text sequence: {type(value)!r}"
+    )
+    return value
+
+
+def _metric(payload: Mapping[str, object], key: str) -> float:
+    """Return a numeric field of a guard event, asserting it is numeric."""
+    value = payload[key]
+    assert isinstance(value, (int, float)), f"{key} is not numeric: {type(value)!r}"
+    return float(value)
 
 
 def _opts(
@@ -250,7 +274,7 @@ def test_blocked_command_returns_redacted_event(tmp_path: Path) -> None:
     assert event["route"] == "block"
     assert event["permitted"] is False
     assert event["executed"] is False
-    assert "destructive_command" in event["firing"]
+    assert "destructive_command" in _seq(event, "firing")
     assert "rm -rf" not in repr(event)
 
 
@@ -270,7 +294,7 @@ def test_untrusted_cloud_mutation_blocks_without_approval_downgrade(
     assert event["route"] == "block"
     assert event["permitted"] is False
     assert event["executed"] is False
-    assert "origin_taint" in event["firing"]
+    assert "origin_taint" in _seq(event, "firing")
 
 
 def test_halt_state_blocks_command_before_execution(tmp_path: Path) -> None:
@@ -303,7 +327,7 @@ def test_execute_runs_only_after_permit(tmp_path: Path) -> None:
     assert event["permitted"] is True
     assert event["executed"] is True
     assert event["output_digest"]
-    assert event["output_size"] > 0
+    assert _metric(event, "output_size") > 0
     assert event["exit_code"] == 0
     assert "guard-ok" not in repr(event)
 
@@ -407,7 +431,7 @@ def test_drifted_live_profile_blocks_before_review(tmp_path: Path) -> None:
     assert event["permitted"] is False
     assert event["executed"] is False
     assert event["firing"] == ("policy_runtime_drift",)
-    assert event["policy_drift"]["changes"] == ("action_block_threshold",)
+    assert _section(event, "policy_drift")["changes"] == ("action_block_threshold",)
     assert verify_chain(str(event["audit_log"])).ok
 
 

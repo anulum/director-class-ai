@@ -16,6 +16,7 @@ import urllib.error
 import urllib.request
 from contextlib import AbstractContextManager
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -249,7 +250,7 @@ def test_service_dispatch_error_paths(tmp_path: Path) -> None:
         config=HaltSwitchServiceConfig(operator_key="operator-key"),
     )
 
-    method = service.handle("PUT", "/v1/halt", operator_key="operator-key")
+    method = service.handle(cast(Any, "PUT"), "/v1/halt", operator_key="operator-key")
     missing = service.handle("POST", "/v1/halt", operator_key="operator-key")
     unknown = service.handle("POST", "/v1/unknown", {}, operator_key="operator-key")
     invalid = service.handle(
@@ -350,7 +351,9 @@ class _running_server(AbstractContextManager[str]):
 
     def __enter__(self) -> str:
         self._thread.start()
-        host, port = self._server.server_address
+        address = self._server.server_address
+        host, port = address[0], address[1]
+        assert isinstance(host, str)
         return f"http://{host}:{port}"
 
     def __exit__(self, exc_type: object, exc: object, tb: object) -> None:

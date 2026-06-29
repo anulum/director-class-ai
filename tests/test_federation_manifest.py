@@ -21,11 +21,21 @@ from __future__ import annotations
 
 import dataclasses
 import re
+from collections.abc import Mapping
+from importlib.metadata import PackageNotFoundError
 
 import pytest
 
 from director_class_ai.federation import StudioManifest, Verb, build_manifest
 from director_class_ai.federation import manifest as manifest_mod
+
+
+def _section(payload: Mapping[str, object], key: str) -> Mapping[str, object]:
+    """Return a nested mapping field of a manifest payload, asserting its type."""
+    value = payload[key]
+    assert isinstance(value, Mapping), f"{key} is not a mapping: {type(value)!r}"
+    return value
+
 
 _SCHEMA_A_KEYS = {
     "contract_era",
@@ -88,7 +98,7 @@ def test_to_dict_schema_a_surface() -> None:
     assert payload["transport_profile"] == "local-first"
     assert payload["studio"] == "director-class-ai"
     assert payload["enumeration"] == "language-agnostic"
-    assert payload["ui_module"]["remote_entry"] == "/studio/remoteEntry.js"
+    assert _section(payload, "ui_module")["remote_entry"] == "/studio/remoteEntry.js"
 
 
 def test_evidence_types_sorted_and_deduplicated() -> None:
@@ -161,7 +171,7 @@ def test_studio_version_fallback_when_not_installed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def _raise(_name: str) -> str:
-        raise manifest_mod.PackageNotFoundError
+        raise PackageNotFoundError
 
     monkeypatch.setattr(manifest_mod, "version", _raise)
     assert manifest_mod._studio_version() == "0+unknown"

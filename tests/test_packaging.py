@@ -16,9 +16,21 @@ import director_class_ai
 _PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
 
 
-def _project() -> dict:
+def _project() -> dict[str, object]:
     with _PYPROJECT.open("rb") as fh:
-        return tomllib.load(fh)["project"]
+        project = tomllib.load(fh)["project"]
+    assert isinstance(project, dict)
+    return project
+
+
+def _classifiers() -> list[str]:
+    value = _project()["classifiers"]
+    assert isinstance(value, list)
+    classifiers: list[str] = []
+    for item in value:
+        assert isinstance(item, str)
+        classifiers.append(item)
+    return classifiers
 
 
 def test_version_matches_pyproject() -> None:
@@ -39,9 +51,9 @@ def test_license_is_business_source_license() -> None:
 def test_not_uploadable_to_pypi() -> None:
     # source-available under BUSL-1.1; distributed via the repository, never
     # published to public PyPI
-    assert "Private :: Do Not Upload" in _project()["classifiers"]
+    assert "Private :: Do Not Upload" in _classifiers()
 
 
 def test_no_deprecated_license_classifier() -> None:
     # licence is the bundled LICENSE file, not a deprecated License:: classifier
-    assert not any(c.startswith("License ::") for c in _project()["classifiers"])
+    assert not any(c.startswith("License ::") for c in _classifiers())

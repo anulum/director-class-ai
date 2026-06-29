@@ -28,7 +28,7 @@ class _FakeSpan:
 @dataclass
 class _FakeDetection:
     hallucinated: bool
-    spans: tuple
+    spans: tuple[_FakeSpan, ...]
     max_token_score: float
     flagged_tokens: int
 
