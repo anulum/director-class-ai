@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import importlib
+from collections.abc import Sequence
 from types import SimpleNamespace
 from typing import cast
 
@@ -155,7 +156,9 @@ def test_meta_classifier_fusion_policy_is_explicit_opt_in() -> None:
 
 
 class TestRustMetaClassifierParity:
-    def test_loader_ignores_missing_callables(self, monkeypatch) -> None:
+    def test_loader_ignores_missing_callables(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         module = SimpleNamespace(
             meta_extract_signal_features=object(),
             meta_risk=object(),
@@ -167,7 +170,9 @@ class TestRustMetaClassifierParity:
         assert meta_classifier._load_rust_risk() is None
         assert meta_classifier._load_rust_fit() is None
 
-    def test_loaders_return_none_when_extension_is_absent(self, monkeypatch) -> None:
+    def test_loaders_return_none_when_extension_is_absent(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         def missing_extension(_name: str) -> object:
             raise ImportError("extension absent")
 
@@ -178,7 +183,7 @@ class TestRustMetaClassifierParity:
         assert meta_classifier._load_rust_fit() is None
 
     def test_python_paths_are_used_when_rust_primitives_are_absent(
-        self, monkeypatch
+        self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         signals = [_sig(score=0.7)]
         observations = [([_sig(score=0.1)], 0), ([_sig(score=0.9)], 1)]
@@ -213,7 +218,9 @@ class TestRustMetaClassifierParity:
             )
         )
 
-    def test_feature_mismatch_falls_back_to_python(self, monkeypatch) -> None:
+    def test_feature_mismatch_falls_back_to_python(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         signals = [_sig(score=0.7)]
         monkeypatch.setattr(
             meta_classifier,
@@ -225,10 +232,14 @@ class TestRustMetaClassifierParity:
             signals
         ) == meta_classifier._extract_signal_features_python(signals)
 
-    def test_feature_exception_falls_back_to_python(self, monkeypatch) -> None:
+    def test_feature_exception_falls_back_to_python(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         signals = [_sig(score=0.7)]
 
-        def broken_extract(_rows):
+        def broken_extract(
+            _rows: Sequence[tuple[str, float, str, str, str, float]],
+        ) -> list[tuple[str, float]]:
             raise RuntimeError("boom")
 
         monkeypatch.setattr(meta_classifier, "_RUST_EXTRACT_FEATURES", broken_extract)
@@ -236,7 +247,9 @@ class TestRustMetaClassifierParity:
             signals
         ) == meta_classifier._extract_signal_features_python(signals)
 
-    def test_risk_mismatch_and_exception_fall_back_to_python(self, monkeypatch) -> None:
+    def test_risk_mismatch_and_exception_fall_back_to_python(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         model = SignalMetaClassifier(weights={"max_score": 3.0}, bias=-1.0)
         signals = [_sig(score=0.7)]
         expected = model.risk(signals)
@@ -244,13 +257,19 @@ class TestRustMetaClassifierParity:
         monkeypatch.setattr(meta_classifier, "_RUST_RISK", lambda _w, _b, _f: 0.0)
         assert model.risk(signals) == pytest.approx(expected)
 
-        def broken_risk(_weights, _bias, _features):
+        def broken_risk(
+            _weights: Sequence[tuple[str, float]],
+            _bias: float,
+            _features: Sequence[tuple[str, float]],
+        ) -> float:
             raise RuntimeError("boom")
 
         monkeypatch.setattr(meta_classifier, "_RUST_RISK", broken_risk)
         assert model.risk(signals) == pytest.approx(expected)
 
-    def test_fit_mismatch_and_exception_fall_back_to_python(self, monkeypatch) -> None:
+    def test_fit_mismatch_and_exception_fall_back_to_python(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         observations = [([_sig(score=0.1)], 0), ([_sig(score=0.9)], 1)]
         expected = fit_signal_meta_classifier(observations, iters=20, lr=0.2)
         monkeypatch.setattr(
@@ -260,7 +279,12 @@ class TestRustMetaClassifierParity:
         )
         assert fit_signal_meta_classifier(observations, iters=20, lr=0.2) == expected
 
-        def broken_fit(_rows, _iters, _lr, _l2):
+        def broken_fit(
+            _rows: Sequence[tuple[list[tuple[str, float]], int]],
+            _iters: int,
+            _lr: float,
+            _l2: float,
+        ) -> tuple[list[tuple[str, float]], float]:
             raise RuntimeError("boom")
 
         monkeypatch.setattr(meta_classifier, "_RUST_FIT", broken_fit)
