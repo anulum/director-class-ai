@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from director_class_ai.action import DestructiveCommandDetector, OriginTaintDetector
 from director_class_ai.core import (
     DetectorSignal,
@@ -17,7 +19,13 @@ from director_class_ai.core import (
     ParallelEnsembleScorer,
     Plane,
 )
-from director_class_ai.core.governor import digest_request
+from director_class_ai.core.fusion import Verdict
+from director_class_ai.core.governor import (
+    ApprovalHook,
+    AuditRecord,
+    AuditSink,
+    digest_request,
+)
 
 
 class _BorderlineContent:
@@ -27,7 +35,7 @@ class _BorderlineContent:
     plane = Plane.CONTENT
     tier = 1
 
-    def evaluate(self, request: EvaluationRequest):
+    def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
         if not request.response.strip():
             return None
         return DetectorSignal(
@@ -39,11 +47,15 @@ class _BorderlineContent:
         )
 
 
-def _governor(**kw) -> Governor:
+def _governor(
+    *,
+    approval: ApprovalHook | None = None,
+    audit_sink: AuditSink | None = None,
+) -> Governor:
     ensemble = ParallelEnsembleScorer(
         [DestructiveCommandDetector(), _BorderlineContent()]
     )
-    return Governor(ensemble=ensemble, **kw)
+    return Governor(ensemble=ensemble, approval=approval, audit_sink=audit_sink)
 
 
 def test_safe_request_is_permitted() -> None:
@@ -92,7 +104,7 @@ def test_audit_record_and_trail() -> None:
 
 
 def test_audit_sink_is_called() -> None:
-    seen = []
+    seen: list[AuditRecord] = []
     gov = _governor(audit_sink=seen.append)
     gov.review(EvaluationRequest(action="rm -rf /"))
     assert len(seen) == 1 and seen[0].permitted is False
@@ -113,7 +125,7 @@ def test_digest_binds_tenant_id() -> None:
     assert len(first) == len(second) == 64
 
 
-def test_digest_binds_deployment_salt(monkeypatch) -> None:
+def test_digest_binds_deployment_salt(monkeypatch: pytest.MonkeyPatch) -> None:
     request = EvaluationRequest(action="rm -rf /tmp/x", tenant_id="tenant")
     monkeypatch.setenv("DIRECTOR_CLASS_DIGEST_SALT", "deployment-a")
     first = digest_request(request)
@@ -124,11 +136,15 @@ def test_digest_binds_deployment_salt(monkeypatch) -> None:
     assert len(first) == len(second) == 64
 
 
-def _action_governor(**kw) -> Governor:
+def _action_governor(
+    *,
+    approval: ApprovalHook | None = None,
+    audit_sink: AuditSink | None = None,
+) -> Governor:
     ensemble = ParallelEnsembleScorer(
         [DestructiveCommandDetector(), OriginTaintDetector()]
     )
-    return Governor(ensemble=ensemble, **kw)
+    return Governor(ensemble=ensemble, approval=approval, audit_sink=audit_sink)
 
 
 _USER_PERMISSION_CHANGE = EvaluationRequest(
@@ -160,10 +176,13 @@ def test_user_authorised_destructive_proceeds_once_approved() -> None:
 
 
 def test_irreversible_user_destructive_hard_blocks_without_approval() -> None:
-    consulted = []
-    d = _action_governor(approval=lambda _v, _r: consulted.append(1) or True).review(
-        _USER_DROP
-    )
+    consulted: list[int] = []
+
+    def _approve(_v: Verdict, _r: EvaluationRequest) -> bool:
+        consulted.append(1)
+        return True
+
+    d = _action_governor(approval=_approve).review(_USER_DROP)
     assert d.escalated is False
     assert d.permitted is False
     assert d.record.requires_human is False
@@ -174,8 +193,13 @@ def test_irreversible_user_destructive_hard_blocks_without_approval() -> None:
 def test_injected_destructive_hard_blocks_never_escalates() -> None:
     # Same DROP, but sourced from retrieved content (injection): origin taint fires,
     # so it is a hard block — an approver is never even consulted.
-    consulted = []
-    d = _action_governor(approval=lambda _v, _r: consulted.append(1) or True).review(
+    consulted: list[int] = []
+
+    def _approve(_v: Verdict, _r: EvaluationRequest) -> bool:
+        consulted.append(1)
+        return True
+
+    d = _action_governor(approval=_approve).review(
         EvaluationRequest(
             action="DROP TABLE audit_log;",
             query="report the row counts",
