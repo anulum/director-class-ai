@@ -12,6 +12,8 @@ import json
 import tomllib
 from pathlib import Path
 
+import pytest
+
 from director_class_ai.action import DestructiveCommandDetector
 from director_class_ai.audit import AuditChainSink, AuditExportOptions, run_export
 from director_class_ai.audit.export_cli import main
@@ -142,9 +144,9 @@ def test_run_export_verifies_signed_head_and_anchor(tmp_path: Path) -> None:
 
 
 def test_main_verifies_signed_head_from_env(
-    capsys,
+    capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "audit.jsonl"
     anchor = tmp_path / "anchor.jsonl"
@@ -169,8 +171,8 @@ def test_main_verifies_signed_head_from_env(
 
 def test_main_fails_when_head_key_env_is_missing(
     tmp_path: Path,
-    monkeypatch,
-    capsys,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     source = tmp_path / "audit.jsonl"
     monkeypatch.delenv("DCA_AUDIT_HEAD_KEY", raising=False)
@@ -183,7 +185,9 @@ def test_main_fails_when_head_key_env_is_missing(
     assert "environment variable" in captured.err
 
 
-def test_main_writes_stdout_jsonl(capsys, tmp_path: Path) -> None:
+def test_main_writes_stdout_jsonl(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
     source = tmp_path / "audit.jsonl"
     _populate(source)
 
@@ -198,7 +202,9 @@ def test_main_writes_stdout_jsonl(capsys, tmp_path: Path) -> None:
     assert events[1]["technique_ids"] == ["ASI05", "AML.T0050"]
 
 
-def test_main_writes_output_file_without_stdout(capsys, tmp_path: Path) -> None:
+def test_main_writes_output_file_without_stdout(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
     source = tmp_path / "audit.jsonl"
     output = tmp_path / "soc.jsonl"
     _populate(source)
@@ -212,7 +218,9 @@ def test_main_writes_output_file_without_stdout(capsys, tmp_path: Path) -> None:
     assert len(output.read_text(encoding="utf-8").splitlines()) == 2
 
 
-def test_main_returns_two_for_invalid_chain(capsys, tmp_path: Path) -> None:
+def test_main_returns_two_for_invalid_chain(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
     source = tmp_path / "audit.jsonl"
     source.write_text('{"seq": 1}\n', encoding="utf-8")
 

@@ -8,10 +8,26 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import pytest
 
 from benchmarks.action_plane import evaluate
 from benchmarks.partitions import partition_summary, validate_partition_boundaries
+
+
+def _section(payload: Mapping[str, object], key: str) -> Mapping[str, object]:
+    """Return a nested mapping field of a result, asserting its type."""
+    value = payload[key]
+    assert isinstance(value, Mapping), f"{key} is not a mapping: {type(value)!r}"
+    return value
+
+
+def _str(mapping: Mapping[str, object], key: str) -> str:
+    """Return a string field of a mapping, asserting the value is a string."""
+    value = mapping[key]
+    assert isinstance(value, str), f"{key} is not a str: {type(value)!r}"
+    return value
 
 
 def test_authored_partition_rejects_external_metadata() -> None:
@@ -47,8 +63,10 @@ def test_partition_summary_records_claim_boundaries() -> None:
     assert summary["authored"]["n"] == 1
     assert summary["external"]["n"] == 1
     assert summary["customer_private"]["n"] == 0
-    assert "not an external benchmark claim" in summary["authored"]["claim_boundary"]
-    assert "never mixed" in summary["customer_private"]["claim_boundary"]
+    assert "not an external benchmark claim" in _str(
+        _section(summary, "authored"), "claim_boundary"
+    )
+    assert "never mixed" in _str(_section(summary, "customer_private"), "claim_boundary")
 
 
 def test_action_plane_evaluate_exposes_partition_summary() -> None:
@@ -75,7 +93,8 @@ def test_action_plane_evaluate_exposes_partition_summary() -> None:
         ],
     )
 
-    assert result["corpus_partitions"]["authored"]["n"] == 1
-    assert result["corpus_partitions"]["external"]["n"] == 1
-    assert result["authored_metrics"]["n"] == 1
-    assert result["external_metrics"]["n"] == 1
+    partitions = _section(result, "corpus_partitions")
+    assert _section(partitions, "authored")["n"] == 1
+    assert _section(partitions, "external")["n"] == 1
+    assert _section(result, "authored_metrics")["n"] == 1
+    assert _section(result, "external_metrics")["n"] == 1

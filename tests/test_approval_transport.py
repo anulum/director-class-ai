@@ -13,6 +13,7 @@ import hmac
 import http.client
 import json
 import threading
+from collections.abc import Mapping
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -34,6 +35,13 @@ from director_class_ai.approvals import (
 )
 from director_class_ai.approvals.transport import _content_length
 from director_class_ai.core import EvaluationRequest
+
+
+def _section(payload: Mapping[str, object], key: str) -> Mapping[str, object]:
+    """Return a nested mapping field of a response body, asserting its type."""
+    value = payload[key]
+    assert isinstance(value, Mapping), f"{key} is not a mapping: {type(value)!r}"
+    return value
 
 
 class _Clock:
@@ -112,6 +120,7 @@ def test_webhook_sink_posts_signed_redacted_event() -> None:
     sink.publish(event)
     request = opener.requests[0]
     body = request.data or b""
+    assert isinstance(body, bytes)
     expected = hmac.new(b"fixture-key", body, hashlib.sha256).hexdigest()
 
     assert request.full_url == "http://127.0.0.1/hooks"
@@ -226,7 +235,7 @@ def test_service_approves_pending_ticket_and_emits_webhook(
     )
 
     assert response.status == HTTPStatus.OK
-    assert response.body["ticket"]["status"] == "approved"
+    assert _section(response.body, "ticket")["status"] == "approved"
     assert opener.requests
     assert queue.request_approval(None, _request()) is True
     assert "alice" not in repr(response.body)
@@ -249,7 +258,7 @@ def test_service_denies_pending_ticket(tmp_path: Path) -> None:
     )
 
     assert response.status == HTTPStatus.OK
-    assert response.body["ticket"]["status"] == "denied"
+    assert _section(response.body, "ticket")["status"] == "denied"
     assert queue.request_approval(None, _request()) is False
 
 

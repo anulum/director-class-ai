@@ -47,7 +47,9 @@ def _populate(path: Path) -> Governor:
     return gov
 
 
-def test_export_chain_to_siem_jsonl_verifies_and_strips_raw_action(tmp_path) -> None:
+def test_export_chain_to_siem_jsonl_verifies_and_strips_raw_action(
+    tmp_path: Path,
+) -> None:
     path = tmp_path / "audit.jsonl"
     _populate(path)
 
@@ -68,7 +70,7 @@ def test_export_chain_to_siem_jsonl_verifies_and_strips_raw_action(tmp_path) -> 
     assert "rm -rf /" not in exported
 
 
-def test_export_chain_to_siem_jsonl_can_require_signed_anchor(tmp_path) -> None:
+def test_export_chain_to_siem_jsonl_can_require_signed_anchor(tmp_path: Path) -> None:
     path = tmp_path / "audit.jsonl"
     anchor = tmp_path / "anchor.jsonl"
     governor = Governor(
@@ -90,7 +92,7 @@ def test_export_chain_to_siem_jsonl_can_require_signed_anchor(tmp_path) -> None:
     assert len(exported.splitlines()) == 1
 
 
-def test_export_can_write_jsonl_file(tmp_path) -> None:
+def test_export_can_write_jsonl_file(tmp_path: Path) -> None:
     path = tmp_path / "audit.jsonl"
     out = tmp_path / "siem.jsonl"
     _populate(path)
@@ -101,7 +103,7 @@ def test_export_can_write_jsonl_file(tmp_path) -> None:
     assert len(out.read_text(encoding="utf-8").splitlines()) == 2
 
 
-def test_export_tolerates_blank_lines_in_verified_chain(tmp_path) -> None:
+def test_export_tolerates_blank_lines_in_verified_chain(tmp_path: Path) -> None:
     path = tmp_path / "audit.jsonl"
     _populate(path)
     path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
@@ -111,7 +113,7 @@ def test_export_tolerates_blank_lines_in_verified_chain(tmp_path) -> None:
     assert len(exported.splitlines()) == 2
 
 
-def test_export_rejects_unverified_chain(tmp_path) -> None:
+def test_export_rejects_unverified_chain(tmp_path: Path) -> None:
     path = tmp_path / "audit.jsonl"
     _populate(path)
     lines = path.read_text(encoding="utf-8").splitlines()
@@ -124,7 +126,7 @@ def test_export_rejects_unverified_chain(tmp_path) -> None:
         export_chain_to_siem_jsonl(path)
 
 
-def test_live_audit_record_maps_to_otel_style_attributes(tmp_path) -> None:
+def test_live_audit_record_maps_to_otel_style_attributes(tmp_path: Path) -> None:
     path = tmp_path / "audit.jsonl"
     decision = _populate(path).trail[-1]
 
