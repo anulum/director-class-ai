@@ -165,6 +165,9 @@ class TestPersistence:
         governance.save(store)
 
         reloaded = PolicyGovernance.load(store)
-        assert reloaded.head is not None
-        assert reloaded.head.digest == governance.head.digest
+        reloaded_head = reloaded.head
+        governance_head = governance.head
+        assert reloaded_head is not None
+        assert governance_head is not None
+        assert reloaded_head.digest == governance_head.digest
         assert reloaded.pending()[0].digest == pending.digest

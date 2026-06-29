@@ -20,6 +20,7 @@ escalate through the action governor.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from ..core.signal import (
@@ -54,7 +55,7 @@ class ActionTimeline:
     action_source: str = ""
 
     @classmethod
-    def from_mapping(cls, value: dict[str, object]) -> ActionTimeline:
+    def from_mapping(cls, value: Mapping[str, object]) -> ActionTimeline:
         """Build a timeline from metadata while rejecting non-string payloads."""
         return cls(
             user_intent=_string(value.get("user_intent")),

@@ -204,4 +204,4 @@ def _grant(**overrides: object) -> CapabilityGrant:
         "expires_at": 20,
     }
     base.update(overrides)
-    return CapabilityGrant(**base)
+    return CapabilityGrant(**base)  # type: ignore[arg-type]

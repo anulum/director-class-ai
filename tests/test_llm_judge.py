@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 
 from director_class_ai.action import DestructiveCommandDetector
@@ -27,7 +29,9 @@ from director_class_ai.detectors import (
 from director_class_ai.detectors.llm_judge import _coerce_probability, _score_from_json
 
 
-def const_judge(score: float, rationale: str = "r"):
+def const_judge(
+    score: float, rationale: str = "r"
+) -> Callable[[EvaluationRequest], JudgeResult]:
     return lambda _request: JudgeResult(score=score, rationale=rationale)
 
 
@@ -126,13 +130,14 @@ class TestLLMJudgeDetector:
         # alternating 0.4 / 1.0 over samples -> mean 0.7, spread 0.6 -> calibration 0.4
         scores = iter([0.4, 1.0, 0.4, 1.0])
 
-        def flaky(_request):
+        def flaky(_request: EvaluationRequest) -> JudgeResult:
             return JudgeResult(score=next(scores))
 
         det = LLMJudgeDetector(
             flaky, name="j", plane=Plane.CONTENT, signal_type="t", samples=4
         )
         sig = det.evaluate(EvaluationRequest(response="x"))
+        assert sig is not None
         assert sig.score == pytest.approx(0.7)
         assert sig.calibration == pytest.approx(0.4)
 

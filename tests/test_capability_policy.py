@@ -50,7 +50,7 @@ def _grant(**overrides: object) -> CapabilityGrant:
         "expires_at": 20,
     }
     base.update(overrides)
-    return CapabilityGrant(**base)
+    return CapabilityGrant(**base)  # type: ignore[arg-type]
 
 
 def test_capability_policy_allows_matching_grant_and_origin_rule() -> None:

@@ -28,7 +28,7 @@ def _registration() -> MCPToolRegistration:
 
 
 def _call(**overrides: object) -> MCPToolCall:
-    values = {
+    values: dict[str, object] = {
         "server": "fs",
         "tool": "read_file",
         "arguments": {"path": "README.md"},
@@ -40,7 +40,7 @@ def _call(**overrides: object) -> MCPToolCall:
         },
     }
     values.update(overrides)
-    return MCPToolCall(**values)
+    return MCPToolCall(**values)  # type: ignore[arg-type]
 
 
 def test_registration_fingerprint_is_stable_across_mapping_order() -> None:

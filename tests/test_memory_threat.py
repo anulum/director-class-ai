@@ -90,8 +90,11 @@ def test_memory_context_round_trips_to_metadata() -> None:
     loaded = MemoryActionContext.from_mapping(context.as_metadata())
 
     assert loaded.tenant == context.tenant
-    assert loaded.contract is not None
-    assert loaded.contract.contract_digest == context.contract.contract_digest
+    contract = loaded.contract
+    assert contract is not None
+    expected = context.contract
+    assert expected is not None
+    assert contract.contract_digest == expected.contract_digest
 
 
 def test_memory_context_coerces_json_scalars() -> None:
