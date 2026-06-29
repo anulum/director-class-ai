@@ -24,6 +24,8 @@ from director_class_ai.core import (
     Governor,
     ParallelEnsembleScorer,
 )
+from director_class_ai.core.durability import atomic_write_text
+from director_class_ai.core.governor import ApprovalHook
 
 
 class _Clock:
@@ -35,13 +37,13 @@ class _Clock:
         return self.t
 
 
-def _governor(path) -> Governor:
+def _governor(path: Path) -> Governor:
     sink = AuditChainSink(path=path, policy_profile="test", clock=_Clock())
     ensemble = ParallelEnsembleScorer([DestructiveCommandDetector()])
     return Governor(ensemble=ensemble, audit_sink=sink)
 
 
-def _signed_governor(path, *, anchor_path=None) -> Governor:
+def _signed_governor(path: Path, *, anchor_path: Path | None = None) -> Governor:
     sink = AuditChainSink(
         path=path,
         policy_profile="test",
@@ -53,7 +55,7 @@ def _signed_governor(path, *, anchor_path=None) -> Governor:
     return Governor(ensemble=ensemble, audit_sink=sink)
 
 
-def _populate(path, n: int = 4) -> Governor:
+def _populate(path: Path, n: int = 4) -> Governor:
     gov = _governor(path)
     gov.review(EvaluationRequest(action="rm -rf /"))
     gov.review(EvaluationRequest(action="ls -la"))
@@ -62,14 +64,14 @@ def _populate(path, n: int = 4) -> Governor:
     return gov
 
 
-def test_appends_and_verifies(tmp_path) -> None:
+def test_appends_and_verifies(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _populate(p)
     assert p.read_text().count("\n") == 4
     assert verify_chain(p).ok is True
 
 
-def test_genesis_and_linkage(tmp_path) -> None:
+def test_genesis_and_linkage(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _populate(p)
     lines = [json.loads(line) for line in p.read_text().splitlines()]
@@ -78,7 +80,7 @@ def test_genesis_and_linkage(tmp_path) -> None:
     assert [line["seq"] for line in lines] == [0, 1, 2, 3]
 
 
-def test_mutation_detected(tmp_path) -> None:
+def test_mutation_detected(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _populate(p)
     lines = p.read_text().splitlines()
@@ -90,7 +92,7 @@ def test_mutation_detected(tmp_path) -> None:
     assert v.ok is False and v.first_bad_index == 1
 
 
-def test_reordering_detected(tmp_path) -> None:
+def test_reordering_detected(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _populate(p)
     lines = p.read_text().splitlines()
@@ -99,7 +101,7 @@ def test_reordering_detected(tmp_path) -> None:
     assert verify_chain(p).ok is False
 
 
-def test_deletion_detected(tmp_path) -> None:
+def test_deletion_detected(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _populate(p)
     lines = p.read_text().splitlines()
@@ -108,7 +110,7 @@ def test_deletion_detected(tmp_path) -> None:
     assert verify_chain(p).ok is False
 
 
-def test_tail_truncation_detected_via_head(tmp_path) -> None:
+def test_tail_truncation_detected_via_head(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _populate(p)
     lines = p.read_text().splitlines()
@@ -119,7 +121,7 @@ def test_tail_truncation_detected_via_head(tmp_path) -> None:
     assert v.ok is False and "truncated" in v.reason
 
 
-def test_one_entry_beyond_head_is_recoverable_crash_window(tmp_path) -> None:
+def test_one_entry_beyond_head_is_recoverable_crash_window(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _populate(p)
     lines = p.read_text(encoding="utf-8").splitlines()
@@ -137,7 +139,7 @@ def test_one_entry_beyond_head_is_recoverable_crash_window(tmp_path) -> None:
     assert "recoverable" in v.reason
 
 
-def test_signed_head_blocks_tail_truncation_with_rewritten_head(tmp_path) -> None:
+def test_signed_head_blocks_tail_truncation_with_rewritten_head(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _signed_governor(p).review(EvaluationRequest(action="rm -rf /"))
     _signed_governor(p).review(EvaluationRequest(action="ls -la"))
@@ -157,7 +159,7 @@ def test_signed_head_blocks_tail_truncation_with_rewritten_head(tmp_path) -> Non
     assert "signature" in signed.reason
 
 
-def test_signed_head_anchor_blocks_replayed_signed_prefix(tmp_path) -> None:
+def test_signed_head_anchor_blocks_replayed_signed_prefix(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     anchor = tmp_path / "external-anchor.jsonl"
     gov = _signed_governor(p, anchor_path=anchor)
@@ -177,7 +179,7 @@ def test_signed_head_anchor_blocks_replayed_signed_prefix(tmp_path) -> None:
     assert "anchor" in replayed.reason
 
 
-def test_signed_sink_requires_key_for_anchor(tmp_path) -> None:
+def test_signed_sink_requires_key_for_anchor(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="anchor_path requires head_signing_key"):
         AuditChainSink(
             path=tmp_path / "audit.jsonl",
@@ -185,7 +187,7 @@ def test_signed_sink_requires_key_for_anchor(tmp_path) -> None:
         )
 
 
-def test_signed_head_verifies_without_anchor(tmp_path) -> None:
+def test_signed_head_verifies_without_anchor(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _signed_governor(p).review(EvaluationRequest(action="ls -la"))
 
@@ -195,8 +197,8 @@ def test_signed_head_verifies_without_anchor(tmp_path) -> None:
 
 
 def test_verify_chain_uses_python_when_rust_verifier_unavailable(
-    tmp_path,
-    monkeypatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     p = tmp_path / "audit.jsonl"
     _populate(p)
@@ -205,7 +207,7 @@ def test_verify_chain_uses_python_when_rust_verifier_unavailable(
     assert verify_chain(p).ok is True
 
 
-def test_signed_verification_requires_signature_sidecar(tmp_path) -> None:
+def test_signed_verification_requires_signature_sidecar(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _signed_governor(p).review(EvaluationRequest(action="rm -rf /"))
     p.with_suffix(".jsonl.head.sig").unlink()
@@ -216,14 +218,14 @@ def test_signed_verification_requires_signature_sidecar(tmp_path) -> None:
     assert "signature" in verification.reason
 
 
-def test_corrupt_line_detected(tmp_path) -> None:
+def test_corrupt_line_detected(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _populate(p)
     p.write_text(p.read_text() + "{ this is not json\n")
     assert verify_chain(p).ok is False
 
 
-def test_restart_continuity(tmp_path) -> None:
+def test_restart_continuity(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _populate(p)  # first process
     _populate(p)  # a fresh sink/Governor on the same file continues the chain
@@ -232,14 +234,14 @@ def test_restart_continuity(tmp_path) -> None:
     assert verify_chain(p).ok is True
 
 
-def test_no_raw_action_text_in_log(tmp_path) -> None:
+def test_no_raw_action_text_in_log(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _populate(p)
     body = p.read_text()
     assert "rm -rf /" not in body and "DROP TABLE" not in body
 
 
-def test_concurrent_writes(tmp_path) -> None:
+def test_concurrent_writes(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     gov = _governor(p)
 
@@ -257,7 +259,7 @@ def test_concurrent_writes(tmp_path) -> None:
     assert verify_chain(p).ok is True
 
 
-def test_missing_log_is_not_ok(tmp_path) -> None:
+def test_missing_log_is_not_ok(tmp_path: Path) -> None:
     assert verify_chain(tmp_path / "nope.jsonl").ok is False
 
 
@@ -269,7 +271,7 @@ class _BorderlineAction:
     plane = Plane.ACTION
     tier = 0
 
-    def evaluate(self, request):
+    def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
         if "maybe" not in request.action:
             return None
         return DetectorSignal(
@@ -282,27 +284,27 @@ class _BorderlineAction:
         )
 
 
-def _escalating(path, approval):
+def _escalating(path: Path, approval: ApprovalHook | None) -> Governor:
     sink = AuditChainSink(path=path, clock=_Clock())
     ens = ParallelEnsembleScorer([_BorderlineAction()])
     return Governor(ensemble=ens, audit_sink=sink, approval=approval)
 
 
-def test_approval_state_approved(tmp_path) -> None:
+def test_approval_state_approved(tmp_path: Path) -> None:
     p = tmp_path / "a.jsonl"
     _escalating(p, lambda _v, _r: True).review(EvaluationRequest(action="maybe op"))
     rec = json.loads(p.read_text().splitlines()[0])
     assert rec["approval_state"] == "approved" and rec["escalated"] is True
 
 
-def test_approval_state_denied_or_pending(tmp_path) -> None:
+def test_approval_state_denied_or_pending(tmp_path: Path) -> None:
     p = tmp_path / "a.jsonl"
     _escalating(p, None).review(EvaluationRequest(action="maybe op"))
     rec = json.loads(p.read_text().splitlines()[0])
     assert rec["approval_state"] == "denied_or_pending"
 
 
-def test_append_continues_from_preexisting_empty_file(tmp_path) -> None:
+def test_append_continues_from_preexisting_empty_file(tmp_path: Path) -> None:
     p = tmp_path / "a.jsonl"
     p.write_text("")  # exists but empty
     _populate(p)
@@ -310,14 +312,14 @@ def test_append_continues_from_preexisting_empty_file(tmp_path) -> None:
     assert json.loads(p.read_text().splitlines()[0])["seq"] == 0
 
 
-def test_blank_lines_tolerated(tmp_path) -> None:
+def test_blank_lines_tolerated(tmp_path: Path) -> None:
     p = tmp_path / "a.jsonl"
     _populate(p)
     p.write_text(p.read_text().replace("\n", "\n\n", 1))  # inject a blank line
     assert verify_chain(p).ok is True
 
 
-def test_prev_hash_only_mutation_detected(tmp_path) -> None:
+def test_prev_hash_only_mutation_detected(tmp_path: Path) -> None:
     p = tmp_path / "a.jsonl"
     _populate(p)
     lines = p.read_text().splitlines()
@@ -329,14 +331,14 @@ def test_prev_hash_only_mutation_detected(tmp_path) -> None:
     assert v.ok is False and "prev_hash" in v.reason
 
 
-def test_missing_head_sidecar_still_verifies(tmp_path) -> None:
+def test_missing_head_sidecar_still_verifies(tmp_path: Path) -> None:
     p = tmp_path / "a.jsonl"
     _populate(p)
     p.with_suffix(".jsonl.head").unlink()  # remove the sidecar
     assert verify_chain(p).ok is True
 
 
-def test_last_skips_blank_lines_on_append(tmp_path) -> None:
+def test_last_skips_blank_lines_on_append(tmp_path: Path) -> None:
     p = tmp_path / "a.jsonl"
     _populate(p)
     p.write_text(p.read_text() + "\n")  # trailing blank line
@@ -345,7 +347,9 @@ def test_last_skips_blank_lines_on_append(tmp_path) -> None:
     assert json.loads(p.read_text().splitlines()[-1])["seq"] == 4
 
 
-def test_sink_caches_head_after_initial_tail_scan(tmp_path, monkeypatch) -> None:
+def test_sink_caches_head_after_initial_tail_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     p = tmp_path / "audit.jsonl"
     sink = AuditChainSink(path=p, policy_profile="test", clock=_Clock())
     ensemble = ParallelEnsembleScorer([DestructiveCommandDetector()])
@@ -369,13 +373,15 @@ def test_sink_caches_head_after_initial_tail_scan(tmp_path, monkeypatch) -> None
     assert verify_chain(p).ok is True
 
 
-def test_sink_reloads_head_after_partial_sidecar_failure(tmp_path, monkeypatch) -> None:
+def test_sink_reloads_head_after_partial_sidecar_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     p = tmp_path / "audit.jsonl"
     sink = AuditChainSink(path=p, policy_profile="test", clock=_Clock())
     ensemble = ParallelEnsembleScorer([DestructiveCommandDetector()])
     gov = Governor(ensemble=ensemble, audit_sink=sink)
     failed = False
-    original_atomic_write = audit_chain.atomic_write_text
+    original_atomic_write = atomic_write_text
 
     def fail_first_head_write(
         path: str | Path,
@@ -401,7 +407,7 @@ def test_sink_reloads_head_after_partial_sidecar_failure(tmp_path, monkeypatch) 
     assert verify_chain(p).ok is True
 
 
-def test_anchor_verification_requires_signed_head(tmp_path) -> None:
+def test_anchor_verification_requires_signed_head(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _populate(p)
 
@@ -411,7 +417,7 @@ def test_anchor_verification_requires_signed_head(tmp_path) -> None:
     assert "requires head signature" in verification.reason
 
 
-def test_signed_verification_requires_head_sidecar(tmp_path) -> None:
+def test_signed_verification_requires_head_sidecar(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _signed_governor(p).review(EvaluationRequest(action="ls -la"))
     p.with_suffix(".jsonl.head").unlink()
@@ -431,7 +437,7 @@ def test_signed_verification_requires_head_sidecar(tmp_path) -> None:
     ],
 )
 def test_signed_head_metadata_corruption_is_rejected(
-    tmp_path,
+    tmp_path: Path,
     head_payload: str,
     signature_payload: str,
 ) -> None:
@@ -453,7 +459,7 @@ def test_signed_head_metadata_corruption_is_rejected(
     )
 
 
-def test_signed_head_rejects_algorithm_and_signature_mismatch(tmp_path) -> None:
+def test_signed_head_rejects_algorithm_and_signature_mismatch(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _signed_governor(p).review(EvaluationRequest(action="ls -la"))
     signature_path = p.with_suffix(".jsonl.head.sig")
@@ -473,7 +479,7 @@ def test_signed_head_rejects_algorithm_and_signature_mismatch(tmp_path) -> None:
     assert "mismatch" in bad_signature.reason
 
 
-def test_signed_head_rejects_corrupt_signature_sidecar(tmp_path) -> None:
+def test_signed_head_rejects_corrupt_signature_sidecar(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     _signed_governor(p).review(EvaluationRequest(action="ls -la"))
     signature_path = p.with_suffix(".jsonl.head.sig")
@@ -505,7 +511,7 @@ def test_signed_head_rejects_corrupt_signature_sidecar(tmp_path) -> None:
     ],
 )
 def test_anchor_log_corruption_is_rejected(
-    tmp_path,
+    tmp_path: Path,
     anchor_payload: str,
     reason: str,
 ) -> None:
@@ -532,7 +538,7 @@ def test_anchor_log_corruption_is_rejected(
     assert reason in verification.reason
 
 
-def test_missing_anchor_log_is_rejected(tmp_path) -> None:
+def test_missing_anchor_log_is_rejected(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     anchor = tmp_path / "anchor.jsonl"
     _signed_governor(p).review(EvaluationRequest(action="ls -la"))
@@ -547,7 +553,7 @@ def test_missing_anchor_log_is_rejected(tmp_path) -> None:
     assert "anchor log does not exist" in verification.reason
 
 
-def test_anchor_verification_uses_latest_nonblank_anchor(tmp_path) -> None:
+def test_anchor_verification_uses_latest_nonblank_anchor(tmp_path: Path) -> None:
     p = tmp_path / "audit.jsonl"
     anchor = tmp_path / "anchor.jsonl"
     _signed_governor(p, anchor_path=anchor).review(EvaluationRequest(action="ls -la"))
@@ -563,13 +569,17 @@ def test_anchor_verification_uses_latest_nonblank_anchor(tmp_path) -> None:
 
 
 class TestRustAuditPrimitivesParity:
-    def test_loader_ignores_missing_callables(self, monkeypatch) -> None:
+    def test_loader_ignores_missing_callables(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         module = SimpleNamespace(audit_entry_hash=object(), audit_verify_chain=object())
         monkeypatch.setattr(importlib, "import_module", lambda _: module)
         assert audit_chain._load_rust_entry_hash() is None
         assert audit_chain._load_rust_verify_chain() is None
 
-    def test_loaders_return_none_when_extension_is_absent(self, monkeypatch) -> None:
+    def test_loaders_return_none_when_extension_is_absent(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         def missing_extension(_name: str) -> object:
             raise ImportError("extension absent")
 
@@ -578,19 +588,25 @@ class TestRustAuditPrimitivesParity:
         assert audit_chain._load_rust_entry_hash() is None
         assert audit_chain._load_rust_verify_chain() is None
 
-    def test_entry_hash_uses_python_when_rust_unavailable(self, monkeypatch) -> None:
+    def test_entry_hash_uses_python_when_rust_unavailable(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         payload = {"seq": 0, "prev_hash": "0" * 64, "risk": 1.0}
         monkeypatch.setattr(audit_chain, "_RUST_ENTRY_HASH", None)
         expected = audit_chain._entry_hash_python("0" * 64, payload)
         assert audit_chain._entry_hash("0" * 64, payload) == expected
 
-    def test_entry_hash_mismatch_falls_back_to_python(self, monkeypatch) -> None:
+    def test_entry_hash_mismatch_falls_back_to_python(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         payload = {"seq": 0, "prev_hash": "0" * 64, "risk": 1.0}
         monkeypatch.setattr(audit_chain, "_RUST_ENTRY_HASH", lambda _prev, _payload: "x")
         expected = audit_chain._entry_hash_python("0" * 64, payload)
         assert audit_chain._entry_hash("0" * 64, payload) == expected
 
-    def test_entry_hash_exception_falls_back_to_python(self, monkeypatch) -> None:
+    def test_entry_hash_exception_falls_back_to_python(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         payload = {"seq": 0, "prev_hash": "0" * 64, "risk": 1.0}
 
         def broken_hash(_prev: str, _payload: str) -> str:
@@ -600,27 +616,33 @@ class TestRustAuditPrimitivesParity:
         expected = audit_chain._entry_hash_python("0" * 64, payload)
         assert audit_chain._entry_hash("0" * 64, payload) == expected
 
-    def test_verify_mismatch_falls_back_to_python(self, tmp_path, monkeypatch) -> None:
+    def test_verify_mismatch_falls_back_to_python(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         p = tmp_path / "audit.jsonl"
         _populate(p)
 
-        def wrong_verify(_lines, _head):
+        def wrong_verify(_lines: list[str], _head: str) -> tuple[bool, int, str]:
             return (False, 0, "wrong")
 
         monkeypatch.setattr(audit_chain, "_RUST_VERIFY_CHAIN", wrong_verify)
         assert verify_chain(p) == audit_chain._verify_chain_python(p)
 
-    def test_verify_exception_falls_back_to_python(self, tmp_path, monkeypatch) -> None:
+    def test_verify_exception_falls_back_to_python(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         p = tmp_path / "audit.jsonl"
         _populate(p)
 
-        def broken_verify(_lines, _head):
+        def broken_verify(_lines: list[str], _head: str) -> tuple[bool, int, str]:
             raise RuntimeError("boom")
 
         monkeypatch.setattr(audit_chain, "_RUST_VERIFY_CHAIN", broken_verify)
         assert verify_chain(p) == audit_chain._verify_chain_python(p)
 
-    def test_installed_rust_primitives_match_python_when_present(self, tmp_path) -> None:
+    def test_installed_rust_primitives_match_python_when_present(
+        self, tmp_path: Path
+    ) -> None:
         if audit_chain._RUST_ENTRY_HASH is None or audit_chain._RUST_VERIFY_CHAIN is None:
             return
         p = tmp_path / "audit.jsonl"
