@@ -11,6 +11,8 @@ from __future__ import annotations
 import importlib
 from types import SimpleNamespace
 
+import pytest
+
 import director_class_ai.action.mcp_inspector as mcp_inspector
 from director_class_ai.action import (
     BlastRadiusDetector,
@@ -23,18 +25,20 @@ from director_class_ai.action import (
 from director_class_ai.action.mcp_inspector import MCP_CALL_KEY
 from director_class_ai.action.mcp_registry import MCPToolRegistration, MCPTrustRegistry
 from director_class_ai.core import (
+    DetectorSignal,
     EvaluationRequest,
     Governor,
     ParallelEnsembleScorer,
     Plane,
     Severity,
 )
+from director_class_ai.core.governor import ApprovalHook
 from director_class_ai.effectors import MCPEffectorAdapter
 
 _GHP_TOKEN = "ghp_" + "a" * 24  # GitHub-PAT-shaped value, not a real secret
 
 
-def _inspect(call: MCPToolCall):
+def _inspect(call: MCPToolCall) -> DetectorSignal | None:
     return MCPCallInspector().evaluate(EvaluationRequest(metadata={MCP_CALL_KEY: call}))
 
 
@@ -244,7 +248,7 @@ class TestSignalShape:
         assert sig.severity is Severity.HIGH
 
 
-def _governor(approval=None) -> Governor:
+def _governor(approval: ApprovalHook | None = None) -> Governor:
     ensemble = ParallelEnsembleScorer(
         [
             MCPCallInspector(),
@@ -320,7 +324,7 @@ class TestMCPEffectorAdapter:
         seen: list[MCPToolCall] = []
 
         class _Recorder(MCPCallInspector):
-            def evaluate(self, request: EvaluationRequest):
+            def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
                 call = request.metadata.get(MCP_CALL_KEY)
                 if isinstance(call, MCPToolCall):
                     seen.append(call)
@@ -362,12 +366,16 @@ class TestRustMCPScannerParity:
             "argument 'text' sourced from 'retrieved' content",
         )
 
-    def test_loader_ignores_non_callable_extension(self, monkeypatch) -> None:
+    def test_loader_ignores_non_callable_extension(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         module = SimpleNamespace(mcp_structural_scan=object())
         monkeypatch.setattr(importlib, "import_module", lambda _: module)
         assert mcp_inspector._load_rust_mcp_scan() is None
 
-    def test_loader_returns_none_when_extension_is_absent(self, monkeypatch) -> None:
+    def test_loader_returns_none_when_extension_is_absent(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         def missing_extension(_name: str) -> object:
             raise ImportError("extension absent")
 
@@ -376,7 +384,7 @@ class TestRustMCPScannerParity:
         assert mcp_inspector._load_rust_mcp_scan() is None
 
     def test_scan_structural_uses_python_when_rust_scanner_is_absent(
-        self, monkeypatch
+        self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         call = MCPToolCall(
             "fs",
@@ -392,7 +400,7 @@ class TestRustMCPScannerParity:
         assert mcp_inspector._rust_scan_to_python(None) is None
         assert mcp_inspector._rust_scan_to_python((0.1, "unknown", "x")) is None
 
-    def test_exact_rust_parity_is_accepted(self, monkeypatch) -> None:
+    def test_exact_rust_parity_is_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         call = MCPToolCall(
             "fs",
             "read_note",
@@ -400,7 +408,9 @@ class TestRustMCPScannerParity:
             arg_provenance={"text": "retrieved"},
         )
 
-        def fake_scan(tool: str, arguments: list[tuple[str, str, str, bool]]):
+        def fake_scan(
+            tool: str, arguments: list[tuple[str, str, str, bool]]
+        ) -> tuple[float, str, str]:
             assert tool == "read_note"
             assert arguments == [("text", "ok", "retrieved", True)]
             return (0.6, "medium", "argument 'text' sourced from 'retrieved' content")
@@ -408,7 +418,9 @@ class TestRustMCPScannerParity:
         monkeypatch.setattr(mcp_inspector, "_RUST_MCP_SCAN", fake_scan)
         assert mcp_inspector._scan_structural(call) == mcp_inspector._scan_python(call)
 
-    def test_rust_exception_falls_back_to_python(self, monkeypatch) -> None:
+    def test_rust_exception_falls_back_to_python(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         call = MCPToolCall(
             "fs",
             "read_note",
@@ -416,13 +428,17 @@ class TestRustMCPScannerParity:
             arg_provenance={"text": "retrieved"},
         )
 
-        def broken_scan(_tool: str, _arguments: list[tuple[str, str, str, bool]]):
+        def broken_scan(
+            _tool: str, _arguments: list[tuple[str, str, str, bool]]
+        ) -> tuple[float, str, str]:
             raise RuntimeError("boom")
 
         monkeypatch.setattr(mcp_inspector, "_RUST_MCP_SCAN", broken_scan)
         assert mcp_inspector._scan_structural(call) == mcp_inspector._scan_python(call)
 
-    def test_rust_mismatch_falls_back_to_python(self, monkeypatch) -> None:
+    def test_rust_mismatch_falls_back_to_python(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         call = MCPToolCall(
             "fs",
             "read_note",
