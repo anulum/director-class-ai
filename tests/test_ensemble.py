@@ -29,16 +29,16 @@ class FakeDetector:
 
     def __init__(
         self,
-        name,
-        plane,
-        score,
+        name: str,
+        plane: Plane,
+        score: float,
         *,
-        tier=0,
-        sev=Severity.MEDIUM,
-        locus=Locus.RESPONSE,
-        delay=0.0,
-        none=False,
-    ):
+        tier: int = 0,
+        sev: Severity = Severity.MEDIUM,
+        locus: Locus = Locus.RESPONSE,
+        delay: float = 0.0,
+        none: bool = False,
+    ) -> None:
         self.name = name
         self.plane = plane
         self.tier = tier
@@ -49,7 +49,7 @@ class FakeDetector:
         self._none = none
         self.calls = 0
 
-    def evaluate(self, request: EvaluationRequest):
+    def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
         self.calls += 1
         if self._delay:
             time.sleep(self._delay)
@@ -145,7 +145,7 @@ def test_thread_safety_of_concurrent_dispatch() -> None:
     lock = threading.Lock()
 
     class Recorder(FakeDetector):
-        def evaluate(self, request):
+        def evaluate(self, request: EvaluationRequest) -> DetectorSignal | None:
             with lock:
                 seen.add(threading.get_ident())
             return super().evaluate(request)
