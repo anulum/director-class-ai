@@ -12,7 +12,7 @@ import json
 import threading
 import urllib.error
 import urllib.request
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from contextlib import AbstractContextManager
 from pathlib import Path
 
@@ -34,6 +34,22 @@ from director_class_ai.policy import (
     Profile,
 )
 from director_class_ai.sidecar import LocalHaltSwitch
+
+
+def _section(payload: Mapping[str, object], key: str) -> Mapping[str, object]:
+    """Return a nested mapping field of a service response, asserting its type."""
+    value = payload[key]
+    assert isinstance(value, Mapping), f"{key} is not a mapping: {type(value)!r}"
+    return value
+
+
+def _seq(payload: Mapping[str, object], key: str) -> Sequence[object]:
+    """Return a sequence field of a service response (list or tuple, not text)."""
+    value = payload[key]
+    assert isinstance(value, Sequence) and not isinstance(value, (str, bytes)), (
+        f"{key} is not a non-text sequence: {type(value)!r}"
+    )
+    return value
 
 
 def _remote_auth(audience: str = "mcp://fs") -> dict[str, object]:
@@ -106,7 +122,7 @@ def test_service_rejects_changed_pinned_discovery_descriptor() -> None:
 
     assert first.status == 200
     assert second.status == 403
-    assert "tofu_pin_mismatch" in second.body["findings"]
+    assert "tofu_pin_mismatch" in _seq(second.body, "findings")
     assert second.body["registration_count"] == 1
 
 
@@ -233,7 +249,7 @@ def test_service_discovery_rejects_malformed_descriptor_listing() -> None:
     )
 
     assert response.status == 403
-    assert "empty_discovery" in response.body["findings"]
+    assert "empty_discovery" in _seq(response.body, "findings")
 
 
 def test_service_review_accepts_malformed_optional_mappings_safely() -> None:
@@ -360,7 +376,7 @@ def test_service_review_preserves_argument_provenance_mapping() -> None:
 
     assert response.status == 403
     assert response.body["route"] == "block"
-    assert "mcp_tool_call" in response.body["firing"]
+    assert "mcp_tool_call" in _seq(response.body, "firing")
 
 
 def test_service_discovery_updates_signed_registry_for_safe_remote_read() -> None:
@@ -415,12 +431,12 @@ def test_service_review_accepts_capability_context_and_redacts_policy() -> None:
     assert discovery["permitted"] is True
     assert review.status == 200
     assert review.body["route"] == "allow"
-    assert review.body["policy"]["summary"]["resource_present"] is True
-    assert review.body["policy"]["context_digest"]
-    assert review.body["policy"]["decision"]["matched_grant_ids"] == ("grant-read",)
-    assert review.body["policy"]["decision"]["rationale"] == (
-        "capability and origin policy matched"
-    )
+    policy = _section(review.body, "policy")
+    assert _section(policy, "summary")["resource_present"] is True
+    assert policy["context_digest"]
+    decision = _section(policy, "decision")
+    assert decision["matched_grant_ids"] == ("grant-read",)
+    assert decision["rationale"] == ("capability and origin policy matched")
     assert "workspace:README.md" not in repr(review.body)
 
 
@@ -453,7 +469,9 @@ def test_service_binds_gateway_to_approved_policy_store(tmp_path: Path) -> None:
     assert discovery["permitted"] is True
     assert review.status == 200
     assert review.body["route"] == "allow"
-    assert review.body["policy"]["decision"]["matched_grant_ids"] == ("grant-read",)
+    assert _section(_section(review.body, "policy"), "decision")["matched_grant_ids"] == (
+        "grant-read",
+    )
 
 
 def test_service_review_blocks_when_capability_context_is_missing() -> None:
@@ -493,7 +511,7 @@ def test_service_blocks_remote_discovery_without_auth_context() -> None:
 
     assert response.status == 403
     assert response.body["permitted"] is False
-    assert "remote_auth_missing" in response.body["findings"]
+    assert "remote_auth_missing" in _seq(response.body, "findings")
     assert service.registration_count == 0
 
 
@@ -519,7 +537,7 @@ def test_service_blocks_remote_review_audience_mismatch() -> None:
 
     assert response.status == 403
     assert response.body["route"] == "block"
-    assert "mcp_remote_auth" in response.body["firing"]
+    assert "mcp_remote_auth" in _seq(response.body, "firing")
 
 
 def test_service_response_review_remains_redacted() -> None:
@@ -658,7 +676,9 @@ class _running_server(AbstractContextManager[str]):
 
     def __enter__(self) -> str:
         self._thread.start()
-        host, port = self._server.server_address
+        address = self._server.server_address
+        host, port = address[0], address[1]
+        assert isinstance(host, str)
         return f"http://{host}:{port}"
 
     def __exit__(self, *exc_info: object) -> None:
