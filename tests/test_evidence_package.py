@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
 from pathlib import Path
 
 from director_class_ai.action import DestructiveCommandDetector, OriginTaintDetector
@@ -35,31 +34,7 @@ from director_class_ai.evidence import (
     hash_chain_proof_for_digest,
     replay_incident,
 )
-
-
-def _section(payload: Mapping[str, object], key: str) -> Mapping[str, object]:
-    """Return a nested mapping field of a JSON payload, asserting its type."""
-    value = payload[key]
-    assert isinstance(value, Mapping), f"{key} is not a mapping: {type(value)!r}"
-    return value
-
-
-def _rows(payload: Mapping[str, object], key: str) -> list[Mapping[str, object]]:
-    """Return a list-of-mappings field of a JSON payload, asserting its shape."""
-    value = payload[key]
-    assert isinstance(value, list), f"{key} is not a list: {type(value)!r}"
-    rows: list[Mapping[str, object]] = []
-    for item in value:
-        assert isinstance(item, Mapping), f"{key} item is not a mapping: {type(item)!r}"
-        rows.append(item)
-    return rows
-
-
-def _str(mapping: Mapping[str, object], key: str) -> str:
-    """Return a string field of a mapping, asserting the value is a string."""
-    value = mapping[key]
-    assert isinstance(value, str), f"{key} is not a str: {type(value)!r}"
-    return value
+from tests._payloads import rows, section, text
 
 
 class _Clock:
@@ -145,14 +120,14 @@ def test_evidence_package_is_redacted_and_chain_bound(tmp_path: Path) -> None:
     assert payload["policy_profile"] == "pilot"
     assert payload["action_route"] == "block"
     assert payload["approval_state"] == "blocked"
-    assert _section(payload, "hash_chain_proof")["verified"] is True
-    assert _section(payload, "hash_chain_proof")["entry_hash"]
+    assert section(payload, "hash_chain_proof")["verified"] is True
+    assert section(payload, "hash_chain_proof")["entry_hash"]
     assert payload["benchmark_replay_id"] == "action-plane-functional-2026-06-18"
     assert payload["evidence_digest"] == package.evidence_digest
     assert "destructive_command" in rendered
-    tags = _rows(payload, "technique_tags")
+    tags = rows(payload, "technique_tags")
     assert any(tag["technique_id"] == "AML.T0050" for tag in tags)
-    assert all("does not" in _str(tag, "claim_boundary") for tag in tags)
+    assert all("does not" in text(tag, "claim_boundary") for tag in tags)
     assert "rm -rf" not in rendered
     assert "private" not in rendered
 
@@ -179,14 +154,14 @@ def test_evidence_package_includes_capability_grants_and_controls(
     payload = package.to_json()
 
     assert payload["capability_grant_ids"] == ["grant-prod-shell"]
-    controls = _rows(payload, "controls")
+    controls = rows(payload, "controls")
     assert any(
         control["framework"] == "NIST AI RMF / GenAI profile" for control in controls
     )
     assert any(control["framework"] == "OWASP LLM risks" for control in controls)
     assert any(control["framework"] == "Buyer control taxonomy" for control in controls)
-    assert all("does not" in _str(control, "claim_boundary") for control in controls)
-    assert any(tag["technique_id"] == "ASI09" for tag in _rows(payload, "technique_tags"))
+    assert all("does not" in text(control, "claim_boundary") for control in controls)
+    assert any(tag["technique_id"] == "ASI09" for tag in rows(payload, "technique_tags"))
 
 
 def test_evidence_package_accepts_mapping_edges_and_existing_digest() -> None:
@@ -222,8 +197,8 @@ def test_evidence_package_accepts_mapping_edges_and_existing_digest() -> None:
     payload = package.to_json()
 
     assert payload["evidence_digest"] == "existing-digest"
-    assert _rows(payload, "provenance_graph")[0]["source"] == "operator"
-    assert _rows(payload, "controls")[0]["control_id"] == "manual"
+    assert rows(payload, "provenance_graph")[0]["source"] == "operator"
+    assert rows(payload, "controls")[0]["control_id"] == "manual"
     assert payload["technique_tags"] == []
 
 
@@ -244,7 +219,7 @@ def test_manual_decision_routes_cover_allow_and_approved_human() -> None:
     assert approved.to_json()["approval_state"] == "approved"
     assert any(
         control["framework"] == "MCP security considerations"
-        for control in _rows(approved.to_json(), "controls")
+        for control in rows(approved.to_json(), "controls")
     )
 
 
@@ -258,7 +233,7 @@ def test_manual_pending_human_decision_records_pending_state() -> None:
     assert payload["action_route"] == "human"
     assert payload["approval_state"] == "denied_or_pending"
     assert any(
-        tag["technique_id"] == "AML.T0061" for tag in _rows(payload, "technique_tags")
+        tag["technique_id"] == "AML.T0061" for tag in rows(payload, "technique_tags")
     )
 
 

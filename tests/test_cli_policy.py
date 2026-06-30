@@ -9,39 +9,12 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import pytest
 
 from director_class_ai.cli.policy import main
-
-
-def _section(payload: Mapping[str, object], key: str) -> Mapping[str, object]:
-    """Return a nested mapping field of a CLI result, asserting its type."""
-    value = payload[key]
-    assert isinstance(value, Mapping), f"{key} is not a mapping: {type(value)!r}"
-    return value
-
-
-def _rows(payload: Mapping[str, object], key: str) -> Sequence[Mapping[str, object]]:
-    """Return a sequence-of-mappings field of a CLI result, asserting its shape."""
-    value = payload[key]
-    assert isinstance(value, Sequence) and not isinstance(value, (str, bytes)), (
-        f"{key} is not a non-text sequence: {type(value)!r}"
-    )
-    rows: list[Mapping[str, object]] = []
-    for item in value:
-        assert isinstance(item, Mapping), f"{key} item is not a mapping: {type(item)!r}"
-        rows.append(item)
-    return rows
-
-
-def _str(mapping: Mapping[str, object], key: str) -> str:
-    """Return a string field of a mapping, asserting the value is a string."""
-    value = mapping[key]
-    assert isinstance(value, str), f"{key} is not a str: {type(value)!r}"
-    return value
+from tests._payloads import rows, section, text
 
 
 def _profile_toml(
@@ -229,7 +202,7 @@ def test_propose_defaults_timestamp_when_omitted(
         capsys,
     )
     assert rc == 0
-    assert _section(proposal, "revision")["created_at"]  # a timestamp was filled in
+    assert section(proposal, "revision")["created_at"]  # a timestamp was filled in
 
 
 def test_approve_commits_head(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -268,7 +241,7 @@ def test_self_approval_is_rejected(
             "--store",
             str(store),
             "--digest",
-            _str(proposal, "digest"),
+            text(proposal, "digest"),
             "--reviewer",
             "alice",
             "--at",
@@ -309,7 +282,7 @@ def test_deny_marks_pending_proposal_rejected(
             "--store",
             str(store),
             "--digest",
-            _str(proposal, "digest"),
+            text(proposal, "digest"),
             "--reviewer",
             "bob",
             "--at",
@@ -405,7 +378,7 @@ def test_rollback_requires_second_reviewer_approval(
             "--store",
             str(store),
             "--digest",
-            _str(proposal, "digest"),
+            text(proposal, "digest"),
             "--reviewer",
             "bob",
             "--at",
@@ -471,7 +444,7 @@ def test_drift_detected_and_absent(
     )
     assert rc == 0
     assert result["drift"] is True
-    assert _rows(_section(result, "event"), "changes")[0]["field"] == (
+    assert rows(section(result, "event"), "changes")[0]["field"] == (
         "action_block_threshold"
     )
 

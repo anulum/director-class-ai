@@ -8,8 +8,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-
 from director_class_ai.action import (
     BROWSER_ACTION_KEY,
     BrowserAction,
@@ -19,15 +17,7 @@ from director_class_ai.action import (
     ComputerAction,
 )
 from director_class_ai.core import EvaluationRequest
-
-
-def _seq(payload: Mapping[str, object], key: str) -> Sequence[object]:
-    """Return a sequence field of a work-log export (list or tuple, not text)."""
-    value = payload[key]
-    assert isinstance(value, Sequence) and not isinstance(value, (str, bytes)), (
-        f"{key} is not a non-text sequence: {type(value)!r}"
-    )
-    return value
+from tests._payloads import seq
 
 
 def _request(action: str, browser: BrowserAction) -> EvaluationRequest:
@@ -235,7 +225,7 @@ def test_browser_work_log_exports_only_redacted_evidence() -> None:
     assert exported["origins_touched"] == ("https://bank.example",)
     assert exported["actions_attempted"] == ("submit payment",)
     assert exported["approvals"] == ("browser_sensitive_site_approval",)
-    assert "sha256:screen" in _seq(exported, "evidence_digests")
+    assert "sha256:screen" in seq(exported, "evidence_digests")
     assert "150.00" not in rendered
     assert "customer private note" not in rendered
     assert "/tmp/private/update.sh" not in rendered
