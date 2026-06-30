@@ -5,6 +5,11 @@ venv*/
 *.egg-info/
 build/
 dist/
+# Compiled native extension built by PyO3/maturin into the package tree
+*.so
+*.pyd
+# Rust build output
+target/
 .pytest_cache/
 .ruff_cache/
 .coverage
