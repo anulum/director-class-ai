@@ -1,10 +1,19 @@
 version: 2
 updates:
-  - package-ecosystem: pip
+  # The pip ecosystem is intentionally not declared. The production package has no
+  # runtime dependencies (`[project.dependencies]` is empty); the dev/optional
+  # extras are open-bounded (`>=`), and the real CI lockfiles
+  # (`requirements/*.txt`) are `pip-compile --generate-hashes` output that
+  # Dependabot cannot recompile. Dependabot's pip resolver additionally fails on
+  # this project because the maturin/PyO3 build backend needs a Rust toolchain to
+  # resolve, which the Dependabot sandbox lacks — the pip ecosystem produced only
+  # recurring weekly failures with no actionable update PR. Dependabot security
+  # alerts still cover pip via the dependency graph, independent of this config.
+  - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
-  - package-ecosystem: github-actions
+  - package-ecosystem: cargo
     directory: "/"
     schedule:
       interval: weekly
