@@ -45,6 +45,7 @@ _REQUIRED_LOCAL_GATES = (
     "numeric-claims",
     "lint",
     "types",
+    "types-all",
 )
 _REQUIRED_SCRIPTS = (
     "director-class-guard",

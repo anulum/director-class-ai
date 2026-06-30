@@ -75,8 +75,11 @@ jobs:
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.12"
-      - run: python -m pip install "mypy>=1.11"
-      - run: mypy --strict director_class_ai/
+      - run: python -m pip install -r requirements/dev.txt
+      - name: Strict mypy (production package)
+        run: mypy --strict director_class_ai/
+      - name: Strict mypy (all Python — tests, benchmarks, tools, demos)
+        run: mypy --strict --explicit-package-bases director_class_ai tools benchmarks demos tests
 
   detectors-contract:
     name: Director-AI Detector Contract

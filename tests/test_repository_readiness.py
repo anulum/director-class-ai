@@ -120,6 +120,21 @@ def test_repository_readiness_rejects_missing_ci_job(tmp_path: Path) -> None:
     assert any("Build & Wheel Smoke" in failure for failure in failures)
 
 
+def test_repository_readiness_rejects_missing_all_python_types_gate(
+    tmp_path: Path,
+) -> None:
+    repo = _copy_readiness_surface(tmp_path)
+    makefile = repo / "Makefile"
+    makefile.write_text(
+        makefile.read_text(encoding="utf-8").replace("types-all", "types-broad"),
+        encoding="utf-8",
+    )
+
+    failures = validate_repository_readiness(repo)
+
+    assert any("types-all" in failure for failure in failures)
+
+
 def test_repository_readiness_rejects_lower_than_full_coverage_gate(
     tmp_path: Path,
 ) -> None:

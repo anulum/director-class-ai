@@ -11,7 +11,10 @@ Every change keeps the repo green to the GOTM standard:
 - **Tests + coverage:** CI owns the full `make test` gate; run only focused
   module or workflow tests locally for touched code.
 - **Style:** `make lint` (ruff check + format). Auto-fix with `make fmt`.
-- **Types:** `make types` — `mypy --strict`, no untyped defs.
+- **Types:** `make types` — `mypy --strict` on the production package, no
+  untyped defs. `make types-all` extends the same strict check to tests,
+  benchmarks, tools, and demos; both are wired into `make preflight` and the CI
+  `Types` job, so the whole tree stays strict-clean and cannot regress.
 - **Test quality:** `make test-quality` rejects bucket/import-only fake tests.
 - **Boundary evidence:** `make test-boundaries` validates integration/e2e
   evidence for boundary-crossing surfaces.

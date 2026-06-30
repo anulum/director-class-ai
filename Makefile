@@ -2,7 +2,7 @@
 # Director-Class AI — developer task runner
 .DEFAULT_GOAL := help
 PY ?= python
-.PHONY: help test lint fmt types sast spdx test-quality test-boundaries godfiles docs build bench bench-evidence bench-audit import-external redteam repository-readiness phase4-intake claim-boundaries numeric-claims preflight
+.PHONY: help test lint fmt types types-all sast spdx test-quality test-boundaries godfiles docs build bench bench-evidence bench-audit import-external redteam repository-readiness phase4-intake claim-boundaries numeric-claims preflight
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -19,8 +19,11 @@ fmt: ## Auto-fix style
 	$(PY) -m ruff check --fix director_class_ai tests benchmarks tools demos
 	$(PY) -m ruff format director_class_ai tests benchmarks tools demos
 
-types: ## Strict type-check
+types: ## Strict type-check (production package)
 	$(PY) -m mypy --strict director_class_ai
+
+types-all: ## Strict type-check across all Python (package + tests + benchmarks + tools + demos)
+	$(PY) -m mypy --strict --explicit-package-bases director_class_ai tools benchmarks demos tests
 
 sast: ## SAST scan (bandit + semgrep via uvx)
 	$(PY) -m bandit -r director_class_ai -ll
@@ -76,5 +79,5 @@ claim-boundaries: ## Reject public audit-integrity and court-evidence overclaims
 numeric-claims: ## Verify numeric claims are tied to evidence artefacts
 	$(PY) tools/check_numeric_claim_evidence.py
 
-preflight: spdx test-quality test-boundaries godfiles docs lint types repository-readiness phase4-intake numeric-claims ## Local gate without full-suite tests
+preflight: spdx test-quality test-boundaries godfiles docs lint types types-all repository-readiness phase4-intake numeric-claims ## Local gate without full-suite tests
 	@echo "preflight OK"

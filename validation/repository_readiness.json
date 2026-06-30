@@ -1,6 +1,6 @@
 {
   "schema_version": "director-class-ai.repository-readiness.v1",
-  "updated_at": "2026-06-27",
+  "updated_at": "2026-06-30",
   "package_name": "director-class-ai",
   "module_name": "director_class_ai",
   "remote_url": "https://github.com/anulum/director-class-ai.git",
@@ -43,7 +43,8 @@
     "phase4-intake",
     "numeric-claims",
     "lint",
-    "types"
+    "types",
+    "types-all"
   ],
   "remote_ci_status": "green_on_main",
   "branch_protection_status": "required_checks_configured",
