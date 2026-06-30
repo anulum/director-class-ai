@@ -25,12 +25,11 @@ jobs:
       contents: read
       security-events: write
       id-token: write
+    # The scorecard publishing webapp rejects any job that contains a non-`uses`
+    # step, so the private-repo guard is expressed per step with `if:` rather than
+    # a `run:` skip step. On a private repository every step is skipped and the
+    # job is a no-op success; on a public repository the analysis publishes.
     steps:
-      - name: Skip action on private repositories
-        if: ${{ github.event.repository.private }}
-        run: |
-          echo "OpenSSF Scorecard action is skipped while this repository is private."
-
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: ${{ !github.event.repository.private }}
         with:
