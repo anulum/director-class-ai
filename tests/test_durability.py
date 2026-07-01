@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from pathlib import Path
 
 import pytest
@@ -32,6 +33,61 @@ def test_atomic_write_overwrites_and_leaves_no_temp(tmp_path: Path) -> None:
     atomic_write_text(target, "new")
     assert target.read_text(encoding="utf-8") == "new"
     assert list(tmp_path.iterdir()) == [target]  # the .tmp sibling was renamed away
+
+
+def test_concurrent_writes_never_expose_a_partial_or_mixed_file(
+    tmp_path: Path,
+) -> None:
+    # Distinct multi-kilobyte payloads written concurrently to one path. A unique
+    # temp file per write means every os.replace swaps in a complete file, so a
+    # concurrent reader only ever observes one whole payload — never a truncated
+    # or interleaved mix, which a shared fixed temp name would allow.
+    target = tmp_path / "state.json"
+    payloads = [str(digit) * 4096 for digit in range(4)]
+    atomic_write_text(target, payloads[0])
+    valid = set(payloads)
+    corrupt: list[str] = []
+    stop = threading.Event()
+
+    def writer(payload: str) -> None:
+        for _ in range(50):
+            atomic_write_text(target, payload)
+
+    def reader() -> None:
+        while not stop.is_set():
+            if target.read_text(encoding="utf-8") not in valid:
+                corrupt.append("bad")
+
+    writers = [threading.Thread(target=writer, args=(p,)) for p in payloads]
+    reader_thread = threading.Thread(target=reader)
+    reader_thread.start()
+    for thread in writers:
+        thread.start()
+    for thread in writers:
+        thread.join()
+    stop.set()
+    reader_thread.join()
+
+    assert corrupt == []
+    assert target.read_text(encoding="utf-8") in valid
+    assert list(tmp_path.iterdir()) == [target]  # no stray temp files remain
+
+
+def test_failed_replacement_preserves_original_and_leaves_no_temp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "state.json"
+    atomic_write_text(target, "original")
+
+    def _boom(src: object, dst: object) -> None:
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(os, "replace", _boom)
+    with pytest.raises(OSError, match="replace failed"):
+        atomic_write_text(target, "replacement")
+
+    assert target.read_text(encoding="utf-8") == "original"
+    assert list(tmp_path.iterdir()) == [target]  # the temp was cleaned up on failure
 
 
 def test_durable_append_accumulates_lines(tmp_path: Path) -> None:

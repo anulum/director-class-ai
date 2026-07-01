@@ -19,6 +19,7 @@ directory entry is itself synced so the rename is durable.
 from __future__ import annotations
 
 import os
+import secrets
 from pathlib import Path
 
 __all__ = ["atomic_write_text", "durable_append_line"]
@@ -49,14 +50,25 @@ def atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8") -
     then renamed over ``path`` (an atomic operation on POSIX), and the parent
     directory is synced. A crash at any point leaves either the old file intact or
     the new file complete — never a truncated mix.
+
+    The temporary file name is unique per write (process id plus a random token).
+    Two writers targeting the same path — for example separate instances
+    persisting a shared approval queue — therefore never share one temporary file
+    and truncate each other's content before the rename; each write remains an
+    independent atomic swap. The temporary file is removed if the write or the
+    rename fails, so a failed write leaves no stray sibling behind.
     """
     path = Path(path)
-    tmp = path.with_name(f"{path.name}.tmp")
-    with tmp.open("w", encoding=encoding) as handle:
-        handle.write(text)
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(tmp, path)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{secrets.token_hex(8)}.tmp")
+    try:
+        with tmp.open("w", encoding=encoding) as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
     _fsync_dir(path.parent)
 
 
